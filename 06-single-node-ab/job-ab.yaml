@@ -1,0 +1,61 @@
+# Single-node A/B benchmark job. RUN_ID_PLACEHOLDER and EXTRA_FLAGS_PLACEHOLDER
+# are substituted by run-ab.sh (per arm).
+#
+# Sizing: one vLLM pod = 2,237,040 tokens KV capacity; ~36 sessions of ~61k
+# tokens fit. 80 sessions keeps the same 2.2x over-subscription as the
+# 4-pod saturation run (05-saturation), scaled down to one node.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: thunderagent-ab-bench
+  namespace: llm-d-program-aware-scheduling
+spec:
+  backoffLimit: 0
+  # Generous: the tr-nodecay no-release arm waits out the router's 1800s
+  # forced-resume timeout before its held sessions can run.
+  activeDeadlineSeconds: 5400
+  template:
+    metadata:
+      labels:
+        app: thunderagent-ab-bench
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: bench
+          image: python:3.12-slim
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              python /bench/benchmark.py \
+                --base-url http://thunderagent-ab:8300 \
+                --sessions 80 --turns 3 --preamble-words 40000 \
+                --max-tokens 80 --think-time 0.3 --ramp-seconds 10 \
+                --probe-interval 2 \
+                --min-hit-rate 0 --allow-backend-moves \
+                EXTRA_FLAGS_PLACEHOLDER \
+                --run-id "$RUN_ID" --out "/results/$RUN_ID" > /results/stdout.log 2>&1
+              echo "EXIT=$?" >> /results/stdout.log
+              cat /results/stdout.log
+              touch /results/DONE
+              sleep 3600
+          env:
+            - name: RUN_ID
+              value: RUN_ID_PLACEHOLDER
+          volumeMounts:
+            - name: bench-script
+              mountPath: /bench
+            - name: results
+              mountPath: /results
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 3Gi
+      volumes:
+        - name: bench-script
+          configMap:
+            name: thunderagent-bench-script
+        - name: results
+          emptyDir: {}

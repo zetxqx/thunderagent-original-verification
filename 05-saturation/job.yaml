@@ -1,0 +1,60 @@
+# In-cluster saturation benchmark job. RUN_ID_PLACEHOLDER is substituted by
+# run-saturation.sh. The script comes from ConfigMap thunderagent-bench-script
+# (created from 04-benchmark/benchmark.py).
+#
+# Sizing: each vLLM pod has 2,237,040 tokens of KV capacity. Each session
+# carries a ~40k-token unique context (40000 random words), so ~56 sessions
+# fill one pod and ~224 fill all four. 320 sessions guarantees sustained
+# over-subscription, so ThunderAgent's admission control must pause programs.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: thunderagent-saturation-bench
+  namespace: llm-d-program-aware-scheduling
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 3600
+  template:
+    metadata:
+      labels:
+        app: thunderagent-saturation-bench
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: bench
+          image: python:3.12-slim
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              python /bench/benchmark.py \
+                --base-url http://thunderagent-router:8300 \
+                --sessions 320 --turns 3 --preamble-words 40000 \
+                --max-tokens 80 --think-time 0.3 --ramp-seconds 20 \
+                --request-timeout 900 --probe-interval 2 \
+                --min-hit-rate 0.1 --expect-pauses --allow-backend-moves \
+                --run-id "$RUN_ID" --out "/results/$RUN_ID" > /results/stdout.log 2>&1
+              echo "EXIT=$?" >> /results/stdout.log
+              cat /results/stdout.log
+              touch /results/DONE
+              sleep 3600
+          env:
+            - name: RUN_ID
+              value: RUN_ID_PLACEHOLDER
+          volumeMounts:
+            - name: bench-script
+              mountPath: /bench
+            - name: results
+              mountPath: /results
+          resources:
+            requests:
+              cpu: "2"
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 4Gi
+      volumes:
+        - name: bench-script
+          configMap:
+            name: thunderagent-bench-script
+        - name: results
+          emptyDir: {}

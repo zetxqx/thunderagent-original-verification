@@ -1,0 +1,269 @@
+
+=== 1. /health ===
+{
+    "status": "ok",
+    "router_mode": "tr",
+    "scheduling_enabled": true,
+    "backends": [
+        "http://10.100.15.12:8000",
+        "http://10.100.2.5:8000",
+        "http://10.100.2.6:8000",
+        "http://10.100.3.5:8000"
+    ],
+    "programs_count": 0,
+    "reasoning_count": 0,
+    "acting_count": 0,
+    "paused_count": 0,
+    "per_backend": {
+        "http://10.100.15.12:8000": {
+            "total": 0,
+            "reasoning": 0,
+            "acting": 0,
+            "paused": 0,
+            "marked_for_pause": 0,
+            "future_paused_tokens": 0
+        },
+        "http://10.100.2.5:8000": {
+            "total": 0,
+            "reasoning": 0,
+            "acting": 0,
+            "paused": 0,
+            "marked_for_pause": 0,
+            "future_paused_tokens": 0
+        },
+        "http://10.100.2.6:8000": {
+            "total": 0,
+            "reasoning": 0,
+            "acting": 0,
+            "paused": 0,
+            "marked_for_pause": 0,
+            "future_paused_tokens": 0
+        },
+        "http://10.100.3.5:8000": {
+            "total": 0,
+            "reasoning": 0,
+            "acting": 0,
+            "paused": 0,
+            "marked_for_pause": 0,
+            "future_paused_tokens": 0
+        }
+    },
+    "profile_enabled": true
+}
+
+=== 2. /v1/models (known upstream bug: proxies to /models instead of /v1/models, so vLLM returns 404) ===
+{"detail":"Not Found"}
+
+=== 3a. program verify-a, turn 1 ===
+assistant: Hello from turn one.
+
+=== 3b. program verify-a, turn 2 (multi-turn, same prefix) ===
+assistant: Hello from turn two.
+usage: {'prompt_tokens': 38, 'total_tokens': 44, 'completion_tokens': 6, 'prompt_tokens_details': None, 'completion_tokens_details': None}
+
+=== 3c. program verify-b, turn 1 ===
+assistant: pong
+
+=== 4. /programs (program state tracking) ===
+{
+    "verify-a": {
+        "backend": "http://10.100.15.12:8000",
+        "context_len": 300,
+        "total_tokens": 44,
+        "step_count": 2,
+        "status": "acting",
+        "state": "active",
+        "profile": {
+            "step_count": 2,
+            "avg_prefill_s": 0.0,
+            "avg_decode_s": 0.0,
+            "avg_pause_s": 0.0002,
+            "avg_tool_call_s": 0.2998,
+            "avg_prompt_tokens": 26.5,
+            "avg_completion_tokens": 6.0,
+            "avg_cached_tokens": null,
+            "avg_kv_hit_rate": null
+        }
+    },
+    "verify-b": {
+        "backend": "http://10.100.2.5:8000",
+        "context_len": 173,
+        "total_tokens": 17,
+        "step_count": 1,
+        "status": "acting",
+        "state": "active",
+        "profile": {
+            "step_count": 1,
+            "avg_prefill_s": 0.0,
+            "avg_decode_s": 0.0,
+            "avg_pause_s": 0.0001,
+            "avg_tool_call_s": 0.0,
+            "avg_prompt_tokens": 15.0,
+            "avg_completion_tokens": 2.0,
+            "avg_cached_tokens": null,
+            "avg_kv_hit_rate": null
+        }
+    }
+}
+
+=== 5. /metrics (per-backend capacity + prefix cache) ===
+{
+    "metrics_enabled": true,
+    "metrics_interval": 5.0,
+    "backends": {
+        "http://10.100.15.12:8000": {
+            "url": "http://10.100.15.12:8000",
+            "active_program_tokens": 44,
+            "reasoning_program_tokens": 0,
+            "acting_program_tokens": 44,
+            "active_program_count": 1,
+            "reasoning_program_count": 0,
+            "acting_program_count": 1,
+            "active_program_tokens_ratio": 0.0,
+            "total_program_tokens": 44,
+            "paused_program_count": 0,
+            "future_paused_tokens": 0,
+            "shared_tokens": 0,
+            "buffer_per_program": 100,
+            "capacity_overflow": 0,
+            "healthy": true,
+            "monitoring": true,
+            "cache_config": {
+                "block_size": 16,
+                "num_gpu_blocks": 139815,
+                "total_tokens_capacity": 2237040
+            },
+            "metrics": {
+                "num_requests_running": 0,
+                "num_requests_waiting": 0,
+                "kv_cache_usage_perc": 0.0,
+                "prefix_cache_hit_rate": 0.9179,
+                "prefix_cache_queries": 1157373560,
+                "prefix_cache_hits": 1062362192,
+                "prompt_tokens_total": 1157373560,
+                "generation_tokens_total": 11680043,
+                "num_preemptions": 0,
+                "requests_completed": 11430,
+                "last_updated": 1789503810.0920188,
+                "history_size": 12
+            }
+        },
+        "http://10.100.2.5:8000": {
+            "url": "http://10.100.2.5:8000",
+            "active_program_tokens": 17,
+            "reasoning_program_tokens": 0,
+            "acting_program_tokens": 17,
+            "active_program_count": 1,
+            "reasoning_program_count": 0,
+            "acting_program_count": 1,
+            "active_program_tokens_ratio": 0.0,
+            "total_program_tokens": 17,
+            "paused_program_count": 0,
+            "future_paused_tokens": 0,
+            "shared_tokens": 0,
+            "buffer_per_program": 100,
+            "capacity_overflow": 0,
+            "healthy": true,
+            "monitoring": true,
+            "cache_config": {
+                "block_size": 16,
+                "num_gpu_blocks": 139815,
+                "total_tokens_capacity": 2237040
+            },
+            "metrics": {
+                "num_requests_running": 0,
+                "num_requests_waiting": 0,
+                "kv_cache_usage_perc": 0.0,
+                "prefix_cache_hit_rate": 0.0,
+                "prefix_cache_queries": 0,
+                "prefix_cache_hits": 0,
+                "prompt_tokens_total": 0,
+                "generation_tokens_total": 0,
+                "num_preemptions": 0,
+                "requests_completed": 0,
+                "last_updated": 1789503810.0994077,
+                "history_size": 12
+            }
+        },
+        "http://10.100.2.6:8000": {
+            "url": "http://10.100.2.6:8000",
+            "active_program_tokens": 0,
+            "reasoning_program_tokens": 0,
+            "acting_program_tokens": 0,
+            "active_program_count": 0,
+            "reasoning_program_count": 0,
+            "acting_program_count": 0,
+            "active_program_tokens_ratio": 0.0,
+            "total_program_tokens": 0,
+            "paused_program_count": 0,
+            "future_paused_tokens": 0,
+            "shared_tokens": 0,
+            "buffer_per_program": 100,
+            "capacity_overflow": 0,
+            "healthy": true,
+            "monitoring": true,
+            "cache_config": {
+                "block_size": 16,
+                "num_gpu_blocks": 139815,
+                "total_tokens_capacity": 2237040
+            },
+            "metrics": {
+                "num_requests_running": 0,
+                "num_requests_waiting": 0,
+                "kv_cache_usage_perc": 0.0,
+                "prefix_cache_hit_rate": 0.0,
+                "prefix_cache_queries": 0,
+                "prefix_cache_hits": 0,
+                "prompt_tokens_total": 0,
+                "generation_tokens_total": 0,
+                "num_preemptions": 0,
+                "requests_completed": 0,
+                "last_updated": 1789503810.106951,
+                "history_size": 12
+            }
+        },
+        "http://10.100.3.5:8000": {
+            "url": "http://10.100.3.5:8000",
+            "active_program_tokens": 0,
+            "reasoning_program_tokens": 0,
+            "acting_program_tokens": 0,
+            "active_program_count": 0,
+            "reasoning_program_count": 0,
+            "acting_program_count": 0,
+            "active_program_tokens_ratio": 0.0,
+            "total_program_tokens": 0,
+            "paused_program_count": 0,
+            "future_paused_tokens": 0,
+            "shared_tokens": 0,
+            "buffer_per_program": 100,
+            "capacity_overflow": 0,
+            "healthy": true,
+            "monitoring": true,
+            "cache_config": {
+                "block_size": 16,
+                "num_gpu_blocks": 139815,
+                "total_tokens_capacity": 2237040
+            },
+            "metrics": {
+                "num_requests_running": 0,
+                "num_requests_waiting": 0,
+                "kv_cache_usage_perc": 0.0,
+                "prefix_cache_hit_rate": 0.0,
+                "prefix_cache_queries": 0,
+                "prefix_cache_hits": 0,
+                "prompt_tokens_total": 0,
+                "generation_tokens_total": 0,
+                "num_preemptions": 0,
+                "requests_completed": 0,
+                "last_updated": 1789503810.113479,
+                "history_size": 12
+            }
+        }
+    }
+}
+
+=== 6. release both programs ===
+{"program_id":"verify-a","released":true}
+{"program_id":"verify-b","released":true}
+
+=== done ===

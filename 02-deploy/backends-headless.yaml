@@ -1,0 +1,20 @@
+# Headless service used only for DNS discovery of the vLLM backend pod IPs.
+# Selects the existing program-aware-vllm-decode pods; does not change them.
+apiVersion: v1
+kind: Service
+metadata:
+  name: thunderagent-vllm-backends
+  namespace: llm-d-program-aware-scheduling
+  labels:
+    app: thunderagent-original
+spec:
+  clusterIP: None
+  selector:
+    llm-d.ai/engine-type: vllm
+    llm-d.ai/guide: program-aware-scheduling
+    llm-d.ai/model: Qwen3-Coder-30B-A3B-FP8
+    llm-d.ai/role: decode
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

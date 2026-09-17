@@ -1,0 +1,95 @@
+# Original (upstream Python) ThunderAgent router in "tr" mode.
+# Image built by 01-image/build.sh from ThunderAgent commit 7ddc861.
+# Started via launcher.py (mounted from the ConfigMap below) instead of the
+# `thunderagent` CLI, because the upstream CLI silently ignores its flags -
+# see launcher.py for the explanation. Create the ConfigMap with:
+#   kubectl create configmap thunderagent-launcher \
+#     --from-file=launcher.py -n llm-d-program-aware-scheduling
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: thunderagent-original
+  namespace: llm-d-program-aware-scheduling
+  labels:
+    app: thunderagent-original
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: thunderagent-original
+  template:
+    metadata:
+      labels:
+        app: thunderagent-original
+    spec:
+      containers:
+        - name: router
+          image: us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/thunderagent-original:7ddc861
+          command: ["/bin/sh", "-c"]
+          # ThunderAgent takes a static --backends list; resolve the vLLM pod
+          # IPs from the headless service once at startup and wait until all
+          # 4 replicas are ready. If a backend pod is replaced later, restart
+          # this deployment to re-resolve.
+          args:
+            - |
+              set -eu
+              SVC=thunderagent-vllm-backends.llm-d-program-aware-scheduling.svc.cluster.local
+              EXPECTED=4
+              while true; do
+                IPS=$(getent hosts "$SVC" | awk '{print $1}' | sort -u || true)
+                N=$(printf '%s\n' "$IPS" | grep -c . || true)
+                [ "$N" -ge "$EXPECTED" ] && break
+                echo "waiting for backends: $N/$EXPECTED ready"
+                sleep 2
+              done
+              BACKENDS=$(printf '%s\n' "$IPS" | awk '{print "http://"$1":8000"}' | paste -sd, -)
+              echo "resolved backends: $BACKENDS"
+              exec python /launcher/launcher.py \
+                --host 0.0.0.0 --port 8300 \
+                --router tr --backend-type vllm \
+                --backends "$BACKENDS" \
+                --metrics --profile
+          volumeMounts:
+            - name: launcher
+              mountPath: /launcher
+          ports:
+            - name: http
+              containerPort: 8300
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+      volumes:
+        - name: launcher
+          configMap:
+            name: thunderagent-launcher
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: thunderagent-router
+  namespace: llm-d-program-aware-scheduling
+  labels:
+    app: thunderagent-original
+spec:
+  selector:
+    app: thunderagent-original
+  ports:
+    - name: http
+      port: 8300
+      targetPort: 8300

@@ -1,0 +1,71 @@
+# Per-pair ThunderAgent router for the parallel weka sweep.
+# Placeholders (run-weka-ab.sh): __NAME__ (e.g. thunderagent-ab-c16),
+# __MODE__ (tr | default), __ROUTER_EXTRA__, __BACKEND_IP__.
+# One router per concurrency pair, pointing at that pair's dedicated vLLM pod.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: __NAME__
+  namespace: llm-d-program-aware-scheduling
+  labels:
+    app: __NAME__
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: __NAME__
+  template:
+    metadata:
+      labels:
+        app: __NAME__
+        mode: __MODE__
+    spec:
+      containers:
+        - name: router
+          image: us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/thunderagent-original:7ddc861
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              exec python /launcher/launcher.py \
+                --host 0.0.0.0 --port 8300 \
+                --router __MODE__ --backend-type vllm \
+                --backends "http://__BACKEND_IP__:8000" \
+                --metrics --profile __ROUTER_EXTRA__
+          volumeMounts:
+            - name: launcher
+              mountPath: /launcher
+          ports:
+            - name: http
+              containerPort: 8300
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+          resources:
+            requests:
+              cpu: "2"
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 2Gi
+      volumes:
+        - name: launcher
+          configMap:
+            name: thunderagent-launcher
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: __NAME__
+  namespace: llm-d-program-aware-scheduling
+  labels:
+    app: __NAME__
+spec:
+  selector:
+    app: __NAME__
+  ports:
+    - name: http
+      port: 8300
+      targetPort: 8300

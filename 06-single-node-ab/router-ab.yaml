@@ -1,0 +1,73 @@
+# Dedicated A/B router: original ThunderAgent pointing at a SINGLE vLLM pod.
+# MODE_PLACEHOLDER (tr | default), ROUTER_EXTRA_PLACEHOLDER (e.g.
+# --use-acting-token-decay) and BACKEND_IP_PLACEHOLDER are substituted by
+# run-ab.sh. Reuses ConfigMap thunderagent-launcher from 02-deploy.
+# With one backend there is no placement decision, so the tr-vs-default
+# difference isolates admission control alone.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: thunderagent-ab
+  namespace: llm-d-program-aware-scheduling
+  labels:
+    app: thunderagent-ab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: thunderagent-ab
+  template:
+    metadata:
+      labels:
+        app: thunderagent-ab
+        mode: MODE_PLACEHOLDER
+    spec:
+      containers:
+        - name: router
+          image: us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/thunderagent-original:7ddc861
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              exec python /launcher/launcher.py \
+                --host 0.0.0.0 --port 8300 \
+                --router MODE_PLACEHOLDER --backend-type vllm \
+                --backends "http://BACKEND_IP_PLACEHOLDER:8000" \
+                --metrics --profile ROUTER_EXTRA_PLACEHOLDER
+          volumeMounts:
+            - name: launcher
+              mountPath: /launcher
+          ports:
+            - name: http
+              containerPort: 8300
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+      volumes:
+        - name: launcher
+          configMap:
+            name: thunderagent-launcher
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: thunderagent-ab
+  namespace: llm-d-program-aware-scheduling
+  labels:
+    app: thunderagent-ab
+spec:
+  selector:
+    app: thunderagent-ab
+  ports:
+    - name: http
+      port: 8300
+      targetPort: 8300
