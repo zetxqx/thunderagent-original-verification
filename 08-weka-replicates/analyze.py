@@ -285,28 +285,45 @@ def main():
     print("\n".join(L))
 
     # Figure: per-replicate points, so the spread is visible rather than averaged away.
-    plt.rcParams.update({"font.family": ["DejaVu Sans", "sans-serif"], "font.size": 13,
-                         "axes.spines.top": False, "axes.spines.right": False,
-                         "legend.frameon": False, "axes.linewidth": 2.0})
-    panels = [("throughput", "Throughput (output tok/s)", False),
-              ("hit_steady", "Hit rate, steady state (after 10 min)", False),
-              ("ttft_p50", "TTFT p50 (s)", True)]
-    fig, axes = plt.subplots(1, len(panels), figsize=(5.6 * len(panels), 5))
-    for ax, (key, title, logy) in zip(axes, panels):
-        for j, (arm, col, lab) in enumerate(ARMS):
-            vals = [c[key] for c in data[arm]]
-            ax.scatter([j] * len(vals), vals, s=110, color=col, zorder=3, label=lab)
-            if vals:
-                ax.hlines(st.mean(vals), j - 0.25, j + 0.25, color=col, linewidth=3)
-        ax.set_xticks(range(len(ARMS)), [a[0] for a in ARMS])
-        ax.set_title(title, fontsize=14)
-        if logy:
-            ax.set_yscale("log")
-        else:
-            ax.set_ylim(bottom=0)
-    axes[0].set_ylabel(f"one point per replicate (n={len(reps)}), bar = mean")
-    fig.suptitle("Same configuration, repeated: how stable is the result?", fontsize=15)
-    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    plt.rcParams.update({"font.family": ["Helvetica", "Arial", "DejaVu Sans", "sans-serif"],
+                         "font.size": 13, "axes.spines.top": False, "axes.spines.right": False,
+                         "legend.frameon": False, "axes.linewidth": 1.6,
+                         "xtick.major.width": 1.6, "ytick.major.width": 1.6})
+    panels = [("throughput", "Throughput", "output tokens / s", "{:.0f}", "higher"),
+              ("hit_steady", "Prefix-cache hit rate", "steady state (after 10 min)", "{:.3f}", "higher"),
+              ("ttft_p50", "TTFT p50", "seconds", "{:.1f}", "lower")]
+    fig, axes = plt.subplots(1, len(panels), figsize=(4.1 * len(panels), 4.3))
+    for ax, (key, title, unit, spec, better) in zip(axes, panels):
+        means, top = [], 0.0
+        for j, (arm, col, _) in enumerate(ARMS):
+            vals = np.array([c[key] for c in data[arm]], dtype=float)
+            if not len(vals):
+                means.append(np.nan)
+                continue
+            m = float(vals.mean())
+            means.append(m)
+            top = max(top, float(vals.max()))
+            ax.bar(j, m, width=0.62, color=col, alpha=0.2, edgecolor=col, linewidth=1.8, zorder=1)
+            ax.vlines(j, vals.min(), vals.max(), color=col, linewidth=1.8, zorder=2)
+            jit = np.linspace(-0.13, 0.13, len(vals)) if len(vals) > 1 else [0.0]
+            ax.scatter(j + jit, vals, s=60, color=col, edgecolor="white", linewidth=1.0, zorder=3)
+            ax.annotate(spec.format(m), (j, vals.max()), xytext=(0, 7), textcoords="offset points",
+                        ha="center", va="bottom", fontsize=12, fontweight="bold", color=col)
+        if len(means) == 2 and all(np.isfinite(means)) and min(means) > 0:
+            r = means[1] / means[0] if better == "higher" else means[0] / means[1]
+            ax.text(0.5, 0.97, f"{r:.0f}x {better}" if r >= 10 else f"{r:.1f}x {better}",
+                    transform=ax.transAxes, ha="center", va="top", fontsize=13,
+                    fontweight="bold", color="#333333")
+        ax.set_xticks(range(len(ARMS)), ["default\n(proxy)", "tr-decay\n(ThunderAgent)"])
+        ax.set_xlim(-0.6, len(ARMS) - 0.4)
+        ax.set_ylim(0, top * 1.32 if top else 1)
+        ax.set_title(title, fontsize=14, fontweight="bold", loc="left")
+        ax.set_ylabel(unit)
+        ax.tick_params(axis="x", length=0)
+    fig.text(0.01, 0.01, f"n = {len(reps)} replicates per arm at c = 128. "
+             "Bar = mean, whisker = min-max, dots = individual runs.",
+             fontsize=10.5, color="#555555", ha="left", va="bottom")
+    fig.tight_layout(rect=(0, 0.05, 1, 1), w_pad=2.5)
     for ext in ("png", "pdf"):
         fig.savefig(root / f"replicates.{ext}", dpi=300 if ext == "png" else None,
                     bbox_inches="tight", pad_inches=0.06)
