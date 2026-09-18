@@ -15,7 +15,7 @@ Written 2026-09-18 so a fresh session can continue without replaying the history
 
 ## Cluster state right now
 
-- Helm release `program-aware-scheduling` (the main EPP, 1 replica, envoy sidecar, service port 80 -> envoy 8081, metrics 9090): revision 22, back at the step 09 state: image `thunder-agent-v3`, thunder config, envoy ext_proc `message_timeout` 1000 s. `12-llm-d-router-pool/run-pool.sh` upgrades it per cell with `main-values.yaml` (2400 s timeout) and reverts are documented in `08-cluster-changes.md`.
+- Helm release `program-aware-scheduling` (the main EPP, 1 replica, envoy sidecar, service port 80 -> envoy 8081, metrics 9090): revision 23 (2026-09-18 11:30): image `thunder-agent-v3`, **baseline** plugin config (`12-llm-d-router-pool/baseline-plugins.yaml`) and envoy `message_timeout` 2400 s, left there by the interrupted first step 13 launch; revision 22 was the step 09 state (thunder config, 1000 s). Whatever arm ran last leaves its config on the release. `12-llm-d-router-pool/run-pool.sh` upgrades it per cell with `main-values.yaml` (2400 s timeout) and reverts are documented in `08-cluster-changes.md`.
 - The three step 10 lane EPPs, their pod labels and the `thunder-lane-auth-delegator` binding were removed on 2026-09-18 (`10-llm-d-router-replicates/teardown-lanes.sh`); `deploy-lanes.sh` recreates them if single-pod work resumes.
 - ServiceAccount `thunderagent-metrics-reader` (namespace) with a ClusterRole on `/metrics` and `/debug/plugins/state`: the EPP metrics port enforces kube-rbac; use `kubectl create token thunderagent-metrics-reader -n <ns>` as a bearer. The EPP's own service account gets 403.
 - The original Python router `thunderagent-original` (step 02) is still deployed and idle.
@@ -61,7 +61,7 @@ Written 2026-09-18 so a fresh session can continue without replaying the history
 
 ## Open items, in the order they were agreed
 
-1. Step 13 sweep: two arms, six levels, 30-minute cells, about 8 hours. Files are ready; not launched.
+1. Step 13 sweep: two arms, six levels, 30-minute cells, about 9 hours. A first launch at 11:30 on 2026-09-18 was interrupted after the driver started the `epp-baseline-c48` cell; the cell finished inside the pod (job `weka-bench-epp-baseline-c48`, bench container sleeping) but nothing was collected, so it is voided: delete that job and the `results/sweep-20260918-113021-t1900` directory before relaunching.
 2. Commit and push this repo (steps 09 to 13, the step 08 addenda, the docs); the user asks for commits explicitly.
 3. Proposal Part 3 (origin-only resume): implement the `resumePlacement` knob, rebuild `thunder-agent-v4`, one pool arm.
 4. Proposals Part 1 (queue aging) and Part 2 (interval plus smoothing) remain unrun; Part 2's premise was weakened by step 10 (continuous admission cost hit rate under upstream's phantom regime; see step 10 RESULTS).
