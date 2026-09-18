@@ -1,0 +1,74 @@
+run id: cal-20260918-004115-c128-t1900  concurrency=128 replicates=1 window=600s arms=thunder client_timeout=1900s
+[r1] ===== epp-thunder-r1 (arm=thunder lane=a pod=program-aware-vllm-decode-9c9b54cb6-f9qsh) =====
+[r1] reset_prefix_cache: 200
+[r1] [epp-thunder-r1] epp pod thunder-lane-a-epp-7cbb9d68f6-p9nd5, flow control lines: 1
+[r1] 00:42:30 [epp-thunder-r1] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[r1] 00:43:32 [epp-thunder-r1] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[r1] 00:44:35 [epp-thunder-r1] run 0 idle 0 paused 70 holds 0 pauses 70 resumes 0 queue 1
+[r1] 00:45:38 [epp-thunder-r1] run 30 idle 2 paused 70 holds 36 pauses 112 resumes 42 queue 0
+[r1] 00:46:42 [epp-thunder-r1] run 0 idle 0 paused 71 holds 65 pauses 155 resumes 84 queue 0
+[r1] 00:47:45 [epp-thunder-r1] run 27 idle 1 paused 73 holds 96 pauses 211 resumes 138 queue 0
+[r1] 00:48:49 [epp-thunder-r1] run 18 idle 1 paused 72 holds 135 pauses 265 resumes 193 queue 0
+[r1] 00:49:52 [epp-thunder-r1] run 25 idle 1 paused 73 holds 168 pauses 314 resumes 241 queue 0
+[r1] 00:50:56 [epp-thunder-r1] run 8 idle 0 paused 77 holds 199 pauses 364 resumes 287 queue 0
+[r1] 00:51:59 [epp-thunder-r1] run 0 idle 0 paused 79 holds 234 pauses 424 resumes 345 queue 0
+[r1] 00:53:02 [epp-thunder-r1] run 15 idle 0 paused 83 holds 268 pauses 479 resumes 396 queue 0
+[r1] 00:54:06 [epp-thunder-r1] run 18 idle 0 paused 85 holds 298 pauses 519 resumes 434 queue 0
+[r1] 00:55:09 [epp-thunder-r1] run 25 idle 1 paused 87 holds 327 pauses 550 resumes 463 queue 0
+[r1] 00:56:12 [epp-thunder-r1] run 0 idle 35 paused 93 holds 355 pauses 574 resumes 481 queue 0
+[r1] └───────┴───────────┘
+[r1] EXIT=0
+[r1] REPORTS_COMPLETE=yes
+
+===== analysis =====
+# Step 10: replicated A/B through the EPP, 1 run(s) of the same configuration
+
+Each cell shows mean (min-max) over replicates.
+
+| metric | epp-sticky | epp-thunder | ratio of means |
+|---|---|---|---|
+| throughput (output tok/s) | - | 539 | - |
+| requests completed | - | 727 | - |
+| hit rate, whole window | - | 0.325 | - |
+| hit rate, first 10 min (warm-up) | - | 0.341 | - |
+| hit rate, after 10 min (STEADY) | - | 0.268 | - |
+| TTFT p50 (s) | - | 4.4 | - |
+| TTFT p90 (s) | - | 74.9 | - |
+| requests with zero cache hit | - | 0.63 | - |
+| errors | - | 0 | - |
+| EPP holds (paused + new) | - | 355 | - |
+| EPP pauses | - | 574 | - |
+| EPP resumes | - | 481 | - |
+| EPP max programs paused at once | - | 93 | - |
+| EPP forced admissions | - | 0 | - |
+| EPP mean queue wait (s) | - | 61.8 | - |
+| EPP max queue size | - | 170 | - |
+
+## Against step 08 (Python router, same protocol)
+
+| metric | py default | epp-sticky | py tr-decay | epp-thunder |
+|---|---|---|---|---|
+| throughput (output tok/s) | 221 | - | 469 | 539 |
+| requests completed | 1059 | - | 1994 | 727 |
+| hit rate, after 10 min (STEADY) | 0.008 | - | 0.685 | 0.268 |
+| TTFT p50 (s) | 52.7 | - | 3.0 | 4.4 |
+| TTFT p90 (s) | 92.5 | - | 18.0 | 74.9 |
+
+## Same sessions only (turns completed)
+
+Restricted to the sessions BOTH arms of a replicate started, so the faster arm pulling extra traces out of the corpus cannot flatter it.
+
+| replicate | shared sessions | turns: epp-sticky | turns: epp-thunder | ratio |
+|---|---|---|---|---|
+
+figure: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/10-llm-d-router-replicates/results/cal-20260918-004115-c128-t1900/replicates.png
+Traceback (most recent call last):
+  File "/Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/10-llm-d-router-replicates/analyze.py", line 401, in <module>
+    main()
+  File "/Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/10-llm-d-router-replicates/analyze.py", line 397, in main
+    make_error_figure(root, reps)
+  File "/Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/10-llm-d-router-replicates/analyze.py", line 206, in make_error_figure
+    share = 100 * a["n_err"] / (a["n_ok"] + a["n_err"])
+            ~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~
+ZeroDivisionError: division by zero
+artifacts: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/10-llm-d-router-replicates/results/cal-20260918-004115-c128-t1900

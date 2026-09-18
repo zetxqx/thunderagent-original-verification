@@ -1,0 +1,175 @@
+# Bench Job template for one cell (one arm x one concurrency).
+# Placeholders substituted by run-weka-ab.sh:
+#   __CELL__         cell name (e.g. tr-decay-c16) - names Job + ConfigMap, enables parallel cells
+#   __RUN_ID__       cell run id (e.g. weka-20260916-...-tr-decay-c16)
+#   __VLLM_URLS__    comma-separated http://<ip>:8000 of every pod in the pool (prober scrapes each)
+#   __ROUTER__       this lane's EPP service name (thunder-lane-X-epp; port 80 -> envoy 8081, 9090 -> metrics)
+#   __MAX_TRACES__   0 for real cells, 3 for smoke
+#   __RUN_BUDGET__   hard kill budget for inference-perf (stage timeout + slack)
+#   __PROBE_MAX_SECONDS__  prober deadline, so sampling stops with the stage
+#
+# Containers:
+#   initContainer fetch-traces: downloads + filters the trace slice (filter_traces.py)
+#   bench:  official inference-perf v0.7.0 (digest-pinned), runs the rendered config
+#   prober: 2s time series (vLLM pod metrics + EPP thunder_agent and flow-control metrics)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: weka-bench-__CELL__
+  namespace: llm-d-program-aware-scheduling
+spec:
+  backoffLimit: 0
+  # 12h: run (~1h) + 8h post-DONE grace so results survive an unattended
+  # night even if the local driver dies; driver deletes the job after copy.
+  activeDeadlineSeconds: 43200
+  template:
+    metadata:
+      labels:
+        app: weka-bench
+        cell: __CELL__
+    spec:
+      restartPolicy: Never
+      # Projects a token the prober sends to the EPP metrics port (kube-rbac).
+      serviceAccountName: thunderagent-metrics-reader
+      # The load generator needs ~24 cores (see the bench resources note), but
+      # the default pool only has ~17 free per node. The H100 nodes have 103
+      # allocatable cores with ~90 free, fenced off by this taint for GPU
+      # workloads; the bench uses no GPU and leaves vLLM (limit 16 cores)
+      # ample headroom. Each cell manifest records where its bench pod landed
+      # so CPU contention with the measured pod can be checked afterwards.
+      # Run the load generator on the non-spot CPU pool. Step 08 placed it on
+      # the H100 nodes for 24 cores, a diagnosis made under the v0.7.0 permit
+      # bug; with the fixed generator it uses about 2.3 cores median and 10
+      # at peak for 338 sessions, which the default pool can host, and a spot
+      # preemption of an H100 node then no longer takes the bench pod with it.
+      nodeSelector:
+        cloud.google.com/gke-nodepool: default-pool
+      initContainers:
+        - name: fetch-traces
+          image: python:3.12-alpine
+          command: ["python", "/scripts/filter_traces.py"]
+          env:
+            - name: OUT_DIR
+              value: /data/traces
+            - name: MANIFEST
+              value: /results/trace-manifest.json
+            - name: MAX_TRACES
+              value: "__MAX_TRACES__"
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+            - name: data
+              mountPath: /data
+            - name: results
+              mountPath: /results
+      containers:
+        - name: bench
+          # quay.io/inference-perf/inference-perf:v0.7.0 (official upstream)
+          image: __BENCH_IMAGE__
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              # inference-perf v0.7.0 can finish a timeout-truncated stage,
+              # write every report, and then never exit (see
+              # HANG-INVESTIGATION.md / UPSTREAM-ISSUES.md issue 1). Bound it:
+              # by the time the budget expires the reports are already on disk,
+              # so killing it costs nothing, and DONE is written unconditionally
+              # so collection never depends on the exit path.
+              timeout -s INT __RUN_BUDGET__ \
+                inference-perf --config_file /etc/config/config.yml > /results/bench-stdout.log 2>&1 &
+              BENCH_PID=$!
+              # validation.json is the LAST report written. Once it exists the
+              # run has produced everything we collect, so stop waiting on an
+              # exit that may never come: give it 15s to finish flushing, then
+              # end it. The timeout above stays as the backstop for the case
+              # where reports are never written at all.
+              while kill -0 "$BENCH_PID" 2>/dev/null; do
+                if [ -f /results/report/validation.json ]; then
+                  echo "reports complete; stopping benchmark process" >> /results/bench-stdout.log
+                  sleep 15
+                  kill -INT "$BENCH_PID" 2>/dev/null
+                  sleep 10
+                  kill -KILL "$BENCH_PID" 2>/dev/null
+                  break
+                fi
+                sleep 5
+              done
+              wait "$BENCH_PID" 2>/dev/null
+              echo "EXIT=$?" >> /results/bench-stdout.log
+              if [ -f /results/report/validation.json ]; then
+                echo "REPORTS_COMPLETE=yes" >> /results/bench-stdout.log
+              else
+                echo "REPORTS_COMPLETE=no" >> /results/bench-stdout.log
+              fi
+              tail -30 /results/bench-stdout.log
+              touch /results/DONE
+              sleep 28800
+          env:
+            - name: RUN_ID
+              value: __RUN_ID__
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: llm-d-hf-token
+                  key: HF_TOKEN
+                  optional: true
+          resources:
+            # The load generator is CPU-bound building full-history prompts
+            # (upstream #648). Calibration round 1 with 4/8 CPU capped
+            # effective concurrency at 17-19 no matter what concurrent_sessions
+            # said, leaving the engine idle. num_workers are real PROCESSES, so
+            # cores translate into in-flight requests: keep CPU >= num_workers.
+            # H100 nodes have 103 allocatable cores with ~90 free, so this fits
+            # alongside vLLM, and three lanes still schedule on three nodes.
+            requests:
+              cpu: "8"
+              memory: 16Gi
+            limits:
+              cpu: "16"
+              memory: 32Gi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: results
+              mountPath: /results
+        - name: prober
+          image: python:3.12-alpine
+          command: ["python", "/scripts/prober.py"]
+          env:
+            - name: VLLM_URLS
+              value: __VLLM_URLS__
+            - name: EPP_METRICS_URL
+              value: http://__ROUTER__:9090/metrics
+            - name: OUT_DIR
+              value: /results
+            - name: INTERVAL
+              value: "2"
+            # Stop sampling when the stage window has elapsed even if DONE
+            # never appears, so a hung exit cannot pad the time series with
+            # idle-system samples (that artifact faked a concurrency collapse
+            # in calibration round 2).
+            - name: MAX_SECONDS
+              value: "__PROBE_MAX_SECONDS__"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: 256Mi
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+            - name: results
+              mountPath: /results
+      volumes:
+        - name: config
+          configMap:
+            name: weka-bench-config-__CELL__
+        - name: scripts
+          configMap:
+            name: weka-bench-scripts
+        - name: data
+          emptyDir: {}
+        - name: results
+          emptyDir: {}

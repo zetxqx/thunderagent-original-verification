@@ -1,0 +1,58 @@
+
+=== 1. running build ===
+inference_extension_info{build_ref="dev",commit="513f072797a8946f08b5dba8851a4fa24d1e35a5"} 1
+PASS  build info metric present
+
+=== 2. plugin loaded with the faithful config (new metrics exist only in this build) ===
+metrics: thunder_agent_pauses_total thunder_agent_pod_capacity_tokens thunder_agent_pod_utilization thunder_agent_programs thunder_agent_rebinds_total thunder_agent_releases_total thunder_agent_resumes_total thunder_agent_session_final_releases_total thunder_agent_starvation_promotions_total thunder_agent_ttl_evictions_total 
+PASS  thunder_agent_pauses_total exists (v3 build)
+PASS  thunder_agent_resumes_total exists (v3 build)
+PASS  thunder_agent_sheds_total absent (old build)
+
+=== 3. per-pod capacity is the real scraped value ===
+thunder_agent_pod_capacity_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-f9qsh-rank-0",source="real"} 2.23704e+06
+thunder_agent_pod_capacity_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-gkzmr-rank-0",source="real"} 2.23704e+06
+thunder_agent_pod_capacity_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-kccxc-rank-0",source="real"} 2.23704e+06
+thunder_agent_pod_capacity_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-mngw2-rank-0",source="real"} 2.23704e+06
+PASS  4 pods report source=real with 2,237,040 tokens (got 4)
+
+=== 4. state dump and counters before traffic ===
+{"totalPrograms": 1, "totalInflightTokens": 0, "totalCommittedTokens": 18, "pausedPrograms": 0, "bytesPerToken": 7.597590870616543, "pausesTotal": 0, "resumesTotal": 0, "pods": {"llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-mngw2-rank-0": {"programs": 1, "tokens": 18, "decayed": 2.8952890775002793e-13}}}
+baseline: programs=1 releases new=3 reasoning=5 rebinds=0 final_releases=2
+PASS  state dump reachable
+
+=== 5a. session smoke-a, turn 1 ===
+assistant: Hello from turn one.
+HTTP/1.1 200 OK
+PASS  turn 1 answered
+
+=== 5b. session smoke-a, turn 2 (same history, grown) ===
+assistant: Hello from turn two.
+PASS  turn 2 answered
+
+=== 5c. session smoke-b, turn 1 ===
+assistant: Hello from b
+PASS  smoke-b answered
+
+=== 6. state dump after traffic: two programs, committed tokens, bound pods ===
+{"totalPrograms": 3, "totalInflightTokens": 0, "totalCommittedTokens": 80, "pausedPrograms": 0, "bytesPerToken": 8.229593593424845, "pausesTotal": 0, "resumesTotal": 0, "pods": {"llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-gkzmr-rank-0": {"programs": 1, "tokens": 18, "decayed": 14.767252193368309}, "llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-kccxc-rank-0": {"programs": 1, "tokens": 44, "decayed": 29.57137706563579}, "llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-mngw2-rank-0": {"programs": 1, "tokens": 18, "decayed": 5.4752727564352115e-14}}}
+PASS  2 new programs tracked
+PASS  committed tokens > 0
+PASS  no in-flight tokens left
+PASS  no program paused
+PASS  every bound pod carries tokens
+
+=== 7. class accounting and stickiness ===
+deltas: releases new=2 reasoning=1 rebinds=0; totals holds=0 pauses=0
+PASS  two first turns dispatched as class=new
+PASS  one follow-up turn dispatched as class=reasoning
+PASS  no rebinds: smoke-a-1789689613 stayed on its pod
+PASS  no holds, no pauses at real capacity
+
+=== 8. session-final releases smoke-a-1789689613 ===
+assistant: Hello from turn two.
+{"totalPrograms": 2, "totalInflightTokens": 0, "totalCommittedTokens": 36, "pausedPrograms": 0, "bytesPerToken": 8.02578013789777, "pausesTotal": 0, "resumesTotal": 0, "pods": {"llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-gkzmr-rank-0": {"programs": 1, "tokens": 18, "decayed": 1.7717914598546203}, "llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-mngw2-rank-0": {"programs": 1, "tokens": 18, "decayed": 6.569293585019901e-15}}}
+PASS  one program released by the final turn
+PASS  session_final_releases_total advanced by 1
+
+=== 0 check(s) failed ===

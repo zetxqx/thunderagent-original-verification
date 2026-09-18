@@ -1,0 +1,73 @@
+# inference-perf config TEMPLATE for the weka -> ThunderAgent A/B sweep.
+# Rendered per cell by run-weka-ab.sh: __CONCURRENCY__, __STAGE_TIMEOUT__ and
+# __ROUTER__ (per-pair router service) are substituted; the rendered copy is
+# saved with each cell's results and sha256-recorded in the cell manifest.
+#
+# Image: quay.io/inference-perf/inference-perf:v0.7.0 (official upstream).
+# Every field below verified to exist in the v0.7.0 tag.
+load:
+  type: trace_session_replay
+  stages:
+    # Whole filtered corpus at fixed concurrency, truncated by timeout (s).
+    # num_sessions omitted -> all sessions from the corpus; identical work
+    # list across cells, only concurrency differs.
+    - concurrent_sessions: __CONCURRENCY__
+      timeout: __STAGE_TIMEOUT__
+  # Worker PROCESSES, so this is the real parallelism of request construction.
+  # Must be set explicitly: the default is cpu_count(), which inside a
+  # container reports the node's 103 cores and would oversubscribe the limit.
+  # Keep <= the CPU request in job-weka.yaml.
+  num_workers: 24
+  worker_max_concurrency: 100
+  # Client patience. 1900 s (above the 1800 s forced-admission backstop) for
+  # the main step 10 run; 600 s reproduces step 08's client, which kills the
+  # longest-held sessions and drops their remaining turns (see RESULTS.md).
+  # Rendered per run by run-replicates.sh.
+  request_timeout: __REQUEST_TIMEOUT__
+  # PINNED: deterministic session shuffle so cells are pair-able.
+  base_seed: 20260915
+api:
+  type: chat
+  streaming: true
+  # ThunderAgent (original) resolves program_id from this header
+  # (app.py get_program_id, resolution order 3).
+  session_id_header_key: x-session-id
+server:
+  type: vllm
+  model_name: Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8
+  base_url: http://__ROUTER__:80
+tokenizer:
+  # Must match the served model: hash blocks are 64-token aligned.
+  pretrained_model_name_or_path: Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8
+data:
+  type: weka_trace_replay
+  weka_trace_replay:
+    # Filtered per-trace files produced by the fetch-traces initContainer
+    # (turns <= 400, max input tokens <= 245000; see filter_traces.py).
+    trace_directory: /data/traces
+    num_dataset_entries: 400
+    use_static_model: true
+    static_model_name: "Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8"
+    default_block_size: 64
+    skip_invalid_files: true
+    # Keep BOTH caps consistent (they interact): real think-time
+    # distribution preserved up to 10s.
+    trace_idle_gap_cap_seconds: 10.0
+    max_wait_ms: 10000
+    datagen_workers: 8
+report:
+  request_lifecycle:
+    summary: true
+    per_stage: true
+    per_request: true
+    # MANDATORY: drop raw text or the per-request report is ~1MB/request.
+    per_request_fields:
+      request: false
+      response: false
+      response_chunks: false
+      info: true
+      computed_metrics: true
+    use_server_output_tokens: true
+storage:
+  local_storage:
+    path: /results/report

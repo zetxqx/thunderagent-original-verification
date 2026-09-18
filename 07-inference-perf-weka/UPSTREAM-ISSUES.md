@@ -148,3 +148,14 @@ ERROR Program wekatrace132_... has no valid backend
 The error is raised at the `logger.error("Program %s has no valid backend")` branch in `scheduler/router.py` (step 3 of `update_program_before_request`). Suggested fix: hold the program lock across the pause, or have the request path re-resolve/await admission instead of failing when it finds no backend.
 
 Reproduction: saturate a single backend (KV over-subscribed ~2x) with `--router tr --use-acting-token-decay` and drive ~50 concurrent multi-turn sessions for 45 minutes; the scheduler then pauses programs frequently enough to hit the window.
+
+
+## Issue 4: a request that ends without a usage chunk leaves its program REASONING forever
+
+**Where**: `ThunderAgent/scheduler/vllm_request_processor.py:205-210`. `on_usage` is the only transition back to ACTING and it runs in a `finally` block guarded by `total_tokens is not None`; the comment acknowledges the step is "not finalized" otherwise.
+
+**When it happens**: the client disconnects before the stream ends (its own timeout), or the proxy fails mid-stream. With inference-perf at `request_timeout: 600` this happened 45 to 50 times per 45-minute tr-decay cell in step 08.
+
+**Effect**: the program keeps `status=REASONING` with its full `total_tokens`. REASONING programs are never decayed (decay applies to ACTING), never paused (the sweep only marks them, and the mark matures on a response that never arrives) and never evicted (no TTL). Each one is a permanent occupant of the backend's capacity model. Step 08 measured the router's REASONING count reaching 76 to 83 while vLLM ran 17 to 20 requests; in tr mode this throttled live admissions and changed the measured regime (see `08-weka-replicates/RESULTS.md`, addendum).
+
+**Fix**: run `update_program_after_request` (or at least the ACTING transition and an `acting_since` stamp) from the `finally` block regardless of whether usage arrived, using the last known token count; and treat a client disconnect on a waiting request as a release from the waiting pool. The llm-d-router port does both through the director's guaranteed end-of-stream callback.

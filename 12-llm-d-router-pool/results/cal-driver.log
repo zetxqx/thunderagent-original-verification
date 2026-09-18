@@ -1,0 +1,65 @@
+run id: cal-20260918-010226-c338-t1900  concurrency=338 replicates=1 window=600s arms=thunder client_timeout=1900s
+pool: program-aware-vllm-decode-9c9b54cb6-f9qsh program-aware-vllm-decode-9c9b54cb6-gkzmr program-aware-vllm-decode-9c9b54cb6-kccxc program-aware-vllm-decode-9c9b54cb6-mngw2
+===== epp-thunder-r1 (arm=thunder) =====
+reset_prefix_cache program-aware-vllm-decode-9c9b54cb6-f9qsh: 200
+reset_prefix_cache program-aware-vllm-decode-9c9b54cb6-gkzmr: 200
+reset_prefix_cache program-aware-vllm-decode-9c9b54cb6-kccxc: 200
+reset_prefix_cache program-aware-vllm-decode-9c9b54cb6-mngw2: 200
+[epp-thunder-r1] epp pod program-aware-scheduling-epp-74478dfb7b-9pjq6  Scorers: [thunder/thunder-agent: 1.000000]  flow-control=1
+01:03:46 [epp-thunder-r1] paused 0 holds 0 pauses 0 queued 0
+01:04:49 [epp-thunder-r1] paused 0 holds 0 pauses 0 queued 0
+01:05:51 [epp-thunder-r1] paused 113 holds 7 pauses 137 queued 226
+01:06:56 [epp-thunder-r1] paused 119 holds 96 pauses 287 queued 232
+01:08:00 [epp-thunder-r1] paused 127 holds 156 pauses 464 queued 242
+01:09:04 [epp-thunder-r1] paused 135 holds 211 pauses 651 queued 262
+01:10:08 [epp-thunder-r1] paused 142 holds 269 pauses 819 queued 276
+01:11:12 [epp-thunder-r1] paused 150 holds 322 pauses 975 queued 292
+01:12:16 [epp-thunder-r1] paused 155 holds 379 pauses 1115 queued 310
+01:13:20 [epp-thunder-r1] paused 163 holds 443 pauses 1258 queued 324
+01:14:24 [epp-thunder-r1] paused 162 holds 499 pauses 1397 queued 328
+01:15:29 [epp-thunder-r1] paused 175 holds 591 pauses 1536 queued 178
+01:16:33 [epp-thunder-r1] paused 197 holds 667 pauses 1634 queued 24
+01:17:37 [epp-thunder-r1] paused 249 holds 678 pauses 1697 queued 0
+./run-pool.sh: line 66: 55676 Terminated: 15          ( while ! kubectl exec "$POD" -n "$NS" -c bench -- test -f /results/DONE 2> /dev/null; do
+    kubectl top pod -n "$NS" --no-headers 2> /dev/null | awk -v t="$(date +%s)" -v e="$DEPLOY" -v b="$POD" '$1 ~ e || $1 ~ /program-aware-vllm-decode/ || $1 == b {print t","$1","$2","$3}' >> "$CELL_DIR/cpu-usage.csv"; sleep 30;
+done )
+└───────┴───────────┘
+EXIT=0
+REPORTS_COMPLETE=yes
+
+===== analysis =====
+# Step 12: three EPP policies on the 4-pod pool, 1 replicate(s)
+
+Each cell shows mean (min-max) over replicates; ratios are against the baseline arm.
+
+| metric | epp-baseline | epp-affinity | epp-thunder | affinity / baseline | thunder / baseline |
+|---|---|---|---|---|---|
+| throughput (output tok/s) | - | - | 1574 | - | - |
+| requests completed | - | - | 2210 | - | - |
+| sessions that issued a request | - | - | 338 | - | - |
+| hit rate, whole window | - | - | 0.176 | - | - |
+| hit rate, first 10 min | - | - | 0.193 | - | - |
+| hit rate, after 10 min (STEADY) | - | - | 0.115 | - | - |
+| TTFT p50 (s) | - | - | 3.7 | - | - |
+| TTFT p90 (s) | - | - | 57.8 | - | - |
+| requests with zero cache hit | - | - | 0.74 | - | - |
+| errors | - | - | 0 | - | - |
+| pool in-flight requests (mean) | - | - | 151.1 | - | - |
+| pool KV usage (mean) | - | - | 0.75 | - | - |
+| EPP holds | - | - | 678 | - | - |
+| EPP pauses | - | - | 1697 | - | - |
+| EPP resumes | - | - | 1448 | - | - |
+| EPP max programs paused | - | - | 249 | - | - |
+| EPP forced admissions | - | - | 0 | - | - |
+
+## Per pod (steady-state hit rate / mean KV / mean in flight), first replicate of each arm
+
+| pod | epp-baseline | epp-affinity | epp-thunder |
+|---|---|---|---|
+| 10-100-15-20 | - | - | 0.13 / 0.75 / 36 |
+| 10-100-15-21 | - | - | 0.11 / 0.75 / 38 |
+| 10-100-2-6 | - | - | 0.09 / 0.75 / 38 |
+| 10-100-3-12 | - | - | 0.13 / 0.75 / 38 |
+
+figure: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/12-llm-d-router-pool/results/cal-20260918-010226-c338-t1900/pool.png
+artifacts: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/12-llm-d-router-pool/results/cal-20260918-010226-c338-t1900

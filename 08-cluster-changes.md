@@ -41,6 +41,36 @@ or `kubectl rollout undo deploy/program-aware-vllm-decode -n llm-d-program-aware
 
 Only 3 distinct nodes now (two pods share ...-6j7g), so a 3-lane parallel sweep still works, but the two pods on 6j7g share a node's CPU/network - avoid putting a comparison pair across those two.
 
+## 2026-09-17: EPP upgraded to the rewritten thunder-agent plugin (step 09)
+
+**Change**: Helm release `program-aware-scheduling` upgraded from revision 10 to 11: EPP image `llm-d-router-endpoint-picker:thunder-agent-v2` -> `thunder-agent-v3` (built from the working tree recorded in `09-llm-d-router-smoke/image-source.md`) and plugin config replaced by `09-llm-d-router-smoke/thunder-plugins.yaml` (upstream tr-decay defaults, no utilization filter, request TTL 0). The chart used is `llm-d-router/config/charts/llm-d-router-standalone` from that checkout, so the rendered envoy config map is that chart's default rather than the newer one revision 10 carried; the EPP and envoy came up and served traffic.
+
+**Why**: verify the port on the live cluster (step 09) before running the step 08 protocol through it.
+
+**Revert**: `helm rollback program-aware-scheduling 10 -n llm-d-program-aware-scheduling` (revision 10 is intact; image `thunder-agent-v2` still exists in the registry).
+
+**Also created**: ServiceAccount `thunderagent-metrics-reader` (namespace `llm-d-program-aware-scheduling`), ClusterRole and ClusterRoleBinding of the same name, granting GET on `/metrics` and `/debug/plugins/state` for the EPP's kube-rbac-protected metrics port. Revert: `kubectl delete -f 09-llm-d-router-smoke/metrics-reader-rbac.yaml`.
+
+## 2026-09-17: three lane EPPs for step 10
+
+**Change**: pods `program-aware-vllm-decode-9c9b54cb6-{f9qsh,gkzmr,mngw2}` labeled `thunder-lane=a|b|c`; three EPP deployments `thunder-lane-{a,b,c}-epp` (each with its envoy sidecar, service, service account, namespaced role, config maps `thunder-lane-X-epp` and `thunder-lane-X-envoy`) applied from rendered manifests under `10-llm-d-router-replicates/results/`; ClusterRoleBinding `thunder-lane-auth-delegator` binding the three lane service accounts to `system:auth-delegator`. Each lane EPP watches only its labeled pod (standalone mode, `--endpoint-selector`). Nothing else changed: the InferencePool, the main EPP release (revision 11) and the vLLM deployment are untouched.
+
+**Why**: one EPP per pod reproduces step 08's one-router-per-pod lanes for the step 10 replicates.
+
+**Revert**: `10-llm-d-router-replicates/teardown-lanes.sh` (deletes the three manifests, the pod labels and the ClusterRoleBinding). Status: the three lane EPPs, the pod labels and the ClusterRoleBinding were removed on 2026-09-18 with `teardown-lanes.sh` after step 12.
+
+## 2026-09-18: main EPP release switched per arm for step 12
+
+**Change**: Helm release `program-aware-scheduling` is upgraded by `12-llm-d-router-pool/run-pool.sh` before every cell (revisions 12 and up): values `12-llm-d-router-pool/main-values.yaml` (the step 09 user values plus the envoy ext_proc `message_timeout` raised to 2400 s) and the arm's plugin config (`baseline-`, `affinity-` or `thunder-plugins.yaml`), followed by a rollout restart. Image stays `thunder-agent-v3`. Prefix caches of all four pods are reset before each cell.
+
+**Revert**: `helm upgrade program-aware-scheduling <chart> -n llm-d-program-aware-scheduling -f 09-llm-d-router-smoke/results/values-rev10-user-supplied.yaml --set router.epp.image.tag=thunder-agent-v3 --set-file router.epp.pluginsCustomConfig.thunder-plugins\.yaml=09-llm-d-router-smoke/thunder-plugins.yaml` restores the step 09 state (revision 11), or `helm rollback program-aware-scheduling 11`. **Done 2026-09-18 after step 12** (see the revision recorded in `12-llm-d-router-pool/results/revert-output.txt`).
+
+## 2026-09-18: unrelated stacks removed to free CPU for the load generator
+
+**Change** (at the user's request, not part of the verification): Helm releases `bench` (namespace `llm-d-bench`, EPP plus `bench-vllm` deployment, 3 pods on the L4 pool) and `text-to-video` (namespace `llm-d-diffusion-t2v`, EPP plus a scaled-to-zero decode deployment) were uninstalled and their model-server deployments deleted. The two namespaces themselves were left in place (empty apart from config maps and secrets); deleting them was not permitted from this session. This frees 14 cores on `default-pool-40bcbd6e-02b4` and three L4 GPUs.
+
+**Revert**: not applicable; these were separate experiments.
+
 ## Resources created and already removed
 
 - `thunderagent-ab*` routers and `weka-bench-*` / `thunderagent-*-bench` Jobs: created and deleted per run by the drivers; none left running.

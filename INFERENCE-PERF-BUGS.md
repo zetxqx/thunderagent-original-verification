@@ -13,7 +13,7 @@ Status: none filed yet. Each section is written to be pasted into an issue as-is
 | 1 | Process never exits after a timeout-truncated stage | High | Blocked an unattended sweep; 2 of 3 cells hung for 30+ min after finishing |
 | 2 | No session identifier in the per-request report | High (analysis) | Invalidated and forced retraction of our primary paired analysis |
 | 3 | Session-lifecycle reports silently missing | Medium | Report schema varies run to run with no error |
-| 4 | `concurrent_sessions` silently not achieved | Medium | Two sweeps measured a load level that was never actually applied |
+| 4 | `concurrent_sessions` silently not achieved | Medium | Two sweeps measured a load level that was never actually applied; root cause found: parked events hold worker permits, fixed in `d5a7c8c` |
 | 5 | `per_request_fields` cannot exclude per-token arrays | Medium | 50-123 MB per per-request report; 25 reports = 1.6 GB, over GitHub's 100 MB file limit |
 
 ---
@@ -166,6 +166,10 @@ Two parts, and the second is worth doing even if the first is hard:
 Worth documenting alongside it: `num_workers` defaults to `cpu_count()`, which inside a container reports the **node's** core count rather than the cgroup limit. On our 103-core nodes with a `limits.cpu: 8` container, the default would spawn 103 worker processes.
 
 ---
+
+### Root cause, found 2026-09-18 (after steps 09 and 10)
+
+The ceiling is not CPU. In v0.7.0 a worker acquires a `worker_max_concurrency` permit before it pulls each event from its queue, and an event that then parks waiting for its predecessors keeps that permit. A session's events are all enqueued at dispatch and sessions are pinned to a worker by hash, so the first one or two sessions on a worker fill its 100 permits with parked turns, and the worker never reads the first turn of the other sessions pinned to it. Evidence in every cell of steps 07 to 10: each worker reports "cancelling 98 to 100 tasks still running at stage teardown" (exactly the permit count), and only 51 to 109 of the 128 to 183 dispatched sessions ever issued their first event. Effective concurrency was therefore about 55 to 65 concurrently active sessions in the 1900 s runs and 65 to 100 in the 600 s runs, for both routers alike, not 128. The fix (release the permit while parked, re-acquire before dispatch) is commit `d5a7c8c` on `zetxqx/inference-perf`, branch `fix-session-replay-permits`, with a regression test; it is not in v0.7.0 (released 2026-09-15). Comparisons within a run stay valid because every arm ran under the same limitation, but the absolute load must be restated and any future run needs an image built from the fix.
 
 ## Issue 5: `per_request_fields` cannot exclude the per-token arrays, so per-request reports stay huge
 

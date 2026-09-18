@@ -1,9 +1,10 @@
-# ThunderAgent scheduling: two proposals
+# ThunderAgent scheduling: three proposals
 
 **Part 1** - why large sessions starve at admission, and four ways to bound the wait.
 **Part 2** - whether the 5-second scheduler interval is costing throughput, and why shortening it should come with signal smoothing.
+**Part 3** - why resumed sessions change pods on a multi-pod pool, and an origin-only resume policy for the llm-d port.
 
-Neither has been run.
+None has been run.
 
 ---
 
@@ -201,3 +202,114 @@ Pre-registered expectations:
 - **The tail is out of scope here.** The >300s holds are caused by the size-ordered queue with no aging (Part 1) and will not move with the interval.
 
 If B clearly beats A, "smooth the capacity signal" becomes an upstream recommendation in its own right, and a more valuable one than a parameter change.
+
+
+---
+
+# Part 3: origin-only resume on a multi-pod pool
+
+Status: proposal, nothing implemented or run yet. Written 2026-09-18 from the step 12 measurements (`../12-llm-d-router-pool/RESULTS.md`), against llm-d-router commit `ae371354` (the port) and upstream ThunderAgent commit `7ddc861`.
+
+## The problem, measured
+
+Step 12 ran the port on the whole 4-pod pool at c=338. It beat llm-d's default profile 1.42x on throughput, but its steady-state prefix-cache hit rate was 0.25, half of the 0.49 the same plugin reached on a single pod at comparable per-pod pressure (step 10). The EPP counters say why:
+
+| per 45-minute cell, mean of 3 replicates | value |
+|---|---|
+| resumes (paused programs whose next turn was admitted) | 4470 |
+| resumes that changed pod (`thunder_agent_rebinds_total`) | about 3100, i.e. 70 percent |
+| pauses | 4720 |
+| requests with zero cache hit | 0.67 (single pod: 0.38) |
+
+Every move is a full re-prefill of a 50k-token history on a pod that has never seen it, plus the eviction of someone else's prefix to make room. The pool calibration showed the same ratio (1025 of 1448) before the main run, so it is a property of the mechanism, not of one cell.
+
+## Root cause in the code
+
+The port's gate (`llm-d-router/pkg/epp/framework/plugins/thunderagent/fairness.go`, `fitPodLocked`) admits a paused program onto its origin pod if that pod's decayed room covers the program, otherwise onto the pod with the most room. It is tempting to read the 70 percent as load imbalance, with the origin pod full and a neighbour half empty. The calibration log says otherwise: every pod is full, and the move is a matching failure rather than a placement preference.
+
+From the calibration cell (`epp.log`, 195 `thunderagent.pause_sweep` records, and the EPP program counters between minutes 2 and 9):
+
+| | value |
+|---|---|
+| working set just after a sweep, median | 2,222,110 |
+| pod ceiling (`capacityTokens` x `utilThreshold`) | 2,237,040 |
+| standing room per pod | about 14,900 |
+| what one resume needs (median prompt + buffer) | 40,690 |
+| unpaused programs with a request in flight | 202 of 203 (idle: 1) |
+
+The chain behind those numbers:
+
+1. **The sweep pins every pod at its ceiling.** `pauseFromPodLocked` pauses programs until the undecayed working set falls back under the ceiling, so in steady state it sits just below it. Standing room is about 15k tokens, well under the 40k a median resume needs.
+2. **Decay never fires, so there is no admission room to find.** Room is `ceiling - usedDecayed`, and `decayedFootprint` discounts only programs with no request in flight. Under this load essentially every unpaused program is in flight, so the decayed view equals the undecayed one and room collapses to `ceiling - working set`.
+3. **Room appears one slot at a time, on one pod.** When a marked program finishes its turn it is paused and leaves `podLoads`, freeing its full footprint, roughly 40k, on that pod and no other.
+4. **A global queue competes for that slot.** `Pick` iterates every queue, skips the candidates that fit nowhere, and takes the best of the remainder by class then footprint. The winner is the smallest paused program in the pool, and its origin has nothing to do with which pod just freed the slot.
+
+A resume therefore keeps its pod only when the pod that happened to free a slot is its own.
+
+Upstream does the same thing by design: `_greedy_resume` (`ThunderAgent/scheduler/router.py`) places each resumed program on the backend with the highest remaining capacity (best-fit-decreasing) and `_resume_program` accepts whatever target it is given; the origin backend is only a fallback when no target is supplied. The single-pod lanes of steps 08 to 10 could not expose this because there was nowhere else to go.
+
+The paper's headline mechanism, keeping a session's prefix resident until its next turn, is therefore undone by its own placement step as soon as there is more than one backend.
+
+### Why one in four
+
+The chain predicts a stay rate near `1/N` on `N` pods, and the calibration cell matches:
+
+| | value |
+|---|---|
+| resumes | 1448 |
+| stayed on the origin pod | 423 (29.2 percent) |
+| `1/N` for N = 4 | 25 percent |
+
+The four point excess is the first-refusal rule in `fitPodLocked`, which keeps the origin on the occasions when it also happens to fit. The prediction is falsifiable and unwelcome: the larger the pool, the smaller the share of resumes that keep their prefix, with an eight-pod pool keeping roughly one in eight.
+
+## What this rules out
+
+Two knobs that look like they should help cannot, and both fail for the same reason: they act on the sweep, not on the placement rule.
+
+- **Lowering `utilThreshold` to leave standing headroom.** The sweep drives the working set to just under whatever the ceiling is, so standing room stays near zero at any threshold. A lower one only pauses more programs sooner.
+- **Tuning `actingHalfLifeSeconds`.** Decay applies only to programs with no request in flight, and under load there is about one of those in the whole pool. The half-life has nothing to act on.
+
+## Options
+
+### Option A: origin-only (the proposal)
+
+A paused program waits for its origin pod. It is admitted only when the origin pod has room for it. Two exceptions: the origin pod has left the pool (then place by room, as today), and the forced-admission backstop has fired (then place by room, as today). New programs' first turns are unchanged and still go to the pod with the most room. Cost: a paused program may wait longer, and pods can diverge in load. Benefit: the prefix stays where it is, which is the whole point of pausing rather than dropping.
+
+Implementation in the port: a config field `resumePlacement` with values `most-room` (today's behaviour, default, faithful to upstream's BFD) and `origin-only`; in `fitPodLocked`, when the policy is `origin-only` and the preferred pod is present in the fit view, return "no fit" instead of falling through to the most-room pod. About twenty lines plus tests. No change to the sweep, the decay, the priorities or the backstop.
+
+No matching logic is needed on top of that. `Pick` already skips candidates that fit nowhere and takes the best of the remainder, so restricting the fit test to the origin pod turns each freed slot into a contest among that pod's own paused programs, which is exactly the behaviour we want.
+
+On the added wait, the arithmetic is kinder than it first looks. Today a program waits for any of `N` pods to free a slot while competing against the whole queue. Under A it waits for one pod while competing against that pod's share of the queue. Supply and demand both fall by `N`, so the mean wait should be roughly unchanged; what rises is its variance, and the real risk is a pod whose own arrival rate and own completion rate drift apart. That is what the pod-balance metric below is for.
+
+### Option B: origin with a bounded wait
+
+Like A, but after a program has waited `T` seconds for its origin pod it may take the most-room pod. `T` on the order of the tail we can tolerate (30 to 60 s). Trades some cache residency for a bounded added delay; adds one parameter and one more interaction with Part 1's starvation.
+
+### Option C: move only when the origin is clearly the worse choice
+
+Allow the move only when the most-room pod has room exceeding the origin's by a margin (for example a full program's worth), i.e. hysteresis on the placement decision. Keeps some load balancing; harder to reason about and to test than A.
+
+Recommendation: A first. It is the smallest change, it isolates one variable, and the two exceptions already cover the failure cases. B and C are refinements to try only if A shows either pod-load divergence or a visibly longer tail.
+
+## Interaction with Part 1
+
+Waiting for one pod instead of any pod lengthens some holds. Part 1's starvation (large sessions losing to a stream of smaller ones, held until the 1800 s backstop) can therefore get worse under A, and the 55 forced admissions per cell measured in step 12 are the number to watch. If forced admissions rise, the queue-aging remedy from Part 1 is the companion change, not a reason to abandon A.
+
+## What I would test first
+
+One more pool arm under the step 12 protocol (`../12-llm-d-router-pool/run-pool.sh`, c=338, 45 minutes, three replicates, image rebuilt as `thunder-agent-v4`):
+
+| arm | `resumePlacement` | status |
+|---|---|---|
+| epp-thunder | most-room | measured: 1447 tok/s, hit rate 0.248, 3100 rebinds, 55 forced admissions per cell |
+| epp-thunder-origin | origin-only | to run |
+
+Pre-registered expectations:
+
+- **Rebinds** fall from about 3100 to near zero (only vanished-pod and forced-admission cases remain).
+- **Steady-state hit rate** rises from 0.25 toward the single-pod 0.49; zero-hit share falls from 0.67 toward 0.4.
+- **Throughput** rises above 1447 tok/s. If it does not while the hit rate does rise, the extra wait for the origin pod is costing more than the saved prefill, and Option B is the next arm.
+- **Forced admissions** per cell are the risk metric: the same 55 or fewer is a pass; a clear rise means Part 1 must come along.
+- **Pod balance**: per-pod in-flight and KV should stay within a few percent of each other; a persistent skew means origin-only needs Option C's escape hatch.
+
+About three hours of pool time. The result also settles a question step 12 could not: how much of the port's gap to its single-pod hit rate is placement, and how much is the higher per-pod pressure of the pool run.

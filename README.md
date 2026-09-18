@@ -99,15 +99,29 @@ Recorded results (two runs): with per-session release, tr is 1.5x faster end-to-
 - restricted to the sessions **both** arms touched, per-session progress is **1.3x**, not 2.1x (the rest of the system-level gain comes from reaching more sessions);
 - the ~50-request in-flight ceiling is the **load generator**, not the single-process router (measured: router 0.06-0.11 cores).
 
-Open item: tr reproducibly produces 2.7x more errors (~2.4% of its requests), not yet diagnosed. Details: `08-weka-replicates/RESULTS.md`.
+Open item, resolved in step 10: the extra errors were 600 s client timeouts on the longest-held sessions, and each one also dropped that session's remaining turns from the workload (about 2300 per tr cell), so the 2.12x is measured on a client-trimmed workload; see the addendum in `08-weka-replicates/RESULTS.md`.
+
+### 9. llm-d-router port on the cluster: smoke test (done)
+
+`09-llm-d-router-smoke/` puts the rewritten `thunder-agent` EPP plugin (upstream tr-decay semantics: 1 s acting decay, 5 s pause sweep, paused-before-new admission, 1800 s forced admission) on the same 4 pods and checks the plumbing with simple traffic: the running build, the new config parsed, real scraped capacity on all pods, program accounting per turn, class ordering, stickiness, and session-final release. **All 20 checks pass.** No load and no holds yet; that is the next step. Details: `09-llm-d-router-smoke/README.md`.
+
+### 10. llm-d-router port: the step 08 protocol through the EPP (done)
+
+`10-llm-d-router-replicates/` runs step 08's replicate protocol through per-lane EPPs, `epp-sticky` (scorer only) vs `epp-thunder` (the port), twice: with a 1900 s client and with step 08's 600 s client. **The EPP path is free (sticky equals the Python proxy). The port delivers 1.54x with a patient client and 1.80x with step 08's client, with the same TTFT and the same loaded-phase hit rate as upstream.** Upstream's 2.12x stands as measured but stacks two artifacts the port does not have: the 600 s client trimmed about 2300 turns per cell in tr-decay's favor, and the Python router leaves client-abandoned requests as phantom REASONING programs (76 to 83 on its books against 17 to 20 running), throttling admission into a lighter, hotter engine late in each run. Time series per lane in both run folders. Details and step 11 in `10-llm-d-router-replicates/RESULTS.md`.
+
+### 12. llm-d-router: three EPP policies on the whole 4-pod pool (done)
+
+`12-llm-d-router-pool/` compares, through one EPP over the four pods, llm-d's default profile (prefix-cache, queue and KV scorers), plain session affinity, and the ThunderAgent port, at c=338 (the whole corpus) for 45 minutes, three replicates each, with the load generator fixed first (inference-perf v0.7.0 lets only about half of the sessions start; see `INFERENCE-PERF-BUGS.md` issue 4). **The two llm-d policies are indistinguishable (1020 tok/s, hit rate 0.002, TTFT p50 123 s). The port gives 1.42x throughput, a 0.25 steady-state hit rate and a 3.7 s median TTFT.** Admission control is the entire effect; placement alone does nothing under oversubscription. The port loses half its single-pod hit rate to pod hopping on resume (70 percent of resumes move), identified before the run; an origin-only resume policy is the next step. Details: `12-llm-d-router-pool/RESULTS.md`.
 
 ## Proposals (not part of the numbered steps)
 
-`proposal/PROPOSAL.md` - two ThunderAgent scheduling proposals, neither run yet. Kept outside the numbered sequence so that `09-` stays free for the next experiment.
+`proposal/PROPOSAL.md` - three ThunderAgent scheduling proposals, none run yet. Kept outside the numbered sequence.
 
 **Part 1, admission-wait starvation**: why a minority of sessions wait up to 30 minutes for admission. Measured cause: `_greedy_resume` orders the waiting pool by token count **ascending** with no aging, so large sessions lose every round to a refreshed supply of smaller newcomers. **71% of sessions above 80k tokens were held past 600s; 0% of sessions below 40k tokens were**, with holds pinned at upstream's hard-coded 1800s forced-admission backstop. Four remedies compared (lower the timeout / age the queue / head-of-line reservation / shed with Retry-After), with a one-cell experiment and pre-registered expectations.
 
 **Part 2, the 5s scheduler interval**: 67% of admission holds last under 12s and pile up on the polling period, and the engine sits idle 9.3% of the time under tr (5.6% under the proxy) with a non-empty waiting queue - so shortening the interval should recover throughput. But the capacity decision reads a single instantaneous sample (`latest_metrics`, never an average), and one sample misjudges free capacity by +-87k tokens - more than a median session - so faster polling multiplies noise-driven decisions rather than averaging them. Proposal: shorten the interval AND smooth the signal, with a three-arm experiment to separate the two.
+
+**Part 3, origin-only resume on a multi-pod pool**: in step 12, 70% of the port's resumes (about 3100 of 4470 per cell) moved the session to another pod, because on equally loaded pods the origin pod rarely has room at the instant a paused session's turn arrives while the pod with the most room always does; upstream's best-fit-decreasing placement behaves the same way. Each move is a full re-prefill, and the pool hit rate ended at half the single-pod value. Proposal: a `resumePlacement` switch, default unchanged, `origin-only` making paused sessions wait for their own pod unless it vanished or the forced-admission backstop fired; new sessions still go to the pod with most room. One more pool arm with pre-registered expectations (rebinds near zero, hit rate toward 0.49, forced admissions as the risk metric).
 
 ## Data note: per-request reports are not in this repo
 

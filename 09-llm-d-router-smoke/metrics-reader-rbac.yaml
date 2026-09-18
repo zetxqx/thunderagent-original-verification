@@ -1,0 +1,30 @@
+# Read-only identity for scraping the EPP metrics port (9090), which enforces
+# kube-rbac: a bearer token whose subject may GET the non-resource URLs.
+# Used by smoke-test.sh via `kubectl create token`. Remove with
+# `kubectl delete -f metrics-reader-rbac.yaml`.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: thunderagent-metrics-reader
+  namespace: llm-d-program-aware-scheduling
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: thunderagent-metrics-reader
+rules:
+- nonResourceURLs: ["/metrics", "/debug/plugins/state"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: thunderagent-metrics-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: thunderagent-metrics-reader
+subjects:
+- kind: ServiceAccount
+  name: thunderagent-metrics-reader
+  namespace: llm-d-program-aware-scheduling

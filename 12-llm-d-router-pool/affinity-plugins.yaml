@@ -1,0 +1,26 @@
+# epp-affinity arm: llm-d's own session affinity, nothing else. The session id
+# comes from the same x-session-id header the thunder arm uses; the binding
+# TTL is raised to an hour so a long think time or a held turn does not drop
+# the pin. New sessions spread by active requests. No admission control.
+apiVersion: inference.networking.x-k8s.io/v1alpha1
+kind: EndpointPickerConfig
+plugins:
+- type: session-affinity-scorer
+  parameters:
+    strategy: session_id
+    sessionIdConfig:
+      sources:
+        - header: x-session-id
+      evictionTtlSeconds: 3600
+      evictionSweepSeconds: 60
+- type: active-request-scorer
+- type: max-score-picker
+- type: single-profile-handler
+schedulingProfiles:
+- name: default
+  plugins:
+  - pluginRef: session-affinity-scorer
+    weight: 3
+  - pluginRef: active-request-scorer
+    weight: 1
+  - pluginRef: max-score-picker

@@ -1,0 +1,118 @@
+router:
+  epp:
+    env:
+    - name: HF_TOKEN
+      valueFrom:
+        secretKeyRef:
+          key: HF_TOKEN
+          name: llm-d-hf-token
+    flags:
+      allow-experimental-plugins: true
+      v: 2
+    image:
+      pullPolicy: IfNotPresent
+      registry: us-central1-docker.pkg.dev
+      repository: bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker
+      tag: thunder-agent-v2
+    pluginsConfigFile: thunder-plugins.yaml
+    pluginsCustomConfig:
+      thunder-plugins.yaml: |
+        apiVersion: llm-d.ai/v1alpha1
+        kind: EndpointPickerConfig
+        featureGates:
+        - flowControl
+        plugins:
+        - type: utilization-detector
+          parameters:
+            headroom: 0.2
+        - type: agent-identity
+          parameters:
+            additionalSessionHeaders:
+            - x-session-id
+        - type: thunder-agent
+          name: thunder
+          parameters:
+            # Fallback if cache_config_info is not scraped; ~1% of the real
+            # fleet value so the smoke budget stays ~22K either way.
+            capacityTokens: 22000
+            # ~22K of the real 2,237,040-token capacity per pod: below the
+            # warm working set of every pod, so a new program waits for decay
+            # to free room. See the sizing rule above before changing it.
+            utilThreshold: 0.01
+            # Required for hold-and-resume: see the header note.
+            actingHalfLifeSeconds: 30
+            bufferTokensPerProgram: 100
+            # Above the decay half-life so decay, not the guard, is what
+            # normally admits a held program, but well below the request TTL
+            # so the guard still fires first: see the header note.
+            headWaitStarvationMs: 60000
+            evictionTtlSeconds: 600
+            evictionSweepSeconds: 60
+            sessionFinalHeader: x-session-final
+        - type: kv-cache-utilization-scorer
+        - type: queue-scorer
+        - type: max-score-picker
+        - type: single-profile-handler
+        flowControl:
+          # A held program must outlive the queue deadline, or the hold ends
+          # in a 429 instead of an admission: see the header note.
+          defaultRequestTTL: 300s
+          saturationDetector:
+            pluginRef: thunder
+          defaultPriorityBand:
+            fairnessPolicyRef: thunder
+        schedulingProfiles:
+        - name: default
+          plugins:
+          - pluginRef: utilization-detector
+          - pluginRef: thunder
+            weight: 3
+          - pluginRef: kv-cache-utilization-scorer
+            weight: 1
+          - pluginRef: queue-scorer
+            weight: 1
+          - pluginRef: max-score-picker
+    replicas: 1
+    resources:
+      limits:
+        memory: 16Gi
+      requests:
+        cpu: "4"
+        memory: 8Gi
+  extraServicePorts:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 8081
+  inferencePool:
+    failureMode: FailOpen
+  modelServers:
+    matchLabels:
+      llm-d.ai/guide: program-aware-scheduling
+    protocol: http
+  proxy:
+    args:
+    - --service-node
+    - envoy-sidecar
+    - --log-level
+    - warn
+    - --concurrency
+    - "8"
+    - --drain-strategy
+    - immediate
+    - --drain-time-s
+    - "60"
+    - -c
+    - /etc/envoy/envoy.yaml
+    proxyType: envoy
+    resources:
+      limits:
+        memory: 16Gi
+      requests:
+        cpu: "4"
+        memory: 8Gi
+  tracing:
+    otelExporterEndpoint: http://localhost:4317
+    sampling:
+      sampler: parentbased_traceidratio
+      samplerArg: "0.1"

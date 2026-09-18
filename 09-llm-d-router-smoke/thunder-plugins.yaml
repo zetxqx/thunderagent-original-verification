@@ -1,0 +1,42 @@
+# EPP plugin config for step 09: the thunder-agent plugin configured to
+# reproduce upstream ThunderAgent tr-decay, on the real 4-pod deployment.
+# Same as llm-d-router/deploy/config/thunderagent-config.yaml except the
+# capacity fallback, which is set to the real per-pod value measured in
+# step 03 (block_size x num_gpu_blocks = 2,237,040) in case cache_config_info
+# is not scraped. With real capacity a smoke test never holds anything; the
+# point of this config is to verify plumbing, accounting and stickiness.
+apiVersion: inference.networking.x-k8s.io/v1alpha1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- type: agent-identity
+  parameters:
+    additionalSessionHeaders:
+    - x-session-id
+- type: thunder-agent
+  name: thunder
+  parameters:
+    capacityTokens: 2237040
+    utilThreshold: 1.0
+    actingHalfLifeSeconds: 1
+    bufferTokensPerProgram: 100
+    pauseSweepSeconds: 5
+    kvUsageCorrection: false
+    headWaitStarvationMs: 1800000
+    evictionTtlSeconds: 3600
+    evictionSweepSeconds: 300
+    sessionFinalHeader: x-session-final
+- type: max-score-picker
+- type: single-profile-handler
+flowControl:
+  defaultRequestTTL: "0s"
+  saturationDetector:
+    pluginRef: thunder
+  defaultPriorityBand:
+    fairnessPolicyRef: thunder
+schedulingProfiles:
+- name: default
+  plugins:
+  - pluginRef: thunder
+  - pluginRef: max-score-picker
