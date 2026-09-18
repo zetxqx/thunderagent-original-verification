@@ -9,6 +9,7 @@ This folder records every step. Files are numbered in the order they were used.
 - Cluster: GKE `bobbm` (`gke_bobzetian-gke-dev_us-central1_bobbm`)
 - Namespace: `llm-d-program-aware-scheduling`
 - Backends: Deployment `program-aware-vllm-decode`, 4 replicas of `vllm/vllm-openai:v0.28.0`, model `Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8`, TP=2 on H100 (spot), serving port 8000
+- Full serving-side reference (engine flags, resolved batch and chunked-prefill settings, KV pool, hardware, change history): `model-server/README.md`, re-collectable with `model-server/collect.sh`
 - Already present (untouched by this setup): the llm-d EPP with the Go `thunder-agent` plugin (`program-aware-scheduling-epp`)
 - Upstream ThunderAgent source: `../ThunderAgent` at git commit `7ddc861`, clean working tree
 

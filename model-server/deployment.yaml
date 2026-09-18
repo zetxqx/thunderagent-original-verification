@@ -1,0 +1,134 @@
+# Live manifest of the vLLM model server, exported 2026-09-18 from
+# namespace llm-d-program-aware-scheduling on GKE cluster bobbm.
+# Deployment revision 3: identical to revision 2 except --enable-prompt-tokens-details.
+# This is the backend every benchmark in steps 04 to 13 ran against.
+#
+# Runtime-only fields (status, uid, resourceVersion, generation, creationTimestamp,
+# last-applied-configuration) are stripped so this re-applies cleanly.
+#
+# Prerequisites in the target namespace:
+#   - secret llm-d-hf-token with key HF_TOKEN (referenced below, value not included here)
+#   - nodes matching the nodeSelector, with 2 free H100 GPUs per replica
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: '3'
+  labels:
+    llm-d.ai/engine-type: vllm
+    llm-d.ai/guide: program-aware-scheduling
+    llm-d.ai/model: Qwen3-Coder-30B-A3B-FP8
+    llm-d.ai/role: decode
+  name: program-aware-vllm-decode
+  namespace: llm-d-program-aware-scheduling
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 4
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      llm-d.ai/engine-type: vllm
+      llm-d.ai/guide: program-aware-scheduling
+      llm-d.ai/model: Qwen3-Coder-30B-A3B-FP8
+      llm-d.ai/role: decode
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        llm-d.ai/engine-type: vllm
+        llm-d.ai/guide: program-aware-scheduling
+        llm-d.ai/model: Qwen3-Coder-30B-A3B-FP8
+        llm-d.ai/role: decode
+    spec:
+      containers:
+      - args:
+        - Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8
+        - --host=0.0.0.0
+        - --port=8000
+        - --tensor-parallel-size=2
+        - --max-model-len=262144
+        - --kv-cache-dtype=fp8_e4m3
+        - --gpu-memory-utilization=0.88
+        - --compilation-config={"pass_config":{"fuse_allreduce_rms":false}}
+        - --enable-prompt-tokens-details
+        command:
+        - vllm
+        - serve
+        env:
+        - name: VLLM_USE_DEEP_GEMM
+          value: '0'
+        - name: VLLM_ALLREDUCE_USE_SYMM_MEM
+          value: '0'
+        - name: VLLM_SERVER_DEV_MODE
+          value: '1'
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: HF_TOKEN
+              name: llm-d-hf-token
+        image: vllm/vllm-openai:v0.28.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: modelserver
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: modelserver
+        ports:
+        - containerPort: 8000
+          name: modelserver
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /v1/models
+            port: modelserver
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 2
+        resources:
+          limits:
+            cpu: '16'
+            memory: 128Gi
+            nvidia.com/gpu: '2'
+          requests:
+            cpu: '8'
+            memory: 96Gi
+            nvidia.com/gpu: '2'
+        startupProbe:
+          failureThreshold: 120
+          httpGet:
+            path: /health
+            port: modelserver
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 5
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /dev/shm
+          name: shm
+        - mountPath: /root/.cache
+          name: hf-cache
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-h100-80gb
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - emptyDir:
+          medium: Memory
+          sizeLimit: 20Gi
+        name: shm
+      - emptyDir: {}
+        name: hf-cache
