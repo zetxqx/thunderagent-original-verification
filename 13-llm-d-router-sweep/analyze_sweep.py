@@ -105,9 +105,10 @@ def make_figure(root, levels, data):
             ax.text(0.01, 0.15, "port / baseline", transform=ax.transAxes, fontsize=10.5, color=PALETTE["blue_main"], va="bottom")
         ax.set_title(f"{letter}  {title}", loc="left", fontweight="bold", fontsize=16, pad=22)
         ax.text(0, 1.02, unit, transform=ax.transAxes, fontsize=12, color="0.35", va="bottom")
-        ax.set_xlabel("active sessions per pod")
-        ax.set_xticks(x); ax.set_xticklabels([f"{v:g}" for v in x])
-        ax.set_xlim(x[0] - 4, x[-1] + 4)
+        ax.set_xlabel("active sessions per pod (log scale)")
+        ax.set_xscale("log", base=2)  # levels are roughly geometric (4 to 84 per pod); a log axis keeps the low end legible
+        ax.set_xticks(x); ax.set_xticklabels([f"{v:g}" for v in x]); ax.minorticks_off()
+        ax.set_xlim(x[0] / 1.25, x[-1] * 1.25)
         top = np.nanmax([np.nanmax(v) for v in ys.values()])
         ax.set_ylim(0, top * 1.08)
         ax.tick_params(labelsize=13)
@@ -115,7 +116,7 @@ def make_figure(root, levels, data):
     handles, labels = axes[0].get_legend_handles_labels()
     handles.append(plt.Rectangle((0, 0), 1, 1, color=PALETTE["neutral"], alpha=0.45)); labels.append("observed crossover\n(24 to 32 sessions per pod)")
     axes[4].set_axis_off(); axes[4].legend(handles, labels, loc="center left", fontsize=13, handlelength=2.2, labelspacing=1.1)
-    fig.text(0.005, 0.005, "4 vLLM pods behind one EPP; one 30-minute cell per arm and level (first 10 minutes warm-up); client timeout 1900 s; x = c / 4 for c in 48, 96, 128, 192, 256, 338.",
+    fig.text(0.005, 0.005, "4 vLLM pods behind one EPP; one 30-minute cell per arm and level (first 10 minutes warm-up); client timeout 1900 s; x = c / 4 for c in 16, 32, 48, 64, 96, 128, 192, 256, 338.",
              fontsize=11.5, color="0.35")
     fig.tight_layout(pad=1, rect=(0, 0.05, 1, 1))
     for ext in ("png", "pdf"):

@@ -85,3 +85,7 @@ Only 3 distinct nodes now (two pods share ...-6j7g), so a 3-lane parallel sweep 
 ## 2026-09-18 evening: step 13 sweep left the main release on the baseline config
 
 `12-llm-d-router-pool/run-pool.sh` upgraded `program-aware-scheduling` once per cell (revisions 24 to 35). The last cell was `epp-baseline-c338`, so revision 35 carries `baseline-plugins.yaml` and the 2400 s envoy `message_timeout`. Revert to the step 09 thunder state with `09-llm-d-router-smoke/deploy.sh` if single-EPP thunder work resumes.
+
+## 2026-09-19: step 13 extension (c = 16, 32, 64) left the main release on the thunder config
+
+Six more per-cell upgrades (revisions 36 to 41). The last cell was `epp-thunder-c64`, so revision 41 carries `thunder-plugins.yaml` with the 2400 s envoy `message_timeout` (step 09's state differs only in the 1000 s timeout).

@@ -116,13 +116,19 @@ Open item, resolved in step 10: the extra errors were 600 s client timeouts on t
 
 ## Proposals (not part of the numbered steps)
 
-`proposal/PROPOSAL.md` - three ThunderAgent scheduling proposals, none run yet. Kept outside the numbered sequence.
+`proposal/PROPOSAL.md` - six ThunderAgent scheduling proposals, none run yet. Kept outside the numbered sequence.
 
 **Part 1, admission-wait starvation**: why a minority of sessions wait up to 30 minutes for admission. Measured cause: `_greedy_resume` orders the waiting pool by token count **ascending** with no aging, so large sessions lose every round to a refreshed supply of smaller newcomers. **71% of sessions above 80k tokens were held past 600s; 0% of sessions below 40k tokens were**, with holds pinned at upstream's hard-coded 1800s forced-admission backstop. Four remedies compared (lower the timeout / age the queue / head-of-line reservation / shed with Retry-After), with a one-cell experiment and pre-registered expectations.
 
 **Part 2, the 5s scheduler interval**: 67% of admission holds last under 12s and pile up on the polling period, and the engine sits idle 9.3% of the time under tr (5.6% under the proxy) with a non-empty waiting queue - so shortening the interval should recover throughput. But the capacity decision reads a single instantaneous sample (`latest_metrics`, never an average), and one sample misjudges free capacity by +-87k tokens - more than a median session - so faster polling multiplies noise-driven decisions rather than averaging them. Proposal: shorten the interval AND smooth the signal, with a three-arm experiment to separate the two.
 
 **Part 3, origin-only resume on a multi-pod pool**: in step 12, 70% of the port's resumes (about 3100 of 4470 per cell) moved the session to another pod, because on equally loaded pods the origin pod rarely has room at the instant a paused session's turn arrives while the pod with the most room always does; upstream's best-fit-decreasing placement behaves the same way. Each move is a full re-prefill, and the pool hit rate ended at half the single-pod value. Proposal: a `resumePlacement` switch, default unchanged, `origin-only` making paused sessions wait for their own pod unless it vanished or the forced-admission backstop fired; new sessions still go to the pod with most room. One more pool arm with pre-registered expectations (rebinds near zero, hit rate toward 0.49, forced admissions as the risk metric).
+
+**Part 4, P/D disaggregation**: step 13 shows the pool is bound by prefill work caused by KV capacity, not by prefill interference. P/D moves prefill without reducing it and shrinks the resident pool, so it cannot help throughput here; on `a3-highgpu-4g` without RDMA the 2.46 GB per-turn KV transfer is not clearly cheaper than recompute. ITL does degrade 6.5x under load, which P/D would partly fix; one cheap `max-num-batched-tokens` experiment separates the interference share from the batch-size share before any P/D work.
+
+**Part 5, CPU KV offloading**: the c=338 working set (811 GB) fits in GPU plus host RAM, a resumed turn becomes a 0.1 s PCIe copy instead of a 2.9 s recompute, and vLLM v0.28.0 already ships the native connector (`kv_offloading_size` is just unset). Likely the largest single lever on this workload, and likely to remove much of admission control's value, which the proposal says plainly. Three arms to measure it.
+
+**Part 6, mixed chat and agentic**: anonymous chat KV is invisible to the port's fit view (`kvUsageCorrection` has never been on), all chat shares one flow that is gated as NEW behind agentic resumes, and session-bearing chat wins admission then gets paused first for no gain. Fix path: a separate priority band for chat, `kvUsageCorrection: true`, a general load scorer in the profile, plus Part 1's aging. One mixed-traffic cell family to quantify each gap.
 
 ## Data note: per-request reports are not in this repo
 

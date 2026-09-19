@@ -6,7 +6,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | 1278 | 1247 | 0.98x |
+| 32 | 8 | 1782 | 1775 | 1.00x |
 | 48 | 12 | 2014 | 1972 | 0.98x |
+| 64 | 16 | 1956 | 1974 | 1.01x |
 | 96 | 24 | 1541 | 1536 | 1.00x |
 | 128 | 32 | 1151 | 1382 | 1.20x |
 | 192 | 48 | 1065 | 1342 | 1.26x |
@@ -17,7 +20,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | 0.947 | 0.945 | 1.00x |
+| 32 | 8 | 0.953 | 0.952 | 1.00x |
 | 48 | 12 | 0.952 | 0.948 | 1.00x |
+| 64 | 16 | 0.930 | 0.926 | 1.00x |
 | 96 | 24 | 0.625 | 0.602 | 0.96x |
 | 128 | 32 | 0.040 | 0.353 | 8.84x |
 | 192 | 48 | 0.003 | 0.301 | 95.30x |
@@ -28,7 +34,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | 0.5 | 0.4 | 0.98x |
+| 32 | 8 | 0.5 | 0.4 | 0.95x |
 | 48 | 12 | 0.4 | 0.4 | 0.98x |
+| 64 | 16 | 0.4 | 0.4 | 1.00x |
 | 96 | 24 | 0.5 | 0.5 | 1.00x |
 | 128 | 32 | 8.2 | 2.3 | 0.28x |
 | 192 | 48 | 36.0 | 3.2 | 0.09x |
@@ -39,7 +48,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | 1.3 | 1.2 | 0.87x |
+| 32 | 8 | 1.4 | 1.3 | 0.93x |
 | 48 | 12 | 1.4 | 1.4 | 0.95x |
+| 64 | 16 | 1.8 | 1.7 | 0.95x |
 | 96 | 24 | 14.0 | 8.1 | 0.58x |
 | 128 | 32 | 32.9 | 9.9 | 0.30x |
 | 192 | 48 | 81.1 | 12.0 | 0.15x |
@@ -50,7 +62,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | 2192 | 2150 | 0.98x |
+| 32 | 8 | 3093 | 3083 | 1.00x |
 | 48 | 12 | 3740 | 3662 | 0.98x |
+| 64 | 16 | 4020 | 4031 | 1.00x |
 | 96 | 24 | 3578 | 3583 | 1.00x |
 | 128 | 32 | 3026 | 3641 | 1.20x |
 | 192 | 48 | 2933 | 3910 | 1.33x |
@@ -61,7 +76,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | 10 | 10 | 1.02x |
+| 32 | 8 | 20 | 20 | 1.01x |
 | 48 | 12 | 29 | 29 | 0.99x |
+| 64 | 16 | 40 | 39 | 0.97x |
 | 96 | 24 | 64 | 62 | 0.97x |
 | 128 | 32 | 84 | 80 | 0.95x |
 | 192 | 48 | 103 | 95 | 0.93x |
@@ -72,7 +90,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | 0 | 0 | 0.40x |
+| 32 | 8 | 0 | 0 | 0.68x |
 | 48 | 12 | 0 | 0 | 0.98x |
+| 64 | 16 | 0 | 0 | 1.33x |
 | 96 | 24 | 4 | 1 | 0.24x |
 | 128 | 32 | 15 | 1 | 0.06x |
 | 192 | 48 | 50 | 1 | 0.02x |
@@ -83,7 +104,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | 0.13 | 0.13 | 0.99x |
+| 32 | 8 | 0.24 | 0.24 | 0.98x |
 | 48 | 12 | 0.33 | 0.32 | 0.97x |
+| 64 | 16 | 0.42 | 0.41 | 0.97x |
 | 96 | 24 | 0.60 | 0.56 | 0.94x |
 | 128 | 32 | 0.68 | 0.62 | 0.90x |
 | 192 | 48 | 0.73 | 0.62 | 0.86x |
@@ -94,7 +118,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | 2 | 0 | 0.00x |
+| 32 | 8 | 0 | 0 | - |
 | 48 | 12 | 0 | 0 | - |
+| 64 | 16 | 0 | 0 | - |
 | 96 | 24 | 0 | 0 | - |
 | 128 | 32 | 0 | 0 | - |
 | 192 | 48 | 0 | 0 | - |
@@ -105,7 +132,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | 22 | 20 | 0.91x |
+| 32 | 8 | 31 | 31 | 1.00x |
 | 48 | 12 | 33 | 30 | 0.91x |
+| 64 | 16 | 30 | 31 | 1.03x |
 | 96 | 24 | 23 | 23 | 1.00x |
 | 128 | 32 | 14 | 25 | 1.79x |
 | 192 | 48 | 1 | 17 | 17.00x |
@@ -116,7 +146,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | - | 0 | - |
+| 32 | 8 | - | 0 | - |
 | 48 | 12 | - | 0 | - |
+| 64 | 16 | - | 0 | - |
 | 96 | 24 | - | 280 | - |
 | 128 | 32 | - | 698 | - |
 | 192 | 48 | - | 1062 | - |
@@ -127,7 +160,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | - | 0 | - |
+| 32 | 8 | - | 5 | - |
 | 48 | 12 | - | 19 | - |
+| 64 | 16 | - | 53 | - |
 | 96 | 24 | - | 1039 | - |
 | 128 | 32 | - | 1912 | - |
 | 192 | 48 | - | 2785 | - |
@@ -138,7 +174,10 @@ One cell per arm and level. `sessions/pod` = c / 4.
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |
 |---|---|---|---|---|
+| 16 | 4 | - | 0 | - |
+| 32 | 8 | - | 0 | - |
 | 48 | 12 | - | 0 | - |
+| 64 | 16 | - | 0 | - |
 | 96 | 24 | - | 0 | - |
 | 128 | 32 | - | 0 | - |
 | 192 | 48 | - | 0 | - |

@@ -24,13 +24,16 @@ Pre-registered expectations:
 
 ## Results
 
-Run `results/sweep-20260918-134248-t1900` (2026-09-18 13:42 to 23:35 PDT). All 12 cells completed, no preemption, 0 request errors in every cell. Full tables in `sweep.md`, curves in `sweep.png`.
+Run `results/sweep-20260918-134248-t1900`: six levels on 2026-09-18 (13:42 to 23:35 PDT), then three lower levels c = 16, 32, 64 appended on 2026-09-19 (10:24 to 15:15) to locate the throughput peak. All 18 cells completed, no preemption, 0 request errors in every cell. Full tables in `sweep.md` (including a `sessions completed and replaced` row), curves in `sweep.png` (log-scale x axis).
 
 The table below compares the two arms at each level. For the other question this sweep answers, why throughput falls as concurrency rises within an arm, see `RESULTS.md`: the short version is that the pool does 6.6x more token work at c=338 than at c=48 and the metric counts only the decode half.
 
 | c | sessions/pod | throughput baseline / thunder (tok/s) | ratio | steady-state hit rate baseline / thunder | TTFT p50 baseline / thunder (s) | waiting inside vLLM baseline / thunder | thunder resumes that changed pod |
 |---|---|---|---|---|---|---|---|
+| 16 | 4 | 1278 / 1247 | 0.98x | 0.947 / 0.945 | 0.5 / 0.4 | 0 / 0 | 0 of 0 |
+| 32 | 8 | 1782 / 1775 | 1.00x | 0.953 / 0.952 | 0.5 / 0.4 | 0 / 0 | 0 of 1 |
 | 48 | 12 | 2014 / 1972 | 0.98x | 0.952 / 0.948 | 0.4 / 0.4 | 0 / 0 | 0 of 2 |
+| 64 | 16 | 1956 / 1974 | 1.01x | 0.930 / 0.926 | 0.4 / 0.4 | 0 / 0 | 1 of 26 |
 | 96 | 24 | 1541 / 1536 | 1.00x | 0.625 / 0.602 | 0.5 / 0.5 | 4 / 1 | 461 of 949 (49%) |
 | 128 | 32 | 1151 / 1382 | 1.20x | 0.040 / 0.353 | 8.2 / 2.3 | 15 / 1 | 1079 of 1797 (60%) |
 | 192 | 48 | 1065 / 1342 | 1.26x | 0.003 / 0.301 | 36.0 / 3.2 | 50 / 1 | 1808 of 2619 (69%) |
@@ -40,17 +43,20 @@ The table below compares the two arms at each level. For the other question this
 Findings, against the pre-registered expectations:
 
 1. **The crossover is between 24 and 32 sessions per pod**, earlier than the expected 32 to 48. At 24 per pod the arms tie on throughput, but baseline's TTFT p90 is already 1.7x thunder's (14.0 vs 8.1 s) and vLLM starts to queue. At 32 per pod baseline's steady-state hit rate collapses from 0.63 to 0.04 while thunder keeps 0.35.
-2. **Below the crossover thunder costs about 2 percent** (c=48: 1972 vs 2014 tok/s, 19 pauses, 0 holds). This is the flow-control round trip and a few unnecessary pauses on a pool that never fills; as pre-registered, the gate should engage only under pressure.
+2. **Below the crossover the port is free.** Ratios at 4, 8, 12 and 16 sessions per pod are 0.98, 1.00, 0.98 and 1.01: within the plus or minus 2 percent cell-to-cell noise, in both directions. The gate stays idle there (0 to 53 pauses, 0 holds, at most 1 rebind per cell), so the flow-control round trip per turn has no measurable cost. The earlier reading of the single c=48 pair as a 2 percent penalty did not survive the extra levels.
 3. **The gain grows with load to 1.44x at 64 and 1.46x at 84 sessions per pod**, matching step 12's replicated 1.42x (plus or minus 0.3 percent) at c=338. Thunder's throughput is flat to slightly rising from 32 per pod on (1382, 1342, 1438, 1538) while baseline keeps falling to about 1000 tok/s.
 4. **TTFT p50 stays at 2 to 4 s for thunder at every level above the crossover; baseline's grows linearly with load to 101 s.** Baseline's wait sits inside vLLM (mean 4, 15, 50, 93, 152 requests waiting), thunder's inside the EPP (mean 1 waiting in vLLM at every level; 280 to 1716 holds per cell). Forced admissions are 0 up to 48 per pod, 2 at 64, 7 at 84.
 5. **Pod hopping is the port's largest remaining loss and it grows with load.** The share of resumes that moved the program to a different pod is 49, 60, 69, 69, 71 percent from c=96 up (`rebinds_total` / `resumes_total`). This is why thunder's hit rate on the pool (0.25 to 0.35) sits below its single-pod value at the same per-pod pressure (0.55 in step 10 at 32 per pod) and why it does not beat baseline at c=96, where baseline still hits 0.63 and every move costs a full 60k-token prefill. `../proposal/PROPOSAL.md` Part 3 (origin-only resume) targets exactly this.
+
+**Where the pool's throughput peak is (the c = 16, 32, 64 extension).** Output throughput rises from 1278 tok/s at 4 sessions per pod to 1782 at 8, peaks at 2014 at 12, holds at 1956 to 1974 at 16, then falls: 1541 at 24, 1151 at 32 (baseline). So the closed-loop peak of this pool on the weka replay is at 12 to 16 sessions per pod, and the two arms are identical up to that point. Per-stream decode interval (ITL p50) grows steadily with load, 10, 15, 20, 29, 38 ms at 4, 8, 12, 16, 24 per pod, while the pool's KV is only 13 to 42 percent full up to 16 per pod and nothing waits inside vLLM. The engines are therefore not queue-bound but bandwidth-bound on attention over 78k to 95k-token contexts well before the KV fills; adding sessions beyond 12 per pod only slows every stream. The crossover where ThunderAgent starts to pay off (24 to 32 per pod) sits about 2x past the peak, i.e. in the overload regime the paper targets.
 
 Why throughput falls with load in both arms (asked during the run): the pool is past its output-throughput peak at 12 sessions per pod already. Per-stream decode interval (ITL p50) doubles from 20 ms at 12 per pod to 38 ms at 24 and stays at 40 ms above, so the engines are memory-bandwidth-bound on attention over 60k to 84k-token contexts and a larger batch does not add decode throughput. On top of that, lost prefix hits turn into prefill work that steals steps from decoding; this shows as ITL mean rising far above ITL p50 (105 vs 40 ms for baseline at c=128, 90 vs 40 for thunder). Thunder's gain is in avoiding the second effect, not in raising the peak. The peak itself was not measured; c=16, 24, 32 would locate it.
 
 Caveats:
 
+- Sessions that finish their trace are replaced by fresh traces, so the concurrency stays at c but the mix changes: at 4 to 16 sessions per pod, 20 to 33 sessions completed per 30-minute cell (median about 9 minutes each), at 24 per pod 23, at 32 per pod 14 (baseline) and 25 (thunder), and above that 0 to 17. Low-concurrency cells therefore include cold starts and early short-prompt turns; high-concurrency cells are almost all deep long-prompt turns. Within a level the faster arm finishes more sessions and absorbs more cold starts (17 vs 1 at 48 per pod), so the reported ratios are slightly conservative.
 - One cell per arm and level, so no error bars. The c=338 point reproduces step 12's three-replicate result, which had a spread of 0.3 percent on throughput.
 - Absolute throughput is not comparable across levels: with 30-minute cells, low-concurrency sessions progress deeper, so the mean prompt is 84k tokens at c=48 and 61k at c=128. Within a level the arms' prompt means agree to within 1 percent, so the arm comparison is clean.
 - The `epp-thunder-c256` cell was collected by hand. The driver's bench-pod name lookup returned empty on a transient API error, so its DONE poll spun forever while the cell ran normally inside the pod (bench reported completion, prober captured all metrics); artifacts were copied with the same commands the driver uses and the manifest carries a note. `../12-llm-d-router-pool/run-pool.sh` now retries the lookup until it gets a name. The stuck driver was killed and the last level (c=338, order thunder then baseline as planned) was relaunched into the same run directory at 21:46.
 - A first launch at 11:30 was interrupted by the user during its first cell; that cell was voided (job deleted, directory removed) before this run.
-- Cells took 42 to 53 minutes end to end for a 30-minute window; the whole sweep took just under 10 hours.
+- Cells took 42 to 53 minutes end to end for a 30-minute window; the first six levels took just under 10 hours, the three appended levels just under 5. The extension used `run-sweep.sh "16 32 64"` with `AB_ID` preset to the existing run id (arm order alternated per level as before: baseline first at 16 and 64, thunder first at 32).
