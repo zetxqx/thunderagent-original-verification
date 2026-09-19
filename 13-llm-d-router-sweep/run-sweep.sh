@@ -8,7 +8,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 POOL="$HERE/../12-llm-d-router-pool/run-pool.sh"
 LEVELS="${1:-48 96 128 192 256 338}"; WINDOW="${2:-1800}"
-export AB_ID="sweep-$(date +%Y%m%d-%H%M%S)-t1900" OUT_BASE="$HERE/results" SKIP_ANALYSIS=1
+# AB_ID may be preset to append levels to an existing run directory.
+export AB_ID="${AB_ID:-sweep-$(date +%Y%m%d-%H%M%S)-t1900}" OUT_BASE="$HERE/results" SKIP_ANALYSIS=1
 echo "sweep run id: $AB_ID  levels: $LEVELS  window: ${WINDOW}s"
 i=0
 for C in $LEVELS; do

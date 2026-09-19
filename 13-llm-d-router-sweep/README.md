@@ -26,6 +26,8 @@ Pre-registered expectations:
 
 Run `results/sweep-20260918-134248-t1900` (2026-09-18 13:42 to 23:35 PDT). All 12 cells completed, no preemption, 0 request errors in every cell. Full tables in `sweep.md`, curves in `sweep.png`.
 
+The table below compares the two arms at each level. For the other question this sweep answers, why throughput falls as concurrency rises within an arm, see `RESULTS.md`: the short version is that the pool does 6.6x more token work at c=338 than at c=48 and the metric counts only the decode half.
+
 | c | sessions/pod | throughput baseline / thunder (tok/s) | ratio | steady-state hit rate baseline / thunder | TTFT p50 baseline / thunder (s) | waiting inside vLLM baseline / thunder | thunder resumes that changed pod |
 |---|---|---|---|---|---|---|---|
 | 48 | 12 | 2014 / 1972 | 0.98x | 0.952 / 0.948 | 0.4 / 0.4 | 0 / 0 | 0 of 2 |

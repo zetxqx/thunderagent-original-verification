@@ -101,6 +101,17 @@ One cell per arm and level. `sessions/pod` = c / 4.
 | 256 | 64 | 0 | 0 | - |
 | 338 | 84 | 0 | 0 | - |
 
+## sessions completed and replaced
+
+| c | sessions/pod | baseline | thunder | thunder / baseline |
+|---|---|---|---|---|
+| 48 | 12 | 33 | 30 | 0.91x |
+| 96 | 24 | 23 | 23 | 1.00x |
+| 128 | 32 | 14 | 25 | 1.79x |
+| 192 | 48 | 1 | 17 | 17.00x |
+| 256 | 64 | 0 | 16 | - |
+| 338 | 84 | 0 | 14 | - |
+
 ## EPP holds
 
 | c | sessions/pod | baseline | thunder | thunder / baseline |

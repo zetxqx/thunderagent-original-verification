@@ -58,7 +58,7 @@ Written 2026-09-18 so a fresh session can continue without replaying the history
 - Every arm of a comparison must use the same client `request_timeout`, above 1800 s unless the point is to reproduce step 08; report skipped turns and sessions ended per arm.
 - Background commands launched through the tool are capped at 10 minutes; long drivers must be started with `nohup ... &` in a subshell (macOS has no `setsid`).
 - Pool cells take about 55 to 58 minutes end to end for a 45-minute window (4000+ requests of reports).
-- The generator starts all sessions at t=0 and starts a new one only when one ends; weka sessions end only on failure within 45 minutes.
+- The generator starts all sessions at t=0 and starts a new trace whenever one ends. Under heavy load sessions rarely finish (0 to 25 of 128 to 338 slots in 30 min), but under light load they do: at c=48 about two thirds of the slots turned over in 30 min (30 to 33 completed sessions, median 9 min). Low-concurrency cells therefore mix in trace turnover (cold starts, early short-prompt turns); see the `sessions completed and replaced` row in the step 13 tables. The faster arm finishes more sessions and pulls in more cold traces, which makes the reported gains slightly conservative.
 
 ## Open items, in the order they were agreed
 
