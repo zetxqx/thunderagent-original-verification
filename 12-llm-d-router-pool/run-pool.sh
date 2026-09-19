@@ -101,7 +101,12 @@ print('reset_prefix_cache $VP:', urllib.request.urlopen(urllib.request.Request('
       -e "s/__MAX_TRACES__/0/" -e "s/__RUN_BUDGET__/$((WINDOW + 2400))/" -e "s/__PROBE_MAX_SECONDS__/$((WINDOW + 1800))/" \
       -e "s|__BENCH_IMAGE__|$BENCH_IMAGE|" "$HERE/job-weka.yaml" | kubectl apply -f - >/dev/null
   kubectl wait pod -l cell="$CELL" -n "$NS" --for=condition=Ready --timeout=900s >/dev/null
-  local POD T0; POD=$(kubectl get pod -l cell="$CELL" -n "$NS" --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}'); T0=$(date +%s)
+  # The name lookup can return nothing on a transient API error; an empty name
+  # would make the DONE poll below spin forever (lost the step 13 c256 cell's collection).
+  local POD T0 n=0
+  until POD=$(kubectl get pod -l cell="$CELL" -n "$NS" --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) && [ -n "$POD" ]; do
+    n=$((n+1)); [ "$n" -ge 30 ] && { echo "ERROR [$CELL]: bench pod name not found" >&2; return 1; }; sleep 10
+  done; T0=$(date +%s)
   ( while ! kubectl exec "$POD" -n "$NS" -c bench -- test -f /results/DONE 2>/dev/null; do
       kubectl top pod -n "$NS" --no-headers 2>/dev/null | awk -v t="$(date +%s)" -v e="$DEPLOY" -v b="$POD" '$1 ~ e || $1 ~ /program-aware-vllm-decode/ || $1 == b {print t","$1","$2","$3}' >> "$CELL_DIR/cpu-usage.csv"; sleep 30; done ) &
   local CPU_PID=$! PREEMPTED=false

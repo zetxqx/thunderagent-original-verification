@@ -1,6 +1,6 @@
 # Handoff: ThunderAgent verification and the llm-d-router port
 
-Written 2026-09-18 so a fresh session can continue without replaying the history. Everything below is derivable from the numbered step folders, but this is the short path. Dates are absolute. Nothing in this repo is committed past step 08; the public GitHub repo (`zetxqx/thunderagent-original-verification`) stops at step 08 and lacks the two step 08 corrections noted below.
+Written 2026-09-18 so a fresh session can continue without replaying the history. Everything below is derivable from the numbered step folders, but this is the short path. Dates are absolute. Everything through step 13 is committed and pushed to the public GitHub repo (`zetxqx/thunderagent-original-verification`); raw per-request reports are git-ignored (see the README data note).
 
 ## Where things are
 
@@ -15,7 +15,7 @@ Written 2026-09-18 so a fresh session can continue without replaying the history
 
 ## Cluster state right now
 
-- Helm release `program-aware-scheduling` (the main EPP, 1 replica, envoy sidecar, service port 80 -> envoy 8081, metrics 9090): revision 23 (2026-09-18 11:30): image `thunder-agent-v3`, **baseline** plugin config (`12-llm-d-router-pool/baseline-plugins.yaml`) and envoy `message_timeout` 2400 s, left there by the interrupted first step 13 launch; revision 22 was the step 09 state (thunder config, 1000 s). Whatever arm ran last leaves its config on the release. `12-llm-d-router-pool/run-pool.sh` upgrades it per cell with `main-values.yaml` (2400 s timeout) and reverts are documented in `08-cluster-changes.md`.
+- Helm release `program-aware-scheduling` (the main EPP, 1 replica, envoy sidecar, service port 80 -> envoy 8081, metrics 9090): revision 35, after the step 13 sweep (2026-09-18 23:35): image `thunder-agent-v3`, **baseline** plugin config (`12-llm-d-router-pool/baseline-plugins.yaml`) and envoy `message_timeout` 2400 s, left by the last cell `epp-baseline-c338`; revision 22 was the step 09 state (thunder config, 1000 s). Whatever arm ran last leaves its config on the release. `12-llm-d-router-pool/run-pool.sh` upgrades it per cell with `main-values.yaml` (2400 s timeout) and reverts are documented in `08-cluster-changes.md`.
 - The three step 10 lane EPPs, their pod labels and the `thunder-lane-auth-delegator` binding were removed on 2026-09-18 (`10-llm-d-router-replicates/teardown-lanes.sh`); `deploy-lanes.sh` recreates them if single-pod work resumes.
 - ServiceAccount `thunderagent-metrics-reader` (namespace) with a ClusterRole on `/metrics` and `/debug/plugins/state`: the EPP metrics port enforces kube-rbac; use `kubectl create token thunderagent-metrics-reader -n <ns>` as a bearer. The EPP's own service account gets 403.
 - The original Python router `thunderagent-original` (step 02) is still deployed and idle.
@@ -30,6 +30,7 @@ Written 2026-09-18 so a fresh session can continue without replaying the history
 4. **Step 10 (single-pod lanes through the EPP, 3 replicates).** `epp-sticky` reproduces the Python proxy (227 vs 221 tok/s). `epp-thunder`: 351 tok/s (1.54x) with a 1900 s client, 405 (1.80x) with step 08's 600 s client; under equal load its hit rate matches upstream (0.55 vs 0.57). The residual gap to 2.12x is the two step 08 artifacts above, not a scheduling difference.
 5. **inference-perf v0.7.0 permit bug (found 2026-09-18).** An event parked on predecessors kept its `worker_max_concurrency` permit, so only about half of the dispatched sessions ever started (51 to 109 of 128 to 183) in every run of steps 07 to 10, both routers alike. Fixed in `d5a7c8c`; every run from step 12 on uses the fixed image. Older runs should quote active sessions, not c. Verified by md5 of the file inside the image and by 128 of 128 / 338 of 338 sessions issuing requests.
 6. **Step 12 (whole 4-pod pool, one EPP, c=338, 45 min, 3 replicates, 1900 s client).** llm-d default profile and plain session affinity are indistinguishable: 1020 tok/s, hit rate 0.002, TTFT p50 123 s, about 190 requests waiting inside vLLM. The port: 1447 tok/s (1.42x, plus or minus 0.3 percent), hit rate 0.248, TTFT p50 3.7 s, engine queue near zero with about 370 requests held in the EPP, 55 forced admissions and 25 client timeouts per cell. About 70 percent of resumes moved pods (3100 of 4470 per cell), which halves the hit rate versus a single pod; recorded as `proposal/PROPOSAL.md` Part 3 (origin-only resume). Figures: `pool.png`, `timeseries.png`, `waiting.png` in the run directory.
+7. **Step 13 (concurrency sweep, two arms, 6 levels, 30 min per cell, one cell each).** Thunder 0.98x at 12 sessions per pod, tie at 24, 1.20x at 32, 1.26x at 48, 1.44x at 64, 1.46x at 84. Thunder TTFT p50 stays 2 to 4 s above the crossover; baseline's grows to 101 s with 152 requests waiting inside vLLM. Resumes that changed pod: 49 to 71 percent. Details and caveats in `13-llm-d-router-sweep/README.md`.
 
 ## Decisions taken (and by whom)
 
@@ -61,7 +62,7 @@ Written 2026-09-18 so a fresh session can continue without replaying the history
 
 ## Open items, in the order they were agreed
 
-1. Step 13 sweep: two arms, six levels, 30-minute cells, about 9 hours. A first launch at 11:30 on 2026-09-18 was interrupted after the driver started the `epp-baseline-c48` cell; the cell finished inside the pod (job `weka-bench-epp-baseline-c48`, bench container sleeping) but nothing was collected, so it is voided: delete that job and the `results/sweep-20260918-113021-t1900` directory before relaunching.
+1. Step 13 sweep: DONE 2026-09-18 (run `13-llm-d-router-sweep/results/sweep-20260918-134248-t1900`, results in the step README). Gain 0.98x at 12 sessions per pod, crossover at 24 to 32, 1.46x at 84; pod-hopping share of resumes 49 to 71 percent. Possible follow-ups: c=16/24/32 to locate the throughput peak; an `epp-thunder-origin` arm (Part 3) at c=96/128/192.
 2. Commit and push this repo (steps 09 to 13, the step 08 addenda, the docs); the user asks for commits explicitly.
 3. Proposal Part 3 (origin-only resume): implement the `resumePlacement` knob, rebuild `thunder-agent-v4`, one pool arm.
 4. Proposals Part 1 (queue aging) and Part 2 (interval plus smoothing) remain unrun; Part 2's premise was weakened by step 10 (continuous admission cost hit rate under upstream's phantom regime; see step 10 RESULTS).

@@ -81,3 +81,7 @@ Only 3 distinct nodes now (two pods share ...-6j7g), so a 3-lane parallel sweep 
 - `thunderagent-original` deployment + `thunderagent-router` service (step 02): the reference router, idle.
 - `thunderagent-vllm-backends` headless service (step 02).
 - The pre-existing `program-aware-scheduling-epp` (llm-d EPP) was never touched.
+
+## 2026-09-18 evening: step 13 sweep left the main release on the baseline config
+
+`12-llm-d-router-pool/run-pool.sh` upgraded `program-aware-scheduling` once per cell (revisions 24 to 35). The last cell was `epp-baseline-c338`, so revision 35 carries `baseline-plugins.yaml` and the 2400 s envoy `message_timeout`. Revert to the step 09 thunder state with `09-llm-d-router-smoke/deploy.sh` if single-EPP thunder work resumes.

@@ -74,7 +74,7 @@ def main():
                 ax.text(0, 1.02, sub, transform=ax.transAxes, fontsize=10, color="#555555", va="bottom")
             if i == len(reps) - 1:
                 ax.set_xlabel("minutes since start")
-        axes[i, 0].set_ylim(0, 0.6); axes[i, 1].set_ylim(0, 1.02); axes[i, 2].set_ylim(0, 200); axes[i, 3].set_ylim(0, 400)
+        axes[i, 0].set_ylim(0, 1.02); axes[i, 1].set_ylim(0, 1.02); axes[i, 2].set_ylim(0, 200); axes[i, 3].set_ylim(0, 400)
         axes[i, 0].set_ylabel(f"replicate r{r}", fontsize=12, fontweight="bold")
     h0, l0 = axes[0, 0].get_legend_handles_labels(); h3, l3 = axes[0, 3].get_legend_handles_labels()
     fig.legend(h0 + h3, l0 + l3, loc="lower center", ncol=5, fontsize=11, bbox_to_anchor=(0.5, -0.01))
