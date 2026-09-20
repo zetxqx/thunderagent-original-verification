@@ -31,3 +31,7 @@ untracked: pkg/epp/framework/plugins/thunderagent/conformance_test.go pkg/epp/fr
  .../framework/plugins/thunderagent/state_dump.go   |  16 +-
  22 files changed, 968 insertions(+), 573 deletions(-)
 ```
+
+## thunder-agent-v4
+
+Built 2026-09-19 22:36 UTC from llm-d-router commit `8ee881c2` (adds `resumePlacement` with `origin-only`; identical to v3 under the default `most-room`), Cloud Build `98a13127`, amd64. Binary layer differs from v3 (`3675bdb75474` vs `fc7ffc156f66`). Used by the step 13 origin arm and its v4 control cell.

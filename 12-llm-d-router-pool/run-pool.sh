@@ -24,6 +24,8 @@ REPO="${LLM_D_ROUTER:-$HOME/projects/llmdthunder/llm-d-router}"
 CHART="$REPO/config/charts/llm-d-router-standalone"
 CONC="${1:-338}"; REPS="${2:-3}"; WINDOW="${3:-2700}"; ARMS="${4:-baseline,affinity,thunder}"; CLIENT_TIMEOUT="${5:-1900}"
 BENCH_IMAGE="${BENCH_IMAGE:-$(cat "$HERE/results/inference-perf-image.txt")}"
+# EPP image tag; thunder-agent-v4 adds resumePlacement (origin-only arm). v3 and v4 behave the same under most-room.
+EPP_IMAGE_TAG="${EPP_IMAGE_TAG:-thunder-agent-v3}"
 
 PREFIX="rep"; [ "$WINDOW" -lt 1800 ] && PREFIX="cal"
 # AB_ID may be preset to append cells (e.g. a make-up replicate) to an existing run directory;
@@ -43,7 +45,7 @@ echo "pool: ${PODS[*]}"
 {"ab_id":"$AB_ID","kind":"pool","started":"$(date -u +%Y-%m-%dT%H:%M:%SZ)",
  "concurrency":$CONC,"replicates":$REPS,"window_s":$WINDOW,"arms":"$ARMS","client_timeout_s":$CLIENT_TIMEOUT,
  "design":"one EPP over the whole pool; arms sequential per replicate in Latin-square order; fresh EPP and cache reset per cell",
- "epp_image":"thunder-agent-v3","inference_perf":"$BENCH_IMAGE","base_seed":20260915,
+ "epp_image":"$EPP_IMAGE_TAG","inference_perf":"$BENCH_IMAGE","base_seed":20260915,
  "pods":"$(IFS=,; echo "${PODS[*]}")",
  "config_template_sha256":"$(shasum -a 256 "$HERE/config-tmpl.yaml" | cut -d' ' -f1)",
  "prober_sha256":"$(shasum -a 256 "$HERE/prober.py" | cut -d' ' -f1)"}
@@ -78,7 +80,7 @@ print('reset_prefix_cache $VP:', urllib.request.urlopen(urllib.request.Request('
   # Switch the main release to this arm's config, restart for a clean plugin
   # state. Retried: a transient API-server timeout lost baseline-r2 on
   # 2026-09-18 (the arm check then refused to run under the wrong config).
-  retry helm upgrade "$RELEASE" "$CHART" -n "$NS" -f "$HERE/main-values.yaml" \
+  retry helm upgrade "$RELEASE" "$CHART" -n "$NS" -f "$HERE/main-values.yaml" --set "router.epp.image.tag=$EPP_IMAGE_TAG" \
     --set-file "router.epp.pluginsCustomConfig.thunder-plugins\.yaml=$HERE/$ARM-plugins.yaml" >/dev/null
   retry kubectl rollout restart "deploy/$DEPLOY" -n "$NS" >/dev/null
   kubectl rollout status "deploy/$DEPLOY" -n "$NS" --timeout=300s >/dev/null; sleep 5
@@ -86,9 +88,14 @@ print('reset_prefix_cache $VP:', urllib.request.urlopen(urllib.request.Request('
   [ -n "$EPP_POD" ] || EPP_POD=$(kubectl get pod -n "$NS" -o name | grep "$DEPLOY" | head -1 | sed 's|pod/||')
   local PARSED; PARSED=$(kubectl logs "$EPP_POD" -n "$NS" -c epp 2>/dev/null | grep -m1 '"msg":"parsed config"' | grep -oE 'Scorers: \[[^]]*\]' || true)
   local GATE; GATE=$(kubectl logs "$EPP_POD" -n "$NS" -c epp 2>/dev/null | grep -c "Initializing Flow Control layer" || true)
-  echo "[$CELL] epp pod $EPP_POD  $PARSED  flow-control=$GATE"
+  local IMAGE; IMAGE=$(kubectl get pod "$EPP_POD" -n "$NS" -o jsonpath='{.spec.containers[?(@.name=="epp")].image}')
+  echo "[$CELL] epp pod $EPP_POD  image ${IMAGE##*/}  $PARSED  flow-control=$GATE"
+  case "$IMAGE" in *":$EPP_IMAGE_TAG") ;; *) echo "FATAL [$CELL]: EPP image is $IMAGE, expected tag $EPP_IMAGE_TAG" >&2; return 1 ;; esac
   case "$ARM" in
     thunder)  [ "$GATE" -ge 1 ] && echo "$PARSED" | grep -q thunder-agent || { echo "FATAL [$CELL]: thunder arm not active" >&2; return 1; } ;;
+    thunder-origin)
+      [ "$GATE" -ge 1 ] && echo "$PARSED" | grep -q thunder-agent || { echo "FATAL [$CELL]: thunder-origin arm not active" >&2; return 1; }
+      kubectl get cm "$DEPLOY" -n "$NS" -o yaml | grep -q 'resumePlacement: origin-only' || { echo "FATAL [$CELL]: origin-only not in the EPP config" >&2; return 1; } ;;
     affinity) echo "$PARSED" | grep -q session-affinity || { echo "FATAL [$CELL]: affinity arm not active" >&2; return 1; } ;;
     baseline) echo "$PARSED" | grep -q prefix-cache-scorer || { echo "FATAL [$CELL]: baseline arm not active" >&2; return 1; } ;;
   esac
@@ -118,14 +125,19 @@ print('reset_prefix_cache $VP:', urllib.request.urlopen(urllib.request.Request('
   kubectl logs "$EPP_POD" -n "$NS" -c epp --tail=200000 > "$CELL_DIR/epp.log" 2>/dev/null || true
   kubectl logs "$POD" -n "$NS" -c prober --tail=2000 > "$CELL_DIR/prober.log" 2>/dev/null || true
   retry kubectl cp "$NS/$POD:/results" "$CELL_DIR/results" -c bench >/dev/null
+  # The bench pod downloads a 700 MB slice of the trace corpus at start; a truncated
+  # download leaves too few traces to fill the concurrency (the step 13 origin c=192
+  # cell got 10 of 338 traces). Such a cell is voided below, like a preempted one.
+  local KEPT; KEPT=$(python3 -c "import json;print(json.load(open('$CELL_DIR/results/trace-manifest.json')).get('kept',0))" 2>/dev/null || echo 0)
   cat > "$CELL_DIR/manifest.json" <<EOJ
-{"cell":"$CELL","arm":"$ARM","concurrency":$CONC,"window_s":$WINDOW,"client_timeout_s":$CLIENT_TIMEOUT,"epp_pod":"$EPP_POD","bench_pod":"$POD",
+{"cell":"$CELL","arm":"$ARM","concurrency":$CONC,"window_s":$WINDOW,"client_timeout_s":$CLIENT_TIMEOUT,"epp_pod":"$EPP_POD","epp_image":"$EPP_IMAGE_TAG","bench_pod":"$POD","corpus_traces":$KEPT,
  "pods":"$(IFS=,; echo "${PODS[*]}")","preempted":$PREEMPTED,"started_epoch":$T0,"finished_epoch":$(date +%s),
  "config_sha256":"$(shasum -a 256 "$CELL_DIR/config.yml" | cut -d' ' -f1)","plugins_sha256":"$(shasum -a 256 "$HERE/$ARM-plugins.yaml" | cut -d' ' -f1)"}
 EOJ
   kubectl delete job "weka-bench-$CELL" -n "$NS" >/dev/null
   tail -3 "$CELL_DIR/results/bench-stdout.log" 2>/dev/null || true
   [ "$PREEMPTED" = false ] || { mv "$CELL_DIR" "$CELL_DIR-PREEMPTED"; return 1; }
+  [ "$KEPT" -ge "$CONC" ] || [ "$KEPT" -ge 338 ] || { echo "WARNING [$CELL]: corpus has $KEPT traces, fewer than concurrency $CONC (truncated download); voiding cell" >&2; mv "$CELL_DIR" "$CELL_DIR-SHORTCORPUS"; return 1; }
 }
 
 IFS=, read -r -a ARM_LIST <<< "$ARMS"; N=${#ARM_LIST[@]}

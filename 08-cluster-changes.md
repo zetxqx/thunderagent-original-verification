@@ -89,3 +89,7 @@ Only 3 distinct nodes now (two pods share ...-6j7g), so a 3-lane parallel sweep 
 ## 2026-09-19: step 13 extension (c = 16, 32, 64) left the main release on the thunder config
 
 Six more per-cell upgrades (revisions 36 to 41). The last cell was `epp-thunder-c64`, so revision 41 carries `thunder-plugins.yaml` with the 2400 s envoy `message_timeout` (step 09's state differs only in the 1000 s timeout).
+
+## 2026-09-19/20: step 13 origin arm left the main release on thunder-agent-v4 with origin-only
+
+Seven more per-cell upgrades (revisions 42 to 48) with `--set router.epp.image.tag=thunder-agent-v4`. The last cell was the `epp-thunder-origin-c192` rerun, so revision 48 runs image `thunder-agent-v4` with `thunder-origin-plugins.yaml` (`resumePlacement: origin-only`) and the 2400 s envoy `message_timeout`.
