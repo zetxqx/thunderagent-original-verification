@@ -1,0 +1,43 @@
+# EPP plugin config for the epp-thunder-origin-age-reserve arm: age-only plus
+# urgentReserveOrigin: while an urgent paused program does not fit its origin
+# pod, that pod admits no other paused or new program, so freed room
+# accumulates for it. Needs thunder-agent-v6 or later.
+apiVersion: inference.networking.x-k8s.io/v1alpha1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- type: agent-identity
+  parameters:
+    additionalSessionHeaders:
+    - x-session-id
+- type: thunder-agent
+  name: thunder
+  parameters:
+    capacityTokens: 2237040
+    utilThreshold: 1.0
+    actingHalfLifeSeconds: 1
+    bufferTokensPerProgram: 100
+    pauseSweepSeconds: 5
+    kvUsageCorrection: false
+    resumePlacement: origin-only
+    urgentWaitMs: 15000
+    urgentMove: false
+    urgentReserveOrigin: true
+    headWaitStarvationMs: 1800000
+    evictionTtlSeconds: 3600
+    evictionSweepSeconds: 300
+    sessionFinalHeader: x-session-final
+- type: max-score-picker
+- type: single-profile-handler
+flowControl:
+  defaultRequestTTL: "0s"
+  saturationDetector:
+    pluginRef: thunder
+  defaultPriorityBand:
+    fairnessPolicyRef: thunder
+schedulingProfiles:
+- name: default
+  plugins:
+  - pluginRef: thunder
+  - pluginRef: max-score-picker

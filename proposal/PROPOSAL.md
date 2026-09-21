@@ -1,4 +1,4 @@
-# ThunderAgent scheduling: seven proposals
+# ThunderAgent scheduling: eight proposals
 
 **Part 1** - why large sessions starve at admission, and four ways to bound the wait.
 **Part 2** - whether the 5-second scheduler interval is costing throughput, and why shortening it should come with signal smoothing.
@@ -7,8 +7,11 @@
 **Part 5** - why CPU KV offloading attacks the same root cause as admission control at lower cost, and what that does to ThunderAgent's value.
 **Part 6** - three gaps the port has once chat traffic is mixed with agentic, and the fix path through priority bands.
 **Part 7** - session-level metrics for judging these schedulers under an SLO, because request-level TTFT percentiles hide who pays under overload.
+**Part 8** - residency-aware hold-or-move: replace the guessed wait thresholds with knowledge of whether a session's prefix is still cached on its pod, and of each pod's real free KV.
 
-Only Part 3 has been run (step 13); Part 7 is a measurement proposal, partly computable from existing data.
+Parts 3 and 3-Option-B have been run (step 13); Part 7 is a measurement proposal, partly computable from existing data; Part 8 follows from the wait-cost curve measured on 2026-09-21.
+
+`ADMISSION-ORDERING.md` sits alongside these and asks the question underneath Parts 1 and 3: when capacity frees, which waiting session should get it? The port breaks ties on smallest footprint, which on this corpus is the newest and shallowest session, while Little's law and the step 13 data argue for the session whose KV is still resident. Origin-only resume already proved the same principle on the placement axis; the ordering axis is untested.
 
 ---
 
@@ -289,7 +292,7 @@ On the added wait, the arithmetic is kinder than it first looks. Today a program
 
 Like A, but after a program has waited `T` seconds for its origin pod it may take the most-room pod. `T` on the order of the tail we can tolerate (30 to 60 s). Trades some cache residency for a bounded added delay; adds one parameter and one more interaction with Part 1's starvation.
 
-Implemented 2026-09-21 (llm-d-router branch `thunder-agent`) in a stronger form that also settles the Part 1 interaction: `urgentWaitMs`. A paused or new head that has waited that long (a) is ordered ahead of every non-urgent paused or new head, oldest first, and (b) is released from the origin-only restriction. Without (a), a bounded wait alone would let a large session keep losing to smaller newcomers on every pod instead of only on its origin. It remains fit-checked; only `headWaitStarvationMs` bypasses the fit. Suggested value: the TTFT SLO minus one re-prefill, i.e. about 15 s for a 30 s SLO. Counter: `thunder_agent_urgent_promotions_total`.
+Implemented 2026-09-21 (llm-d-router branch `thunder-agent`) in a stronger form that also settles the Part 1 interaction: `urgentWaitMs`. Measured the same day at 15 s on c=128 (step 13 README, Option B): the move half creates a move, overfill, pause loop and fails every criterion except the extreme tail. The knob was then split into `urgentWaitMs` (ordering only), `urgentMove` (the move, off by default) and `urgentReserveOrigin` (close the origin pod to other admissions while an urgent program waits for it), so the three mechanisms can be measured separately. A paused or new head that has waited that long (a) is ordered ahead of every non-urgent paused or new head, oldest first, and (b) is released from the origin-only restriction. Without (a), a bounded wait alone would let a large session keep losing to smaller newcomers on every pod instead of only on its origin. It remains fit-checked; only `headWaitStarvationMs` bypasses the fit. Suggested value: the TTFT SLO minus one re-prefill, i.e. about 15 s for a 30 s SLO. Counter: `thunder_agent_urgent_promotions_total`.
 
 ### Option C: move only when the origin is clearly the worse choice
 
@@ -518,4 +521,67 @@ inference-perf v0.7.0 writes no session identifier into the per-request report (
 - Whether origin-only's extra holds (55 to 69 percent more than most-room) land on many sessions briefly or on a few sessions for long. The first is a TTFT p90 story; the second is a Part 1 story and calls for queue aging.
 - Whether the port's advantage over llm-d's default holds as a capacity-at-SLO claim, which is the form an operator can act on.
 - The concurrency question itself: choosing c for an experiment or a deployment becomes "the largest c at which metric 2 meets the target", instead of a guess.
+
+---
+
+# Part 8: residency-aware hold-or-move (use exact KV knowledge instead of wait thresholds)
+
+Status: proposal, written 2026-09-21 after the Option B experiments and the wait-cost curve (`../13-llm-d-router-sweep/results/sweep-20260918-134248-t1900/wait-cost.md`, `analyze_wait_cost.py`). Nothing implemented beyond the switches of Part 3 Option B.
+
+## What the port knows today, and what it assumes
+
+The port's fit view is a model, not a measurement. Per program it holds a token estimate (request bytes, refined from usage) and a decayed footprint for idle programs (upstream's `2^-t`, meant to stand in for the engine gradually evicting idle KV); per pod it holds capacity minus the sum of those footprints. It does not know whether a paused program's prefix is still resident on its origin pod, and it does not read the engine's real free block count (`kvUsageCorrection` exists but is off, as upstream's `shared_tokens` always was). Every placement policy measured so far therefore acts on an assumption: most-room assumes a move is cheap, origin-only assumes the origin is warm, the 15 s urgent tier assumed a wait of 15 s is still worth something.
+
+## The measurement that exposes the gap
+
+vLLM returns `prompt_tokens_details.cached_tokens` per request (`--enable-prompt-tokens-details`), so for every turn we know how much of its prompt was still cached when it was prefilled. Against the prefix idle age (previous turn's end to this turn's first token), at c=128 (32 sessions per pod, pool KV 50 to 70 percent full):
+
+| prefix idle age | origin-only: median cached fraction | most-room | share of origin-only turns in the bin |
+|---|---|---|---|
+| 0 to 2 s | 0.99 | 0.97 | 39 percent |
+| 2 to 5 s | 0.98 | 0.08 (moved) | 22 percent |
+| 5 to 10 s | 0.92 | 0.00 | 17 percent |
+| 10 to 15 s | 0.17 | 0.00 | 9 percent |
+| 15 s and more | 0.00 | 0.00 | 13 percent |
+
+A paused session's prefix survives about 10 to 12 s on its pod at this load, then it is gone. Three consequences, all seen in step 13:
+
+- origin-only's gain is the 78 percent of turns that resume within 10 s; its long tail (worst-turn p90 261 s) is sessions waiting for an origin that has already evicted them, which buys nothing.
+- most-room moves as soon as the origin is full, so 46 percent of its turns pay a full re-prefill although the prefix was still warm (median cached 0.08 in the 2 to 5 s bin).
+- any policy that acts at 15 s acts on cold sessions. The move variant paid 15 s plus a full prefill per moved turn and started a move, overfill, pause loop; the age-only variant let warm sessions wait behind cold ones until they were cold too (hit rate 0.68 to 0.51 with zero moves). Both failed every criterion.
+
+The horizon is load dependent: fewer sessions per pod means a longer survival, more means shorter. A static threshold is therefore a proxy for the quantity that actually matters, which is whether this session's blocks are still on this pod.
+
+## The proposal
+
+Make the hold-or-move decision from measured residency and measured free room, in three layers of increasing precision.
+
+**Layer 1, static proxy (cheap, to validate the direction)**: `originWaitMaxMs` on origin-only placement, no change to ordering (smallest first stays; the age tier is harmful here, see Option B). Set it just inside the survival horizon, about 8 s at 32 sessions per pod: a paused program waits for its origin while its prefix is almost certainly warm, then moves to the most-room pod before the wait is wasted. Prediction: throughput between most-room's 1370 and origin-only's 1693 tok/s (closer to the latter, since the 78 percent warm resumes are kept), worst-turn TTFT p90 near most-room's 167 s or below, strict session attainment at or above most-room's 0.76, rebinds about 20 percent of resumes. One 30-minute cell at c=128 decides whether to build layer 2.
+
+**Layer 2, residency from the KV index (the actual proposal)**: llm-d already maintains a KV block index from vLLM's KV events (the precise mode of `prefix-cache-scorer`): which block hashes are resident on which pod. In `Pick`, for every paused head, query the index for the number of this program's prompt tokens still cached on its origin pod and on each candidate pod. Then:
+
+- hold while the origin holds (nearly) all of the prefix and has a realistic chance of room soon;
+- move as soon as the origin has evicted it, to the pod that holds the most of it (usually none: then the most-room pod), because waiting longer only adds delay to the same re-prefill;
+- when several pods hold parts of the prefix (a session that moved before), prefer the one with the larger cached share over the one with more room, weighted by the re-prefill it saves.
+
+This replaces the decayed footprint's job (guessing eviction) with a measurement, and turns Part 3's Option C (move when clearly better) into arithmetic: expected re-prefill tokens on each pod versus expected wait on the origin.
+
+**Layer 3, real free room**: read each pod's free KV blocks from the engine (already scraped by the datalayer) and use it as the admission room instead of capacity minus modelled footprints, keeping the model only for the pause sweep's undecayed view. This is `kvUsageCorrection` done properly. It addresses the other half of the u15 loop: admitting a moved 80k-token program onto a pod whose modelled room existed but whose blocks did not.
+
+## What it changes and what it does not
+
+Expected: a placement that dominates both current arms, origin-only's throughput and hit rate with most-room's tail or better, and a threshold that follows load instead of being tuned per level. Not expected: fewer total prefill tokens under overload beyond what residency allows. The pool's work is conserved; this decides who pays and avoids paying twice (wait and then re-prefill). The pause sweep's choice of whom to pause is untouched.
+
+## Risks and costs
+
+- KV event lag. The index is seconds behind the engine; against a 10 s horizon that is not negligible. Treat "cached share" as an upper bound and keep a small static guard.
+- Query cost. A 60k to 90k-token prompt is thousands of blocks; the index lookup per paused head per dispatch cycle must be cheap (cache the answer per program for a few hundred milliseconds, or query only when the head is older than a second).
+- Block granularity and hash chains. Residency of a prefix is "how many leading blocks are present"; a hole early in the chain makes everything after it useless. The index answers this correctly if queried as a prefix match, which is how the prefix-cache scorer uses it.
+- Multi-replica EPP: unchanged single-replica accounting assumption.
+
+## Experiments, in order
+
+1. Layer 1: `origin + originWaitMaxMs 8 s`, one 30-minute cell at c=128 against the existing most-room and origin-only triples; criteria above. About 1 hour including the switch.
+2. Layer 2: implement the index query, one arm at c=96, 128, 192 (30 minutes each) plus one 90-minute cell at c=128, against the same arms; report the Part 7 session metrics and the wait-cost curve (which should show no cold resumes on the origin and no warm moves). About 5 hours of pool time.
+3. Layer 3: turn on real free room with layer 2 and compare pauses, holds and forced admissions at c=192 and 338, where the modelled room diverges most from the engine's.
 

@@ -105,3 +105,7 @@ Revisions 58 and 59 (`epp-baseline-c96-r2`, `epp-baseline-c128-r2`). The release
 ## 2026-09-20 evening: three 90-minute cells at c=128
 
 Revisions 60 to 62 (`epp-thunder-origin-c128-w90`, `epp-baseline-c128-w90`, `epp-thunder-c128-w90`). The release now runs `thunder-agent-v4` with `thunder-plugins.yaml` (most-room) and the 2400 s envoy `message_timeout`.
+
+## 2026-09-21: Option B cells (thunder-agent-v5)
+
+Five per-cell upgrades for the u15 and u15-f25 arms. The last cell was `epp-thunder-origin-u15-c128-w90`, so the release now runs image `thunder-agent-v5` with `thunder-origin-u15-plugins.yaml` (`resumePlacement: origin-only`, `urgentWaitMs: 15000`) and the 2400 s envoy `message_timeout`. The planned u15-f25 90-minute cell was not run.

@@ -1,0 +1,42 @@
+# EPP plugin config for the epp-thunder-origin-u15-f25 arm: as u15, plus the
+# forced-admission backstop lowered from 1800 s to 25 s, so no admission wait
+# exceeds 25 s (at the cost of over-admitting into a full pod). Needs
+# thunder-agent-v5 or later.
+apiVersion: inference.networking.x-k8s.io/v1alpha1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- type: agent-identity
+  parameters:
+    additionalSessionHeaders:
+    - x-session-id
+- type: thunder-agent
+  name: thunder
+  parameters:
+    capacityTokens: 2237040
+    utilThreshold: 1.0
+    actingHalfLifeSeconds: 1
+    bufferTokensPerProgram: 100
+    pauseSweepSeconds: 5
+    kvUsageCorrection: false
+    resumePlacement: origin-only
+    urgentWaitMs: 15000
+    urgentMove: true                  # v5 semantics; v6 splits the move out of urgentWaitMs
+    headWaitStarvationMs: 25000
+    evictionTtlSeconds: 3600
+    evictionSweepSeconds: 300
+    sessionFinalHeader: x-session-final
+- type: max-score-picker
+- type: single-profile-handler
+flowControl:
+  defaultRequestTTL: "0s"
+  saturationDetector:
+    pluginRef: thunder
+  defaultPriorityBand:
+    fairnessPolicyRef: thunder
+schedulingProfiles:
+- name: default
+  plugins:
+  - pluginRef: thunder
+  - pluginRef: max-score-picker

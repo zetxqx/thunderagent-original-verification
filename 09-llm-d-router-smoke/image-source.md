@@ -39,3 +39,11 @@ Built 2026-09-19 22:36 UTC from llm-d-router commit `8ee881c2` (adds `resumePlac
 ## Tags
 
 Annotated tags `thunder-agent-v3`, `thunder-agent-v4`, `thunder-agent-v5` on `zetxqx/llm-d-router` point at the exact commits of each image (https://github.com/zetxqx/llm-d-router/tags). Reference commits through these tags in write-ups; a branch rebase cannot orphan a tagged commit.
+
+## thunder-agent-v5
+
+Built 2026-09-21 09:51 UTC from llm-d-router commit `f6ee4130` (tag `thunder-agent-v5`; adds `urgentWaitMs`, the fit-checked deadline tier, feature commit `1e922b63`), amd64, entrypoint `/app/epp`. Binary layer `e7e159d7a7cf` differs from v4 (`3675bdb75474`). Used by the step 13 Option B arms `thunder-origin-u15` and `thunder-origin-u15-f25`.
+
+## thunder-agent-v6
+
+Built 2026-09-21 16:47 UTC from llm-d-router commit `8283ece1` (tag `thunder-agent-v6`; splits the urgent tier into `urgentWaitMs` ordering, `urgentMove`, `urgentReserveOrigin`; gauge `thunder_agent_reserved_pods`), amd64, entrypoint `/app/epp`. Binary layer `a417e09eab7c` differs from v5 (`e7e159d7a7cf`). Used by the step 13 arms `thunder-origin-age` and `thunder-origin-age-reserve`.

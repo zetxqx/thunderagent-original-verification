@@ -19,7 +19,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-ARMS = (("epp-baseline", "#B64342", "s", "llm-d default"), ("epp-thunder", "#0F4D92", "o", "most-room"), ("epp-thunder-origin", "#3E9B4F", "^", "origin-only"))
+ARMS = (("epp-baseline", "#B64342", "s", "llm-d default"), ("epp-thunder", "#0F4D92", "o", "most-room"), ("epp-thunder-origin", "#3E9B4F", "^", "origin-only"),
+        ("epp-thunder-origin-u15", "#42949E", "D", "origin + urgent 15 s"), ("epp-thunder-origin-u15-f25", "#9A4D8E", "v", "origin + urgent 15 s + forced 25 s"),
+        ("epp-thunder-origin-age", "#E9A6A1", "P", "origin + age-only 15 s"), ("epp-thunder-origin-age-reserve", "#FFD700", "X", "origin + age 15 s + reserve"))
 SLO_S = 30.0
 
 
@@ -94,18 +96,18 @@ def main():
             ("session SLO attainment, strict", "attain_strict", "{:.2f}"), ("session SLO attainment, lenient", "attain_lenient", "{:.2f}"), ("sessions active in the slice", "sessions", "{:.0f}"), ("sessions with zero turns in the slice", "zero_share", "{:.2f}")]
     L = [f"# Long window: {suffix.strip('-')} sliced into {slice_s / 60:.0f}-minute windows\n", "Slice 1 is the warm-up-plus-first-half; later slices see deeper sessions (longer prompts). Ratios are of the arms' values within the same slice.\n"]
     for name, key, spec in rows:
-        L.append(f"## {name}\n"); L.append("| slice | " + " | ".join(a[3] for a in ARMS if a[0] in data) + " | most-room / default | origin / most-room |"); L.append("|---|" + "---|" * (len(data) + 2))
+        L.append(f"## {name}\n"); L.append("| slice | " + " | ".join(a[3] for a in ARMS if a[0] in data) + " | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |"); L.append("|---|" + "---|" * (len(data) + 4))
         for k in range(n):
             vals = {arm: data[arm][k].get(key, float("nan")) if k < len(data[arm]) else float("nan") for arm in data}
             def ratio(a, b):
                 return f"{vals[a] / vals[b]:.2f}x" if a in vals and b in vals and vals[b] == vals[b] and vals[b] else "-"
-            L.append(f"| {k + 1} | " + " | ".join(spec.format(vals[a]) if vals[a] == vals[a] else "-" for a in data) + f" | {ratio('epp-thunder', 'epp-baseline')} | {ratio('epp-thunder-origin', 'epp-thunder')} |")
+            L.append(f"| {k + 1} | " + " | ".join(spec.format(vals[a]) if vals[a] == vals[a] else "-" for a in data) + f" | {ratio('epp-thunder', 'epp-baseline')} | {ratio('epp-thunder-origin', 'epp-thunder')} | {ratio('epp-thunder-origin-u15', 'epp-thunder-origin')} | {ratio('epp-thunder-origin-u15-f25', 'epp-thunder-origin')} |")
         L.append("")
     (root / "long.md").write_text("\n".join(L)); print("\n".join(L[:24]))
 
     plt.rcParams.update({"font.family": ["Helvetica", "Arial", "DejaVu Sans", "sans-serif"], "font.size": 14, "axes.linewidth": 2, "axes.spines.top": False, "axes.spines.right": False, "legend.frameon": False})
     panels = [("throughput", "Throughput", "output tokens / s"), ("hit", "Prefix-cache hit rate", "token-weighted, per slice"), ("ttft_p50", "TTFT p50", "seconds"), ("attain_strict", "Session SLO attainment", f"strict, TTFT <= {SLO_S:.0f} s"), ("prompt_mean", "Mean prompt length", "tokens per request")]
-    fig, axes = plt.subplots(1, len(panels) + 1, figsize=(4.3 * len(panels) + 2.4, 4.8), gridspec_kw={"width_ratios": [1] * len(panels) + [0.5]})
+    fig, axes = plt.subplots(1, len(panels) + 1, figsize=(4.3 * len(panels) + 3.2, 4.8), gridspec_kw={"width_ratios": [1] * len(panels) + [0.75]})
     for ax, (key, title, unit) in zip(axes, panels):
         for arm, col, marker, label in ARMS:
             if arm not in data:

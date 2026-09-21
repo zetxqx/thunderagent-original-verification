@@ -93,9 +93,14 @@ print('reset_prefix_cache $VP:', urllib.request.urlopen(urllib.request.Request('
   case "$IMAGE" in *":$EPP_IMAGE_TAG") ;; *) echo "FATAL [$CELL]: EPP image is $IMAGE, expected tag $EPP_IMAGE_TAG" >&2; return 1 ;; esac
   case "$ARM" in
     thunder)  [ "$GATE" -ge 1 ] && echo "$PARSED" | grep -q thunder-agent || { echo "FATAL [$CELL]: thunder arm not active" >&2; return 1; } ;;
-    thunder-origin)
-      [ "$GATE" -ge 1 ] && echo "$PARSED" | grep -q thunder-agent || { echo "FATAL [$CELL]: thunder-origin arm not active" >&2; return 1; }
-      kubectl get cm "$DEPLOY" -n "$NS" -o yaml | grep -q 'resumePlacement: origin-only' || { echo "FATAL [$CELL]: origin-only not in the EPP config" >&2; return 1; } ;;
+    thunder-origin*)
+      [ "$GATE" -ge 1 ] && echo "$PARSED" | grep -q thunder-agent || { echo "FATAL [$CELL]: $ARM arm not active" >&2; return 1; }
+      # every placement/deadline knob of the arm's plugins file must be in the live ConfigMap
+      local CM; CM=$(kubectl get cm "$DEPLOY" -n "$NS" -o yaml)
+      for KEY in resumePlacement urgentWaitMs urgentMove urgentReserveOrigin headWaitStarvationMs; do
+        LINE=$(grep -oE "$KEY: [^ #]+" "$HERE/$ARM-plugins.yaml" || true)
+        [ -z "$LINE" ] || echo "$CM" | grep -q "$LINE" || { echo "FATAL [$CELL]: '$LINE' not in the EPP config" >&2; return 1; }
+      done ;;
     affinity) echo "$PARSED" | grep -q session-affinity || { echo "FATAL [$CELL]: affinity arm not active" >&2; return 1; } ;;
     baseline) echo "$PARSED" | grep -q prefix-cache-scorer || { echo "FATAL [$CELL]: baseline arm not active" >&2; return 1; } ;;
   esac
@@ -118,7 +123,10 @@ print('reset_prefix_cache $VP:', urllib.request.urlopen(urllib.request.Request('
       kubectl top pod -n "$NS" --no-headers 2>/dev/null | awk -v t="$(date +%s)" -v e="$DEPLOY" -v b="$POD" '$1 ~ e || $1 ~ /program-aware-vllm-decode/ || $1 == b {print t","$1","$2","$3}' >> "$CELL_DIR/cpu-usage.csv"; sleep 30; done ) &
   local CPU_PID=$! PREEMPTED=false
   while ! kubectl exec "$POD" -n "$NS" -c bench -- test -f /results/DONE 2>/dev/null; do
-    [ "$(pod_uids)" = "$UIDS0" ] || { echo "PREEMPTED [$CELL]: a pool pod was replaced; aborting cell" >&2; PREEMPTED=true; break; }
+    # An empty answer means the API call failed (the step 13 u15 w90 cell was falsely voided when the
+    # laptop lost its gcloud token for a few minutes); only a non-empty, different list is a preemption.
+    local U; U=$(pod_uids)
+    [ -z "$U" ] || [ "$U" = "$UIDS0" ] || { echo "PREEMPTED [$CELL]: a pool pod was replaced; aborting cell" >&2; PREEMPTED=true; break; }
     echo "$(date +%H:%M:%S) [$CELL] $(epp_summary "$POD")"; sleep 60
   done
   kill $CPU_PID 2>/dev/null || true
