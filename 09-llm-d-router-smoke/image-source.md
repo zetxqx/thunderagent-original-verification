@@ -35,3 +35,7 @@ untracked: pkg/epp/framework/plugins/thunderagent/conformance_test.go pkg/epp/fr
 ## thunder-agent-v4
 
 Built 2026-09-19 22:36 UTC from llm-d-router commit `8ee881c2` (adds `resumePlacement` with `origin-only`; identical to v3 under the default `most-room`), Cloud Build `98a13127`, amd64. Binary layer differs from v3 (`3675bdb75474` vs `fc7ffc156f66`). Used by the step 13 origin arm and its v4 control cell.
+
+## Tags
+
+Annotated tags `thunder-agent-v3`, `thunder-agent-v4`, `thunder-agent-v5` on `zetxqx/llm-d-router` point at the exact commits of each image (https://github.com/zetxqx/llm-d-router/tags). Reference commits through these tags in write-ups; a branch rebase cannot orphan a tagged commit.

@@ -17,6 +17,21 @@ Pre-registered expectations:
 - At 64 and 85 the gap approaches step 12's 1.42x on throughput and two orders of magnitude on hit rate.
 - Baseline's requests waiting inside vLLM should rise monotonically with load; thunder's should stay near zero above the crossover, with the wait moving into the EPP queue.
 
+## Code versions behind the cells
+
+Every cell's `manifest.json` records the EPP image tag (`epp_image`) and the bench image digest. The tags below resolve those to source commits; each is an annotated git tag on the fork, so the commits stay reachable even if the `thunder-agent` branch is rebased.
+
+| EPP image tag | llm-d-router commit | tag | what it adds | cells |
+|---|---|---|---|---|
+| `thunder-agent-v3` | [`ae371354`](https://github.com/zetxqx/llm-d-router/commit/ae371354a96b663dd7a62cfa96e8950a6a1c71e8) | [`thunder-agent-v3`](https://github.com/zetxqx/llm-d-router/releases/tag/thunder-agent-v3) | port aligned with upstream tr-decay | steps 09 to 12; step 13 sweep and the c = 16, 32, 64 extension (all `epp-baseline-c*` and `epp-thunder-c*` cells without a suffix) |
+| `thunder-agent-v4` | [`8ee881c2`](https://github.com/zetxqx/llm-d-router/commit/8ee881c248c19854a0362bd84ccbfc218ab88186) | [`thunder-agent-v4`](https://github.com/zetxqx/llm-d-router/releases/tag/thunder-agent-v4) | `resumePlacement: origin-only`, `thunder_agent_origin_waits_total` | every `epp-thunder-origin-*` cell, `epp-thunder-c192-v4ctl`, all `-r2`, `-r3` and `-w90` cells |
+| `thunder-agent-v5` | [`f6ee4130`](https://github.com/zetxqx/llm-d-router/commit/f6ee4130977b9880770f6ff6777cf817ae536879) (feature in [`1e922b63`](https://github.com/zetxqx/llm-d-router/commit/1e922b63)) | [`thunder-agent-v5`](https://github.com/zetxqx/llm-d-router/releases/tag/thunder-agent-v5) | `urgentWaitMs` deadline tier, `thunder_agent_urgent_promotions_total` | Option B cells (not yet run) |
+
+| bench image | inference-perf commit | cells |
+|---|---|---|
+| `inference-perf@sha256:63f2fbcf...` | [`d5a7c8c`](https://github.com/zetxqx/inference-perf/commit/d5a7c8c) (permit fix), [PR 3](https://github.com/zetxqx/inference-perf/pull/3) | step 12, step 13 sweep, extension, origin arm |
+| `inference-perf:session-id-v1` (`sha256:f7381b01...`) | [`d2bfa20`](https://github.com/zetxqx/inference-perf/commit/d2bfa20) (session id in the per-request report), same PR | all `-r2`, `-r3`, `-w90` cells |
+
 ## Files
 
 - `SATURATION.md`: why throughput falls with concurrency on this workload, the three meanings of "saturation point" (throughput peak, SLO capacity, collapse), and how to choose concurrency for experiments and for production.
