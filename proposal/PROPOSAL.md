@@ -11,7 +11,7 @@
 
 Parts 3 and 3-Option-B have been run (step 13); Part 7 is a measurement proposal, partly computable from existing data; Part 8 follows from the wait-cost curve measured on 2026-09-21.
 
-`ADMISSION-ORDERING.md` sits alongside these and asks the question underneath Parts 1 and 3: when capacity frees, which waiting session should get it? The port breaks ties on smallest footprint, which on this corpus is the newest and shallowest session, while Little's law and the step 13 data argue for the session whose KV is still resident. Origin-only resume already proved the same principle on the placement axis; the ordering axis is untested.
+`ADMISSION-ORDERING.md` sits alongside these and asks the question underneath Parts 1, 3 and 8: when capacity frees, which waiting session should get it? It first argued for replacing the smallest-footprint tie-break, then records that the age-only cell tested exactly that and lost, because oldest-first is largest-first and each freed block then resumes fewer sessions. It also compares llm-d's merged turn-priority strategy (PR #2116), which picked the depth ordering, and explains why its single-replica, CPU-offloaded, ungated setup does not transfer here.
 
 ---
 
@@ -408,6 +408,12 @@ This is the part to write plainly rather than discover under review. The port si
 - **Capacity = GPU, CPU as backstop.** ThunderAgent keeps the GPU-resident set coherent and the CPU tier absorbs what it pauses. Pause and resume are then cheap, so the cost of a wrong pause falls and Part 1's starvation stakes fall with it.
 
 Which is better is an experiment, and the honest prior is that offloading removes a large share of the value admission control provides on this workload. That is a finding worth having, not something to route around.
+
+## Evidence from upstream that offloading does not make scheduling irrelevant
+
+PR #2116's experiments ran with a 512 GiB CPU tier on a single H200 TP=4 replica, and its KV plot separates GPU-internal from CPU-external hits. At 128 concurrent sessions the FCFS arm sits at zero on **both** tiers while the turn-priority arm holds 75 to 95 percent GPU-internal for the whole 2.5-hour run. A large CPU tier did not rescue a scheduler that lost the GPU tier.
+
+That tempers the concern above. Offloading lowers the cost of a miss; it does not remove the value of not missing. The realistic expectation is that offloading compresses the gap between good and bad scheduling rather than closing it, which makes arm 2 below the interesting one rather than a formality.
 
 ## Proposal: two arms, then a third
 
