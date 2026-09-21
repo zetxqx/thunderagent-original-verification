@@ -47,3 +47,7 @@ Built 2026-09-21 09:51 UTC from llm-d-router commit `f6ee4130` (tag `thunder-age
 ## thunder-agent-v6
 
 Built 2026-09-21 16:47 UTC from llm-d-router commit `8283ece1` (tag `thunder-agent-v6`; splits the urgent tier into `urgentWaitMs` ordering, `urgentMove`, `urgentReserveOrigin`; gauge `thunder_agent_reserved_pods`), amd64, entrypoint `/app/epp`. Binary layer `a417e09eab7c` differs from v5 (`e7e159d7a7cf`). Used by the step 13 arms `thunder-origin-age` and `thunder-origin-age-reserve`.
+
+## thunder-agent-v7
+
+Built 2026-09-21 from llm-d-router commit `e79fd6c3` (tag `thunder-agent-v7`; adds `originWaitMaxMs`, a cap on the origin-only wait without reordering, and `thunder_agent_origin_wait_moves_total`; the tag was moved once before any image was built from it, because `db81e205` lacked the Pick change), amd64. Used by the step 13 arm `thunder-origin-w8`.

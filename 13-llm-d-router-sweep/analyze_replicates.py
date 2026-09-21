@@ -26,8 +26,8 @@ pa = importlib.util.module_from_spec(spec); spec.loader.exec_module(pa)
 
 LEVELS = (96, 128)
 PODS = 4
-ARMS = (("epp-baseline", "llm-d default"), ("epp-thunder", "most-room"), ("epp-thunder-origin", "origin-only"), ("epp-thunder-origin-u15", "origin + urgent 15 s"), ("epp-thunder-origin-u15-f25", "origin + urgent 15 s + forced 25 s"), ("epp-thunder-origin-age", "origin + age-only 15 s"), ("epp-thunder-origin-age-reserve", "origin + age 15 s + reserve"))
-RATIOS = (("epp-thunder", "epp-baseline", "most-room / default"), ("epp-thunder-origin", "epp-thunder", "origin / most-room"), ("epp-thunder-origin-u15", "epp-thunder-origin", "u15 / origin"), ("epp-thunder-origin-u15-f25", "epp-thunder-origin", "u15-f25 / origin"), ("epp-thunder-origin-age", "epp-thunder-origin", "age / origin"), ("epp-thunder-origin-age-reserve", "epp-thunder-origin", "age-reserve / origin"))
+ARMS = (("epp-baseline", "llm-d default"), ("epp-thunder", "most-room"), ("epp-thunder-origin", "origin-only"), ("epp-thunder-origin-u15", "origin + urgent 15 s"), ("epp-thunder-origin-u15-f25", "origin + urgent 15 s + forced 25 s"), ("epp-thunder-origin-age", "origin + age-only 15 s"), ("epp-thunder-origin-age-reserve", "origin + age 15 s + reserve"), ("epp-thunder-origin-w8", "origin + wait cap 8 s"))
+RATIOS = (("epp-thunder", "epp-baseline", "most-room / default"), ("epp-thunder-origin", "epp-thunder", "origin / most-room"), ("epp-thunder-origin-u15", "epp-thunder-origin", "u15 / origin"), ("epp-thunder-origin-u15-f25", "epp-thunder-origin", "u15-f25 / origin"), ("epp-thunder-origin-age", "epp-thunder-origin", "age / origin"), ("epp-thunder-origin-age-reserve", "epp-thunder-origin", "age-reserve / origin"), ("epp-thunder-origin-w8", "epp-thunder-origin", "w8 / origin"))
 REPS = (1, 2, 3)
 WARMUP_S = 600.0
 SLO_S = 30.0
@@ -156,7 +156,7 @@ def main():
 
     # figure: grouped bars with min-max whiskers and replicate dots, house style
     plt.rcParams.update({"font.family": ["Helvetica", "Arial", "DejaVu Sans", "sans-serif"], "font.size": 14, "axes.linewidth": 2, "axes.spines.top": False, "axes.spines.right": False, "legend.frameon": False})
-    COL = {"epp-baseline": "#B64342", "epp-thunder": "#0F4D92", "epp-thunder-origin": "#3E9B4F", "epp-thunder-origin-u15": "#42949E", "epp-thunder-origin-u15-f25": "#9A4D8E", "epp-thunder-origin-age": "#E9A6A1", "epp-thunder-origin-age-reserve": "#FFD700"}
+    COL = {"epp-baseline": "#B64342", "epp-thunder": "#0F4D92", "epp-thunder-origin": "#3E9B4F", "epp-thunder-origin-u15": "#42949E", "epp-thunder-origin-u15-f25": "#9A4D8E", "epp-thunder-origin-age": "#E9A6A1", "epp-thunder-origin-age-reserve": "#FFD700", "epp-thunder-origin-w8": "#3775BA"}
     panels = [("throughput", "Throughput", "output tokens / s"), ("hit_steady", "Prefix-cache hit rate", "steady state"), ("ttft_p50", "TTFT p50", "seconds"), ("attain_strict", "Session SLO attainment", f"strict: every turn TTFT <= {SLO_S:.0f} s")]
     fig, axes = plt.subplots(1, 5, figsize=(23, 5), gridspec_kw={"width_ratios": [1, 1, 1, 1, 0.7]})
     present = [a for a in ARMS if any((a[0], c) in data for c in LEVELS)]

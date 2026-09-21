@@ -38,7 +38,7 @@ VLLM_FIELDS = ["ts", "kv_cache_usage_perc", "num_requests_running",
 EPP_FIELDS = ["ts", "programs_running", "programs_idle", "programs_marked", "programs_paused",
               "holds_reasoning", "holds_paused", "holds_new",
               "releases_reasoning", "releases_paused", "releases_new",
-              "pauses_total", "resumes_total", "rebinds_total", "starvation_promotions_total", "origin_waits_total", "urgent_promotions_total",
+              "pauses_total", "resumes_total", "rebinds_total", "starvation_promotions_total", "origin_waits_total", "urgent_promotions_total", "origin_wait_moves_total",
               "pod_utilization", "fc_queue_size", "fc_queue_wait_sum", "fc_queue_wait_count"]
 
 
@@ -140,6 +140,7 @@ def main():
                 "starvation_promotions_total": g("thunder_agent_starvation_promotions_total"),
                 "origin_waits_total": g("thunder_agent_origin_waits_total"),
                 "urgent_promotions_total": g("thunder_agent_urgent_promotions_total"),
+                "origin_wait_moves_total": g("thunder_agent_origin_wait_moves_total"),
                 "pod_utilization": g("thunder_agent_pod_utilization"),
                 "fc_queue_size": prom_sum(m, "flow_control_queue_size"),
                 "fc_queue_wait_sum": prom_sum(m, "flow_control_request_queue_duration_seconds_sum"),

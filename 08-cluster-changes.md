@@ -109,3 +109,7 @@ Revisions 60 to 62 (`epp-thunder-origin-c128-w90`, `epp-baseline-c128-w90`, `epp
 ## 2026-09-21: Option B cells (thunder-agent-v5)
 
 Five per-cell upgrades for the u15 and u15-f25 arms. The last cell was `epp-thunder-origin-u15-c128-w90`, so the release now runs image `thunder-agent-v5` with `thunder-origin-u15-plugins.yaml` (`resumePlacement: origin-only`, `urgentWaitMs: 15000`) and the 2400 s envoy `message_timeout`. The planned u15-f25 90-minute cell was not run.
+
+## 2026-09-21 midday: age-only (v6) and wait-cap (v7) cells
+
+Revisions 68 and 69. The release now runs image `thunder-agent-v7` with `thunder-origin-w8-plugins.yaml` (`resumePlacement: origin-only`, `originWaitMaxMs: 8000`) and the 2400 s envoy `message_timeout`.

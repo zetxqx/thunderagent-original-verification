@@ -186,6 +186,22 @@ What this settles: bounded origin wait with a move, at a threshold below the typ
 
 A paused session's prefix survives about 10 to 12 s on its pod at this load, then it is gone (LRU under 50 to 70 percent KV use). This single fact explains the whole Option B story: origin-only's gain is the 78 percent of turns that resume within 10 s and its tail is sessions waiting for an origin that has already evicted them; most-room pays a full re-prefill on 46 percent of turns although the prefix was warm (0.08 cached at 2 to 5 s); the 15 s policies acted only on cold sessions, so the move variant paid the wait and the prefill, and the age variant made warm sessions wait behind cold ones until they were cold too. The horizon depends on load, so a static threshold is a proxy for the quantity that matters, whether this session's blocks are still on this pod. Proposal Part 8 turns this into a residency-aware hold-or-move policy; its cheap first test is `originWaitMaxMs` about 8 s with the ordering left smallest-first.
 
+**Wait cap 8 s (2026-09-21 11:49, one 30-minute cell, thunder-agent-v7, `resumePlacement: origin-only`, `originWaitMaxMs: 8000`, ordering unchanged; proposal Part 8 layer 1).** The first variant that improves on most-room on every metric while keeping most of origin-only's throughput:
+
+| metric | most-room (n=3) | origin-only (n=3) | urgent 15 s (n=2) | age-only 15 s (n=1) | **wait cap 8 s (n=1)** | Part 8 prediction |
+|---|---|---|---|---|---|---|
+| throughput (tok/s) | 1370 | 1693 | 1300 | 1461 | **1504** | between 1370 and 1693: met (closer to 1370 than predicted) |
+| steady-state hit rate | 0.35 | 0.68 | 0.27 | 0.51 | 0.53 | |
+| TTFT p50 / p90 (s) | 2.4 / 10.1 | 1.0 / 11.4 | 3.3 / 29.8 | 1.5 / 31.3 | 2.0 / 13.2 | |
+| share of turns with TTFT > 30 s | 3.3% | 3.7% | 21.5% | 18.3% | **3.3%** | |
+| strict / lenient session attainment | 0.76 / 0.78 | 0.70 / 0.75 | 0.33 / 0.34 | 0.39 / 0.41 | **0.78 / 0.80** | >= 0.76: met |
+| per-session worst TTFT, p90 (s) | 167 | 261 | 77 | 171 | **125** | <= 167: met |
+| sessions whose worst turn exceeded 60 s | 14% | 21% | 21% | 34% | **14%** | |
+| goodput within SLO (turns/s) | 1.28 | 1.53 | 0.90 | 1.06 | 1.42 | |
+| rebinds / origin waits / origin-wait moves / forced | 1091 / 0 / 0 / 0 | 0 / 1105 / 0 / 0 | 586 / 1280 / - / 0 | 0 / 1117 / 0 / 0 | 358 / 1272 / 336 / 0 | rebinds about 20% of resumes: met (358 of 1881, 19%) |
+
+Reading: capping the origin wait just inside the prefix survival horizon keeps origin-only's warm resumes (cached fraction 0.96 to 0.98 up to 5 s of idle age) and converts the cold waits into a single move (19 percent of resumes), which gives most-room's tail (same 3.3 percent slow turns, same 14 percent of sessions with a worst turn over 60 s, a shorter worst-turn p90 of 125 s) with 10 percent more throughput than most-room and the best session attainment measured (0.78). Against origin-only it gives up 11 percent throughput and 0.15 of hit rate for the tail. This is one cell; the wait-cost table shows the mechanism working as designed (5 to 10 s bin: cached 0.76 vs origin-only's 0.92, because the moves begin at 8 s; 10 to 15 s bin: 14 percent of turns, all moved and cold). The 13 percent of turns still older than 15 s are holds where no pod had room, present under origin-only as well. Next: two replicates to put error bars on the 1504, and Part 8 layer 2 (residency from the KV index) to make the cap adaptive instead of tuned to 32 sessions per pod.
+
 Why throughput falls with load in both arms (asked during the run): the pool is past its output-throughput peak at 12 sessions per pod already. Per-stream decode interval (ITL p50) doubles from 20 ms at 12 per pod to 38 ms at 24 and stays at 40 ms above, so the engines are memory-bandwidth-bound on attention over 60k to 84k-token contexts and a larger batch does not add decode throughput. On top of that, lost prefix hits turn into prefill work that steals steps from decoding; this shows as ITL mean rising far above ITL p50 (105 vs 40 ms for baseline at c=128, 90 vs 40 for thunder). Thunder's gain is in avoiding the second effect, not in raising the peak. The peak itself was not measured; c=16, 24, 32 would locate it.
 
 Caveats:

@@ -97,7 +97,7 @@ print('reset_prefix_cache $VP:', urllib.request.urlopen(urllib.request.Request('
       [ "$GATE" -ge 1 ] && echo "$PARSED" | grep -q thunder-agent || { echo "FATAL [$CELL]: $ARM arm not active" >&2; return 1; }
       # every placement/deadline knob of the arm's plugins file must be in the live ConfigMap
       local CM; CM=$(kubectl get cm "$DEPLOY" -n "$NS" -o yaml)
-      for KEY in resumePlacement urgentWaitMs urgentMove urgentReserveOrigin headWaitStarvationMs; do
+      for KEY in resumePlacement originWaitMaxMs urgentWaitMs urgentMove urgentReserveOrigin headWaitStarvationMs; do
         LINE=$(grep -oE "$KEY: [^ #]+" "$HERE/$ARM-plugins.yaml" || true)
         [ -z "$LINE" ] || echo "$CM" | grep -q "$LINE" || { echo "FATAL [$CELL]: '$LINE' not in the EPP config" >&2; return 1; }
       done ;;
