@@ -22,7 +22,7 @@ ARMS = [("most-room", ["epp-thunder-c128-r2", "epp-thunder-c128-r3"], "#0F4D92",
         ("origin-only", ["epp-thunder-origin-c128-r2", "epp-thunder-origin-c128-r3"], "#3E9B4F", "^"),
         ("origin + age-only 15 s", ["epp-thunder-origin-age-c128-r2"], "#E9A6A1", "P"),
         ("origin + urgent 15 s (move)", ["epp-thunder-origin-u15-c128-r2", "epp-thunder-origin-u15-c128-r3"], "#42949E", "D"),
-        ("origin + wait cap 8 s", ["epp-thunder-origin-w8-c128-r2"], "#3775BA", "X")]
+        ("origin + wait cap 8 s", ["epp-thunder-origin-w8-c128-r2", "epp-thunder-origin-w8-c128-r3", "epp-thunder-origin-w8-c128-r4"], "#3775BA", "X")]
 BINS = [(0, 2), (2, 5), (5, 10), (10, 15), (15, 30), (30, 60), (60, 120), (120, 1e9)]
 WARMUP_S = 600.0
 

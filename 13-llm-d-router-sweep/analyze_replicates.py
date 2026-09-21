@@ -28,7 +28,7 @@ LEVELS = (96, 128)
 PODS = 4
 ARMS = (("epp-baseline", "llm-d default"), ("epp-thunder", "most-room"), ("epp-thunder-origin", "origin-only"), ("epp-thunder-origin-u15", "origin + urgent 15 s"), ("epp-thunder-origin-u15-f25", "origin + urgent 15 s + forced 25 s"), ("epp-thunder-origin-age", "origin + age-only 15 s"), ("epp-thunder-origin-age-reserve", "origin + age 15 s + reserve"), ("epp-thunder-origin-w8", "origin + wait cap 8 s"))
 RATIOS = (("epp-thunder", "epp-baseline", "most-room / default"), ("epp-thunder-origin", "epp-thunder", "origin / most-room"), ("epp-thunder-origin-u15", "epp-thunder-origin", "u15 / origin"), ("epp-thunder-origin-u15-f25", "epp-thunder-origin", "u15-f25 / origin"), ("epp-thunder-origin-age", "epp-thunder-origin", "age / origin"), ("epp-thunder-origin-age-reserve", "epp-thunder-origin", "age-reserve / origin"), ("epp-thunder-origin-w8", "epp-thunder-origin", "w8 / origin"))
-REPS = (1, 2, 3)
+REPS = (1, 2, 3, 4)
 WARMUP_S = 600.0
 SLO_S = 30.0
 
