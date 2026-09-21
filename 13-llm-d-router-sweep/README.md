@@ -19,13 +19,17 @@ Pre-registered expectations:
 
 ## Files
 
+- `SATURATION.md`: why throughput falls with concurrency on this workload, the three meanings of "saturation point" (throughput peak, SLO capacity, collapse), and how to choose concurrency for experiments and for production.
+
 - `run-sweep.sh [levels] [window_s]`: drives step 12's `run-pool.sh` once per level and arm pair, all cells into one run directory named `sweep-<timestamp>-t1900`, cells named `epp-<arm>-c<level>`.
 - `analyze_sweep.py`: per-level tables (`sweep.md`, one column per arm present plus thunder/baseline and origin/thunder ratios, including rebinds, origin waits and sessions replaced) and the four-panel curve figure (`sweep.png`, log x axis): throughput, steady-state hit rate, TTFT p50 and requests waiting inside vLLM against active sessions per pod.
+- `analyze_long.py [run_dir] [slice_seconds] [cell_suffix]`: the 90-minute cells sliced into 30-minute windows (`long.md`, `long.png`).
+- `run-origin-replicates.sh`: replicates 2 and 3 of most-room and origin-only at c=96 and c=128 (v4 image, session-id bench image); `analyze_replicates.py` writes `replicates.md` and `replicates.png` with cell-level means and min-max plus the Part 7 session-level metrics for cells whose report carries session ids.
 - `run-origin.sh [levels]`: the `epp-thunder-origin` arm (`EPP_IMAGE_TAG=thunder-agent-v4`, `../12-llm-d-router-pool/thunder-origin-plugins.yaml`) appended to an existing run given by `AB_ID`, with the v4 control cell at c=192.
 
 ## Results
 
-Run `results/sweep-20260918-134248-t1900`: six levels on 2026-09-18 (13:42 to 23:35 PDT), three lower levels c = 16, 32, 64 appended on 2026-09-19 (10:24 to 15:15) to locate the throughput peak, then the `epp-thunder-origin` arm at c = 96 to 338 plus a v4 control cell (2026-09-19 15:37 to 2026-09-20 00:05). 24 valid cells, no preemption; every cell of the first two arms had 0 request errors, two origin cells had 2 each (`400 - Context Window`). Full tables in `sweep.md` (including a `sessions completed and replaced` row), curves in `sweep.png` (log-scale x axis).
+Run `results/sweep-20260918-134248-t1900`: six levels on 2026-09-18 (13:42 to 23:35 PDT), three lower levels c = 16, 32, 64 appended on 2026-09-19 (10:24 to 15:15) to locate the throughput peak, then the `epp-thunder-origin` arm at c = 96 to 338 plus a v4 control cell (2026-09-19 15:37 to 2026-09-20 00:05), then two more replicates per arm at c = 96 and 128 (2026-09-20 01:00 to 08:35) one llm-d default cell per level with the session-id bench image (09:39 to 11:15), and three 90-minute cells at c=128 (15:25 to 21:34). 37 valid cells, no preemption; every cell of the first two arms had 0 request errors, two origin cells had 2 each (`400 - Context Window`). Full tables in `sweep.md` (including a `sessions completed and replaced` row), curves in `sweep.png` (log-scale x axis).
 
 The table below compares the two arms at each level. For the other question this sweep answers, why throughput falls as concurrency rises within an arm, see `RESULTS.md`: the short version is that the pool does 6.6x more token work at c=338 than at c=48 and the metric counts only the decode half.
 
@@ -69,11 +73,77 @@ Against Part 3's pre-registered expectations:
 - **The cost is visible and bounded.** Origin waits (resumes delayed while another pod had room) are 552 to 2972 per cell and total holds are 55 to 69 percent higher than most-room. This shows up as TTFT p50 0.5 to 0.9 s higher at 64 and 84 sessions per pod (4.0 and 4.4 s vs 3.4 and 3.5 s), TTFT p90 higher at 32 and 48, and forced admissions rising from 7 to 10 at 84 per pod. At 24 and 32 per pod TTFT is better under origin-only because the avoided prefills outweigh the extra wait. Pod balance stayed within a few percent (pool KV 0.50 to 0.59 vs 0.56 to 0.62), so Option C's escape hatch was not needed.
 - **Recommendation**: `origin-only` is the better default for a multi-pod pool on this workload; Part 3's Option B (a bounded origin wait before moving) is the knob to try if the p90 TTFT cost at 32 to 48 sessions per pod matters. The two 4xx errors in the origin cells at 48 and 64 per pod are `400 - Context Window` from the trace corpus, unrelated to the policy.
 
+**Replicates of origin-only vs most-room (2026-09-20 01:00 to 08:35).** Two more cells per arm at c=96 and c=128 (driver `run-origin-replicates.sh`, both arms on thunder-agent-v4, bench image `session-id-v1`, arm and level alternated), so each arm has three cells per level with the sweep cell as replicate 1. Analysis `analyze_replicates.py`, tables `replicates.md`, figure `replicates.png`. One cell (`epp-thunder-c128-r3`) was voided by the corpus guard added the day before (its download returned 0 traces) and rerun. Cells: mean (min-max); ratio: origin-only / most-room of the means with the range of the per-replicate paired ratios in brackets.
+
+| sessions/pod | metric | most-room (n=3) | origin-only (n=3) | origin / most-room |
+|---|---|---|---|---|
+| 24 (c=96) | throughput (tok/s) | 1531 (1500-1556) | 1830 (1804-1872) | 1.20x [1.18-1.20] |
+| 24 | steady-state hit rate | 0.590 (0.547-0.621) | 0.824 (0.816-0.831) | 1.40x [1.34-1.51] |
+| 24 | TTFT p50 / p90 (s) | 0.5 / 8.0 | 0.5 / 5.9 | 0.98x / 0.74x |
+| 24 | holds / rebinds / origin waits | 275 / 454 / 0 | 439 / 0 / 544 | |
+| 32 (c=128) | throughput (tok/s) | 1370 (1362-1382) | 1693 (1571-1807) | 1.24x [1.14-1.32] |
+| 32 | steady-state hit rate | 0.347 (0.341-0.353) | 0.680 (0.629-0.722) | 1.96x [1.78-2.08] |
+| 32 | TTFT p50 / p90 (s) | 2.4 / 10.1 | 1.0 / 11.4 | 0.41x / 1.13x |
+| 32 | holds / rebinds / origin waits | 711 / 1091 / 0 | 971 / 0 / 1105 | |
+
+Cell-to-cell spread is small: most-room throughput varies by under 4 percent across its three cells at either level, origin-only by 4 percent at c=96 and 14 percent at c=128. The paired ratios never fall below 1.14x, so the origin-only throughput gain of 15 to 25 percent at 24 to 32 sessions per pod is established; rebinds are 0 in every origin-only cell; errors 0 to 1 per cell; forced admissions 0 except one cell with 1.
+
+**Session-level metrics (proposal Part 7)**, from the cells whose per-request report carries session ids: replicates 2 and 3 of most-room and origin-only, and one llm-d default cell per level added on 2026-09-20 (`epp-baseline-c96-r2`, `epp-baseline-c128-r2`; their cell-level numbers agree with the sweep cells: 1597 and 1156 tok/s, hit rate 0.686 and 0.073). SLO = TTFT <= 30 s, after the 10-minute warm-up. Population = sessions with a request open or issued after warm-up ended; a session whose trace finished during warm-up is not counted (an earlier draft of this table counted every session seen in the cell, which inflated the zero-progress share and depressed attainment for all arms; corrected 2026-09-20 evening).
+
+| sessions/pod | metric | llm-d default (n=1) | most-room (n=2) | origin-only (n=2) |
+|---|---|---|---|---|
+| 24 (c=96) | goodput within SLO (turns/s) | 1.22 | 1.09 (1.05-1.14) | 1.58 (1.54-1.62) |
+| 24 | session SLO attainment, strict / lenient | 0.58 / 0.69 | 0.87 / 0.88 | 0.82 / 0.85 |
+| 24 | turns per session after warm-up, p10 / p50 / p90 | 2 / 13 / 29 | 2 / 11 / 25 | 1 / 15 / 34 |
+| 24 | sessions with zero turns after warm-up | 0.00 | 0.01 | 0.03 |
+| 32 (c=128) | goodput within SLO (turns/s) | 0.57 | 1.28 (1.27-1.29) | 1.53 (1.53-1.53) |
+| 32 | session SLO attainment, strict / lenient | 0.08 / 0.08 | 0.76 / 0.78 | 0.70 / 0.75 |
+| 32 | turns per session after warm-up, p10 / p50 / p90 | 3 / 8 / 16 | 2 / 10 / 22 | 1 / 12 / 28 |
+| 32 | sessions with zero turns after warm-up | 0.01 | 0.04 | 0.02 |
+
+Three readings:
+
+- **The llm-d default fails the session SLO long before its throughput does.** At 24 sessions per pod it matches most-room on throughput (0.98x), beats it on hit rate (0.66 vs 0.59) and on goodput within SLO (1.22 vs 1.09 turns/s), yet only 58 percent of its sessions meet the strict SLO against 87 percent under most-room: its misses are spread thinly over many sessions (TTFT p90 12.8 s vs 8.0 s), so the request percentiles look acceptable and the session view does not. At 32 per pod it collapses to 8 percent attainment while the port keeps 70 to 78 percent. This is the capacity-at-SLO statement Part 7 asked for: at a 30 s TTFT SLO and 75 percent strict session attainment, the default supports fewer than 24 sessions per pod and the port about 32.
+- **Origin-only trades a little attainment for a lot of goodput.** It does more work inside the SLO (goodput 1.19x to 1.44x) and moves the typical session faster (p50 and p90 progress up 10 to 36 percent), while strict attainment is 5 to 6 points lower than most-room (0.82 vs 0.87, 0.70 vs 0.76) and lenient 3 points lower. Zero-progress sessions are rare under both (1 to 4 percent); the earlier reading that origin-only doubled them was the population artifact. The remaining attainment gap is sessions whose origin pod stays full for a while: they wait where most-room would have moved them.
+- **Why most-room scores higher on session attainment although the two arms violate the SLO on the same share of turns.** Turns with TTFT over 30 s are 2.0 vs 1.8 percent of turns at 24 per pod and 3.3 vs 3.7 percent at 32 (most-room vs origin-only, per cell), i.e. the same. Two things separate the session numbers: origin-only sessions complete 30 to 40 percent more turns in the window (18 vs 13.5 at 24 per pod, 14.7 vs 12.2 at 32), so a strict all-turns criterion gives them more chances to fail, and when origin-only does wait it waits longer, because a hold for the origin pod lasts until that pod frees room while a most-room move costs one prefill of a few seconds (per-session maximum TTFT p90: 42 to 81 s vs 32 to 34 s at 24 per pod, 219 to 302 s vs 167 s at 32; sessions whose worst turn exceeded 60 s: 21 vs 14 percent at 32 per pod). About half of the failing sessions in either arm failed on a single turn. The strict metric therefore carries a bias against the arm that makes more progress; the lenient variant (95 percent of turns) removes part of it, and a per-turn violation share or attainment over a fixed number of turns should be reported next to it (added to proposal Part 7).
+- **Which arm is "better" depends on the objective.** For total useful work and typical latency, origin-only; for the fraction of users kept inside the SLO, most-room by a few points; the default is worst on both once past 24 sessions per pod. Part 3's Option B (a bounded origin wait) is the natural knob to close the remaining gap; the 90-minute cells below say when it matters most.
+
+**Long window (2026-09-20 15:25 to 21:34): c=128 for 90 minutes, one cell per arm, sliced into 30-minute windows.** Question: does the gain change as sessions deepen. Analysis `analyze_long.py`, tables `long.md`, figure `long.png`. Slice 1 includes the 10-minute warm-up (empty caches); slice 2 is where sessions are deepest (mean prompt 76k to 79k tokens); in slice 3 a wave of sessions finished their traces and fresh ones replaced them (active sessions 242 to 254 vs about 150 in slices 1 and 2; mean prompt back to 62k), so slice 3 is a mix of deep and new sessions, not a deeper regime. The corpus was not exhausted (302 sessions seen at most). Session attainment per slice is over the sessions active in that slice.
+
+| slice (min) | metric | llm-d default | most-room | origin-only | most-room / default | origin / most-room |
+|---|---|---|---|---|---|---|
+| 1 (0-30) | throughput (tok/s) | 981 | 1238 | 1536 | 1.26x | 1.24x |
+| 2 (30-60) | throughput (tok/s) | 761 | 1101 | 1167 | 1.45x | 1.06x |
+| 3 (60-90) | throughput (tok/s) | 972 | 1164 | 1287 | 1.20x | 1.11x |
+| 1 | prefix-cache hit rate | 0.33 | 0.48 | 0.69 | | |
+| 2 | prefix-cache hit rate | 0.002 | 0.33 | 0.52 | | |
+| 3 | prefix-cache hit rate | 0.12 | 0.33 | 0.50 | | |
+| 1 | TTFT p50 / p90 (s) | 5.8 / 32 | 2.2 / 8.9 | 1.1 / 11.2 | | |
+| 2 | TTFT p50 / p90 (s) | 41.2 / 67 | 4.6 / 13.8 | 5.6 / 27.2 | | |
+| 3 | TTFT p50 / p90 (s) | 18.2 / 53 | 3.6 / 12.9 | 3.7 / 21.1 | | |
+| 1 | session SLO attainment, strict | 0.16 | 0.87 | 0.67 | | 0.78x |
+| 2 | session SLO attainment, strict | 0.01 | 0.70 | 0.45 | | 0.64x |
+| 3 | session SLO attainment, strict | 0.06 | 0.67 | 0.49 | | 0.73x |
+| 1 | goodput within SLO (turns/s) | 1.40 | 1.93 | 2.15 | 1.38x | 1.12x |
+| 2 | goodput within SLO (turns/s) | 0.12 | 1.03 | 1.06 | 8.7x | 1.02x |
+| 3 | goodput within SLO (turns/s) | 0.98 | 1.54 | 1.64 | 1.57x | 1.07x |
+| 1 | mean prompt tokens | 60k | 60k | 63k | | |
+| 2 | mean prompt tokens | 79k | 76k | 79k | | |
+| 3 | mean prompt tokens | 63k | 62k | 64k | | |
+
+Findings:
+
+- **The port's gain over the llm-d default grows as sessions deepen.** most-room / default on throughput goes 1.26x, 1.45x, 1.20x across the slices, peaking in the deepest slice, where the default's hit rate is 0.002 and its TTFT p50 is 41 s (goodput within SLO 0.12 turns/s: essentially nothing the default did in that half hour met a 30 s TTFT). The port keeps hit rate 0.33 and TTFT p50 4.6 s there. In slice 3 the replacement wave (fresh short sessions) gives the default cache hits again and the gap narrows to 1.20x. So the 30-minute cells, whose steady state corresponds to the end of slice 1, understate the port's advantage in the deep regime.
+- **Origin-only's extra gain over most-room shrinks as sessions deepen, and its attainment penalty grows.** origin / most-room on throughput goes 1.24x, 1.06x, 1.11x; its strict attainment is 0.78x, 0.64x, 0.73x of most-room's; TTFT p90 in the deepest slice is 27 s vs 14 s. With 80k-token sessions the origin pod is full more often and for longer, so waiting for it costs more and saves less. This is the regime where Part 3's Option B (a bounded origin wait, then move) should help most, and it is where the decision between origin-only and most-room actually depends on the objective: origin-only still completes more work (1.06x to 1.11x, hit rate 0.52 vs 0.33), most-room keeps 20 to 25 points more sessions inside the SLO.
+- **Throughput falls from slice 1 to slice 2 for every arm** (default 981 to 761, most-room 1238 to 1101, origin-only 1536 to 1167), tracking the mean prompt rising from 60k to 79k tokens, then recovers in slice 3 as fresh sessions arrive. This is the same mechanism as the cross-level fall in `SATURATION.md` (attention bandwidth on long contexts) seen within one cell over time. Any fixed-window measurement of this workload is therefore also a measurement of how deep its sessions got.
+- One cell per arm, so the slice-to-slice ratios carry the plus or minus 2 to 4 percent cell noise measured in the replicates; the direction of the two trends (port vs default up, origin vs most-room down with depth) is larger than that, the exact magnitudes are not.
+
 Why throughput falls with load in both arms (asked during the run): the pool is past its output-throughput peak at 12 sessions per pod already. Per-stream decode interval (ITL p50) doubles from 20 ms at 12 per pod to 38 ms at 24 and stays at 40 ms above, so the engines are memory-bandwidth-bound on attention over 60k to 84k-token contexts and a larger batch does not add decode throughput. On top of that, lost prefix hits turn into prefill work that steals steps from decoding; this shows as ITL mean rising far above ITL p50 (105 vs 40 ms for baseline at c=128, 90 vs 40 for thunder). Thunder's gain is in avoiding the second effect, not in raising the peak. The peak itself was not measured; c=16, 24, 32 would locate it.
 
 Caveats:
 
 - Sessions that finish their trace are replaced by fresh traces, so the concurrency stays at c but the mix changes: at 4 to 16 sessions per pod, 20 to 33 sessions completed per 30-minute cell (median about 9 minutes each), at 24 per pod 23, at 32 per pod 14 (baseline) and 25 (thunder), and above that 0 to 17. Low-concurrency cells therefore include cold starts and early short-prompt turns; high-concurrency cells are almost all deep long-prompt turns. Within a level the faster arm finishes more sessions and absorbs more cold starts (17 vs 1 at 48 per pod), so the reported ratios are slightly conservative.
+- At c=338 the corpus is exhausted: the filtered corpus has exactly 338 traces, so a session that finishes is not replaced (338 sessions dispatched in every c=338 cell, vs 81 at c=48 and 126 at c=96 where replacements happen). Concurrency therefore decays during a c=338 cell by the number of completed sessions: 0 for the default, 14 for most-room, 21 for origin-only, i.e. up to 6 percent, and more for the faster arm, which again makes the ratios conservative. Levels up to c=256 are unaffected (256 + 24 completions < 338). Replicates should be run at c <= 256.
 - One cell per arm and level, so no error bars. The c=338 point reproduces step 12's three-replicate result, which had a spread of 0.3 percent on throughput.
 - Absolute throughput is not comparable across levels: with 30-minute cells, low-concurrency sessions progress deeper, so the mean prompt is 84k tokens at c=48 and 61k at c=128. Within a level the arms' prompt means agree to within 1 percent, so the arm comparison is clean.
 - The `epp-thunder-c256` cell was collected by hand. The driver's bench-pod name lookup returned empty on a transient API error, so its DONE poll spun forever while the cell ran normally inside the pod (bench reported completion, prober captured all metrics); artifacts were copied with the same commands the driver uses and the manifest carries a note. `../12-llm-d-router-pool/run-pool.sh` now retries the lookup until it gets a name. The stuck driver was killed and the last level (c=338, order thunder then baseline as planned) was relaunched into the same run directory at 21:46.

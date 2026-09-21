@@ -1,0 +1,1297 @@
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+2026-09-20 16:41:23,485 - inference_perf.config.config - INFO - Using configuration from: /etc/config/config.yml
+2026-09-20 16:41:23,509 - inference_perf.config.config - INFO - Benchmarking with the following config:
+
+api:
+  type: chat
+  streaming: true
+  headers: null
+  slo_unit: null
+  slo_tpot_header: null
+  slo_ttft_header: null
+  response_format: null
+  session_id_header_key: x-session-id
+  session_token_header_key: null
+data:
+  type: weka_trace_replay
+  path: null
+  corpus_file_path: null
+  input_distribution: null
+  output_distribution: null
+  shared_prefix: null
+  multimodal: null
+  trace: null
+  otel_trace_replay: null
+  weka_trace_replay:
+    trace_directory: /data/traces
+    num_dataset_entries: 400
+    use_static_model: true
+    static_model_name: Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8
+    default_block_size: 64
+    skip_invalid_files: true
+    trace_idle_gap_cap_seconds: 10.0
+    max_wait_ms: 10000
+    datagen_workers: 8
+  conversation_replay: null
+  visionarena: null
+  synthetic_agentic: null
+  use_chat_template: false
+load:
+  type: trace_session_replay
+  interval: 1.0
+  stages:
+  - !!python/object:inference_perf.config.loadgen.config.TraceSessionReplayLoadStage
+    __dict__:
+      concurrent_sessions: 96
+      session_rate: null
+      num_sessions: null
+      timeout: 1800.0
+    __pydantic_extra__: null
+    __pydantic_fields_set__: !!set
+      timeout: null
+      concurrent_sessions: null
+    __pydantic_private__: null
+  sweep: null
+  num_workers: 24
+  worker_max_concurrency: 100
+  worker_max_tcp_connections: 2500
+  trace: null
+  circuit_breakers: []
+  request_timeout: 1900
+  request_retries: 0
+  request_retry_backoff_sec: 0.5
+  stage_teardown_grace_seconds: 120.0
+  lora_traffic_split: null
+  base_seed: 20260915
+metrics: null
+report:
+  request_lifecycle:
+    summary: true
+    per_stage: true
+    per_request: true
+    per_request_fields:
+      request: false
+      response: false
+      info: true
+      response_chunks: false
+      computed_metrics: true
+    per_adapter: true
+    per_adapter_stage: false
+    percentiles:
+    - 0.1
+    - 1.0
+    - 5.0
+    - 10.0
+    - 25.0
+    - 50.0
+    - 75.0
+    - 90.0
+    - 95.0
+    - 99.0
+    - 99.9
+    use_server_output_tokens: true
+    max_error_messages: 100
+  prometheus:
+    summary: true
+    per_stage: false
+  session_lifecycle:
+    summary: true
+    per_stage: true
+    per_session: false
+  goodput: null
+storage:
+  local_storage:
+    path: /results/report
+    report_file_prefix: null
+  google_cloud_storage: null
+  simple_storage_service: null
+server:
+  type: vllm
+  model_name: Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8
+  base_url: http://program-aware-scheduling-epp:80
+tokenizer:
+  pretrained_model_name_or_path: Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8
+circuit_breakers: null
+
+
+2026-09-20 16:41:23,511 - inference_perf.client.filestorage.local - INFO - Report files will be stored at: /results/report
+2026-09-20 16:41:23,514 - inference_perf.utils.custom_tokenizer - INFO - Loading tokenizer 'Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8'
+2026-09-20 16:41:23,663 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/agent-harnesses "HTTP/1.1 200 OK"
+2026-09-20 16:41:23,717 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-09-20 16:41:23,735 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/config.json "HTTP/1.1 200 OK"
+2026-09-20 16:41:23,755 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/config.json "HTTP/1.1 200 OK"
+2026-09-20 16:41:23,831 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-09-20 16:41:23,851 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-09-20 16:41:23,869 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-09-20 16:41:23,939 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-09-20 16:41:23,993 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-09-20 16:41:24,041 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/resolve/main/vocab.json "HTTP/1.1 307 Temporary Redirect"
+2026-09-20 16:41:24,060 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/vocab.json "HTTP/1.1 200 OK"
+2026-09-20 16:41:24,085 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/vocab.json "HTTP/1.1 200 OK"
+2026-09-20 16:41:24,249 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/resolve/main/merges.txt "HTTP/1.1 307 Temporary Redirect"
+2026-09-20 16:41:24,266 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/merges.txt "HTTP/1.1 200 OK"
+2026-09-20 16:41:24,285 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/merges.txt "HTTP/1.1 200 OK"
+2026-09-20 16:41:24,380 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/resolve/main/tokenizer.json "HTTP/1.1 302 Found"
+2026-09-20 16:41:25,216 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/resolve/main/added_tokens.json "HTTP/1.1 404 Not Found"
+2026-09-20 16:41:25,269 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/resolve/main/special_tokens_map.json "HTTP/1.1 404 Not Found"
+2026-09-20 16:41:25,323 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/resolve/main/chat_template.jinja "HTTP/1.1 307 Temporary Redirect"
+2026-09-20 16:41:25,341 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/chat_template.jinja "HTTP/1.1 200 OK"
+2026-09-20 16:41:25,359 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/chat_template.jinja "HTTP/1.1 200 OK"
+2026-09-20 16:41:26,486 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8 "HTTP/1.1 200 OK"
+2026-09-20 16:41:26,490 - inference_perf.utils.custom_tokenizer - INFO - Loading tokenizer 'Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8'
+2026-09-20 16:41:26,539 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-09-20 16:41:26,557 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/config.json "HTTP/1.1 200 OK"
+2026-09-20 16:41:26,612 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-09-20 16:41:26,632 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-09-20 16:41:26,700 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-09-20 16:41:26,761 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-09-20 16:41:27,951 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8 "HTTP/1.1 200 OK"
+2026-09-20 16:41:28,086 - inference_perf.datagen.replay.weka_trace_replay_datagen - INFO - Loaded prompt corpus from: /workspace/inference_perf/assets/shakespeare.txt (5020475 chars)
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (1306158 > 1048576). Running this sequence through the model will result in indexing errors
+2026-09-20 16:42:00,336 - inference_perf.datagen.replay.weka_trace_replay_datagen - INFO - Building replay sessions for 338 traces with 8 processes
+2026-09-20 16:44:37,742 - inference_perf.datagen.replay.weka_trace_replay_datagen - INFO - Built 338 replay sessions from 338 traces in 157.4s
+2026-09-20 16:44:38,226 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Built replay schedule: 31527 events across 338 sessions (eager)
+2026-09-20 16:44:41,639 - inference_perf.loadgen.load_generator - INFO - Stage 0 - session-based run started
+2026-09-20 16:44:41,641 - inference_perf.loadgen.load_generator - INFO - Session pool: concurrent_sessions=96, session_rate=None, timeout=1800.0, num_sessions=338 (corpus offset 0), total_sessions=338
+2026-09-20 16:44:41,643 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace174_924cdbd835a5567b0cca1484ce60e90e9f4f: 37 events
+2026-09-20 16:44:41,650 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace64_3607a64644d8b639c63ffcccc098344759e6: 46 events
+2026-09-20 16:44:41,655 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace147_80559b9e10b09ee2d9303acaecceb4d99895: 128 events
+2026-09-20 16:44:41,664 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace116_6601daa3865dae62024a519b66636afcc03e: 71 events
+2026-09-20 16:44:41,674 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace231_b86fab2bba76fbd063c04296cdd2eeee453e: 365 events
+2026-09-20 16:44:41,692 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace132_76ef82400a03738d4f138b163f1890a881c9: 266 events
+2026-09-20 16:44:41,722 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace319_f17d741a05b67f9d50934ca8468d18aa7922: 168 events
+2026-09-20 16:44:41,733 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace2_03be8f1eb1e9e620f46bd07068d6ab1aaae3: 27 events
+2026-09-20 16:44:41,737 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace24_14933d8a4190c45ac8fbd21183bba9469140: 27 events
+2026-09-20 16:44:41,739 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace191_a0edf077d076924c775d4da6377c2c4dc73a: 151 events
+2026-09-20 16:44:41,748 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace197_a3508fe56ade726a9b9118414362d2ead56d: 93 events
+2026-09-20 16:44:41,788 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace278_d4bd5e4015963744e0e1ea592da1594a9d13: 25 events
+2026-09-20 16:44:41,799 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace205_a8579208ea25d6f401207257139b163ec48d: 100 events
+2026-09-20 16:44:41,813 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace323_f33eebc1ce22a17f6d2bf9641b31547eb762: 33 events
+2026-09-20 16:44:41,815 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace257_ca33d363f81e07f21c193285db6d0ad9e4a6: 133 events
+2026-09-20 16:44:41,826 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace213_ac368b0d9027e56c38e5f55b9895dfc01abd: 24 events
+2026-09-20 16:44:41,838 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace83_47f2ae8a81c8db82b4cd4883b8dd4c531c93: 78 events
+2026-09-20 16:44:41,852 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace149_840ebb479056e12a852d3b7f827b8e09db55: 34 events
+2026-09-20 16:44:41,855 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace18_0da3a3bea6f3559a2eff4114839b328dad53: 18 events
+2026-09-20 16:44:41,857 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace181_999eea8a292a67475f955dd8f074dd4e413e: 81 events
+2026-09-20 16:44:41,871 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace118_663eae6f100daddf13cdf54c8e5f9622151d: 104 events
+2026-09-20 16:44:41,885 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace198_a42188fc362bde2410050ff0e6a8b267ed8a: 34 events
+2026-09-20 16:44:41,886 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace250_c3724708e826240f49026f58025d3829dcba: 117 events
+2026-09-20 16:44:41,900 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace333_fabd95c42f988d51e6c96ae9472bc7f69860: 170 events
+2026-09-20 16:44:41,919 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace220_af60ae862f19d091b7d8a3e5fa8b570abe2a: 69 events
+2026-09-20 16:44:41,922 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace55_2df1b153c477169c8ab4ecd9e917ccaa3dba: 324 events
+2026-09-20 16:44:41,933 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace17_0d9c99c3f96c2bcac0f9dec0987d5f411bcd: 83 events
+2026-09-20 16:44:41,937 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace37_217743dd65170f329ffbd58d974e6ef6ef83: 23 events
+2026-09-20 16:44:41,938 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace185_9df3a40cb25de2b1dd07169a4b117fe17e0e: 139 events
+2026-09-20 16:44:41,956 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace86_49ffa26d794d34ba3c66358e1d781b9f3c9c: 25 events
+2026-09-20 16:44:41,958 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace194_a1fc1985dc2bfdfc6b1a28b15e7eba9f8773: 23 events
+2026-09-20 16:44:41,960 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace239_bdbbd8a7870c5771cbf80d8c2b576e3a2526: 27 events
+2026-09-20 16:44:41,964 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace203_a69c007390941a32982d30eaa04e2d9da18c: 225 events
+2026-09-20 16:44:43,681 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace54_2de8538029066d95b4ff113d5750eb403cb7: 221 events
+2026-09-20 16:44:43,704 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace26_1770548ae8e30555e62d6d6296c0166d6074: 38 events
+2026-09-20 16:44:43,704 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace139_7ae0ab568310f5459008be618a9f711bc2be: 55 events
+2026-09-20 16:44:43,713 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace146_8044cd33fd7815ac1a4f0aaeae9e2eaa7509: 21 events
+2026-09-20 16:44:43,722 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace240_bdf8b214663bf985becdb49d48c7d002b62b: 41 events
+2026-09-20 16:44:43,724 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace306_e8621fca4d3bf2379a245fa0e50013d4d863: 22 events
+2026-09-20 16:44:43,725 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace224_b179aeed059d7652622a64954d0331ce68fd: 33 events
+2026-09-20 16:44:43,757 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace163_8e1a61685e99ae7d274a5b2b23ee761076d7: 73 events
+2026-09-20 16:44:43,761 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace283_d7f31968de8975996048824bdc2a097eb6cb: 181 events
+2026-09-20 16:44:43,775 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace39_263134ce70d475337deb473aadc255479210: 63 events
+2026-09-20 16:44:43,823 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace10_095a5152ab8fc1cdc847612872a01525cd1b: 91 events
+2026-09-20 16:44:43,836 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace183_9b3bbac0341e3f179e66e73a1f84f26b62b6: 57 events
+2026-09-20 16:44:43,862 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace120_66eca77264acd8d1c1e95da8065f3e726e8c: 40 events
+2026-09-20 16:44:43,867 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace334_fe1aaa31badf4f218622e630f7c002dcbc18: 131 events
+2026-09-20 16:44:43,886 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace193_a1bfbc403e0ae7ae35051047b2230c978e1f: 352 events
+2026-09-20 16:44:43,917 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace324_f3852e8ca1ac3887151243be3467e483d725: 63 events
+2026-09-20 16:44:43,919 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace247_c0e1ecfc9e7108c799ebc6558042d892b1a5: 50 events
+2026-09-20 16:44:43,920 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace44_27bf77bcaaf2b6d2210bdbdab4934348f322: 30 events
+2026-09-20 16:44:43,929 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace57_300134008d4cc98f288179ea9dd9314f140c: 57 events
+2026-09-20 16:44:43,933 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace280_d4ecfcf5989d3eee18eec421184389148aa4: 31 events
+2026-09-20 16:44:43,934 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace315_f00e5dd80060aadcdd51f987a767800dab73: 253 events
+2026-09-20 16:44:43,943 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace305_e6d72440992899f6329ab4974985e3a43db4: 139 events
+2026-09-20 16:44:43,968 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace131_760634f36fb9e0e04dd81f3355ce8738c842: 33 events
+2026-09-20 16:44:43,976 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace88_4b5b583d4736a4399d3e5222be38f78d80c8: 160 events
+2026-09-20 16:44:43,991 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace259_caab1fdac91bcd159e3abb0606dd85c97f41: 24 events
+2026-09-20 16:44:43,992 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace331_f81ed47b5437c65860a614f86695c35ba363: 27 events
+2026-09-20 16:44:43,993 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace89_4b5c653bebf2b1a49753fd5919f8c14a29ae: 137 events
+2026-09-20 16:44:44,009 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace218_ae38ae775e168171b2d7513c1c7dee412a2b: 69 events
+2026-09-20 16:44:44,010 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace133_76f66f1802d3f394d05477f8decd4386f512: 49 events
+2026-09-20 16:44:44,037 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace189_9f20e7ac308c284e5218e06abb1e59c04c2e: 72 events
+2026-09-20 16:44:44,041 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace173_91ad17460dcb2ac7c54ef37a45507e8d5e4e: 139 events
+2026-09-20 16:44:44,082 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace321_f25cdaf2290264e23187558d177f96ca00dd: 146 events
+2026-09-20 16:44:44,100 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace112_5f0d3b0b3bf6d4954364ce0991f77e473a42: 108 events
+2026-09-20 16:44:44,115 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace97_5205240fa8f546d231b220f7b82e394dcd79: 35 events
+2026-09-20 16:44:44,117 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace227_b3975a6a874ca7e6789ac3364731e500146f: 121 events
+2026-09-20 16:44:44,139 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace294_e29f4e0501d4d5060c0594fc09175936ba1f: 66 events
+2026-09-20 16:44:44,146 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace175_95779044cc58023c929e52070a6df2cf2b91: 97 events
+2026-09-20 16:44:44,161 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace60_331adc4fafe640bd88b0f985d795b2a401fc: 100 events
+2026-09-20 16:44:44,175 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace145_7f7d606bf00e14f644cdbd3f018b3f69378d: 143 events
+2026-09-20 16:44:44,189 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace71_3eaabf7d2b95305a97f5da28d76bd8703c70: 30 events
+2026-09-20 16:44:44,191 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace248_c14d470c05bfa470de9004b38c3d34eb9267: 128 events
+2026-09-20 16:44:44,202 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace245_c03e35003893d05b83ddec10c77f479d5f04: 42 events
+2026-09-20 16:44:44,210 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace268_d1148414f9bc0a6280b42d3e4ba2dc9b53a3: 129 events
+2026-09-20 16:44:44,238 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace12_09c188c8b9201ec2046cc2df702623fef33e: 60 events
+2026-09-20 16:44:44,248 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace79_4478fb9a56bffd5bbd98ff44475608113f41: 122 events
+2026-09-20 16:44:44,252 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace21_116cb8d945f9d0810e788e51e3744adaab74: 23 events
+2026-09-20 16:44:44,262 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace98_52e8a29ecc05a5bc74fec73a49fa0ea0c6e5: 106 events
+2026-09-20 16:44:44,267 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace265_cf870339ff35290d4c4df5bc5cc4d9431b92: 77 events
+2026-09-20 16:44:44,279 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace236_b9952b717179fe28e9e3fa258c531e5d05ef: 285 events
+2026-09-20 16:44:44,316 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace136_79195953f2b41ecedb809ab4eb5ad2559a16: 244 events
+2026-09-20 16:44:44,349 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace258_ca8c494fa282db0e4bb1bc59b339e8071a85: 21 events
+2026-09-20 16:44:44,352 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace269_d1e9dc549473defa20175f9d1a8375b098c9: 25 events
+2026-09-20 16:44:44,370 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace96_50a90c78c331d870bee11b87bb240f00d9ee: 73 events
+2026-09-20 16:44:44,371 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace171_912f15fcd1728b9686d342f07571b5c833a6: 321 events
+2026-09-20 16:44:44,403 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace159_8a40e1e0fd4408fd008f69ba3169f079912b: 78 events
+2026-09-20 16:44:44,413 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace219_ae61ad714c0dbc6eee31ebd673bddd3e6f6f: 322 events
+2026-09-20 16:44:44,438 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace87_4ab6db64fcc354375b87b219764a9cbc5aa3: 32 events
+2026-09-20 16:44:44,442 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace201_a51cdf5df5c9687d77a573b19a228728e45b: 41 events
+2026-09-20 16:44:44,446 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace138_792a769fe13dd05abd68d240f774472e5340: 28 events
+2026-09-20 16:44:44,447 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace316_f02519b0a1c78d3e61c31d06b41c518d827e: 116 events
+2026-09-20 16:44:44,462 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace15_0c70490e175492606971b6979cfbef9c094f: 47 events
+2026-09-20 16:44:44,468 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace67_3b87c0e23861fdc2e2351fbe9c7f69668069: 113 events
+2026-09-20 16:44:44,475 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace184_9caaf8d22b815d8ec8e90b120f057906a81d: 28 events
+2026-09-20 16:48:26,233 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace182_9a47a25e8bb87492c599e8f1139c3333956e: 43 events
+2026-09-20 16:52:05,183 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace273_d2cb3ab225bf904aad72203cf7e904b90432: 23 events
+2026-09-20 16:52:07,323 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace195_a258646b7b14707796583cb63732cb145d23: 360 events
+2026-09-20 16:52:42,958 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace70_3d3bd73c61922b4c3c9833ee94391f3a728a: 58 events
+2026-09-20 16:53:04,159 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace124_7053adfcfbb77d730e5790ff46de93c461eb: 97 events
+2026-09-20 16:53:19,832 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace187_9e74ad6f4f9be07727dd4586eb936301298a: 49 events
+2026-09-20 16:53:20,567 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace289_de9c8c5feff1c38c78bc80a3bca9ba153f1a: 63 events
+2026-09-20 16:53:26,652 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace119_6655cd019b86440a42e54d1024c79673c919: 94 events
+2026-09-20 16:55:57,713 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace242_be8cbe86fa39534cb8534bf53f4d79fec596: 27 events
+2026-09-20 16:56:50,389 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace103_56d419682c5e52c26fe72210877eabb70359: 300 events
+2026-09-20 16:56:59,968 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace113_60f80e6bffe54ed25eb7eea307649a8fdf06: 31 events
+2026-09-20 16:57:13,760 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace16_0d75185d4e958ad360c16451eaa95d508edf: 210 events
+2026-09-20 16:58:06,502 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace92_4d9a5d6076d2e738ba1c7531c8405acffb2a: 86 events
+2026-09-20 16:58:07,469 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace1_01fece675b92efe07620225cd69c3884f774: 28 events
+2026-09-20 16:58:37,790 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace223_b0d0355c29b9b267314c792b9555936f01d6: 48 events
+2026-09-20 16:58:43,157 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace274_d32116118ad8f4cb101915fe12a273e6e13a: 25 events
+2026-09-20 16:58:47,927 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace93_4de7af6e9af97b3da8ebcf2817362fbfebc0: 102 events
+2026-09-20 16:59:03,463 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace11_09a5d415a7157ed48a5a6fa2711f2d8565c1: 243 events
+2026-09-20 16:59:06,555 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace91_4d31a8c14c39af1c31a386144a00b042397d: 37 events
+2026-09-20 17:02:17,602 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace179_994eeb65edeb127ae7995d0817105c91c361: 24 events
+2026-09-20 17:02:50,616 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace255_c8ad4fa8b80abe7fe8c9ad94541541e5f30f: 36 events
+2026-09-20 17:05:56,434 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace176_965b5be429f249d627b6c01870beab5eb252: 55 events
+2026-09-20 17:13:05,287 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace110_5b63c2aa30f153add9bf20ba1a7fcbb78a7c: 33 events
+2026-09-20 17:13:46,240 - inference_perf.datagen.replay.replay_graph_session_datagen - INFO - Dispatching session wekatrace49_2b971773e1889a7692523d5cc0a78a0361cb: 43 events
+2026-09-20 17:14:41,653 - inference_perf.loadgen.load_generator - WARNING - Stage 0: timeout after 1800.0s
+2026-09-20 17:16:41,686 - inference_perf.loadgen.load_generator - WARNING - [Worker 0] cancelling 435 tasks still running at stage teardown
+2026-09-20 17:16:41,689 - inference_perf.loadgen.load_generator - WARNING - [Worker 3] cancelling 353 tasks still running at stage teardown
+2026-09-20 17:16:41,689 - inference_perf.loadgen.load_generator - WARNING - [Worker 23] cancelling 180 tasks still running at stage teardown
+2026-09-20 17:16:41,707 - inference_perf.loadgen.load_generator - WARNING - [Worker 6] cancelling 390 tasks still running at stage teardown
+2026-09-20 17:16:41,711 - inference_perf.loadgen.load_generator - WARNING - [Worker 7] cancelling 383 tasks still running at stage teardown
+2026-09-20 17:16:41,728 - inference_perf.loadgen.load_generator - WARNING - [Worker 20] cancelling 466 tasks still running at stage teardown
+2026-09-20 17:16:41,739 - inference_perf.loadgen.load_generator - WARNING - [Worker 1] cancelling 662 tasks still running at stage teardown
+2026-09-20 17:16:41,754 - inference_perf.loadgen.load_generator - WARNING - [Worker 10] cancelling 339 tasks still running at stage teardown
+2026-09-20 17:16:41,778 - inference_perf.loadgen.load_generator - WARNING - [Worker 22] cancelling 496 tasks still running at stage teardown
+2026-09-20 17:16:41,780 - inference_perf.loadgen.load_generator - WARNING - [Worker 13] cancelling 380 tasks still running at stage teardown
+2026-09-20 17:16:41,787 - inference_perf.loadgen.load_generator - WARNING - [Worker 18] cancelling 92 tasks still running at stage teardown
+2026-09-20 17:16:41,799 - inference_perf.loadgen.load_generator - WARNING - [Worker 21] cancelling 261 tasks still running at stage teardown
+2026-09-20 17:16:41,809 - inference_perf.loadgen.load_generator - WARNING - [Worker 2] cancelling 65 tasks still running at stage teardown
+2026-09-20 17:16:41,813 - inference_perf.loadgen.load_generator - WARNING - [Worker 15] cancelling 310 tasks still running at stage teardown
+2026-09-20 17:16:41,822 - inference_perf.loadgen.load_generator - WARNING - [Worker 17] cancelling 170 tasks still running at stage teardown
+2026-09-20 17:16:41,831 - inference_perf.loadgen.load_generator - WARNING - [Worker 14] cancelling 236 tasks still running at stage teardown
+2026-09-20 17:16:41,852 - inference_perf.loadgen.load_generator - WARNING - [Worker 19] cancelling 277 tasks still running at stage teardown
+2026-09-20 17:16:41,855 - inference_perf.loadgen.load_generator - WARNING - [Worker 12] cancelling 452 tasks still running at stage teardown
+2026-09-20 17:16:41,856 - inference_perf.loadgen.load_generator - WARNING - [Worker 8] cancelling 460 tasks still running at stage teardown
+2026-09-20 17:16:41,857 - inference_perf.loadgen.load_generator - WARNING - [Worker 9] cancelling 198 tasks still running at stage teardown
+2026-09-20 17:16:41,863 - inference_perf.loadgen.load_generator - WARNING - [Worker 5] cancelling 443 tasks still running at stage teardown
+2026-09-20 17:16:41,873 - inference_perf.loadgen.load_generator - WARNING - [Worker 4] cancelling 70 tasks still running at stage teardown
+2026-09-20 17:16:41,890 - inference_perf.loadgen.load_generator - WARNING - [Worker 16] cancelling 344 tasks still running at stage teardown
+2026-09-20 17:16:41,906 - inference_perf.loadgen.load_generator - WARNING - [Worker 11] cancelling 137 tasks still running at stage teardown
+2026-09-20 17:16:42,122 - inference_perf.loadgen.load_generator - INFO - Stage 0 - session-based run failed
+Overall Progress ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 1/1 0:00:00 0:32:00
+2026-09-20 17:16:43,142 - inference_perf.reportgen.base - INFO - Generating Reports...
+2026-09-20 17:16:43,143 - inference_perf.utils.custom_tokenizer - INFO - Loading tokenizer 'Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8'
+2026-09-20 17:16:43,283 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-09-20 17:16:43,312 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/config.json "HTTP/1.1 200 OK"
+2026-09-20 17:16:43,382 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-09-20 17:16:43,413 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/dcaee4d4dfc5ee71ad501f01f530e5652438fde0/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-09-20 17:16:43,481 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-09-20 17:16:43,550 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-09-20 17:16:44,907 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8 "HTTP/1.1 200 OK"
+2026-09-20 17:26:52,451 - inference_perf.reportgen.base - WARNING - Prometheus Metrics Client is not configured or not of type PrometheusMetricsClient
+2026-09-20 17:26:55,016 - inference_perf.reportgen.validation - WARNING - Validation [summary.token_mismatches] summary_lifecycle_metrics.json: 1566 request(s) where the client-side token count disagrees with the server-reported completion_tokens
+2026-09-20 17:26:55,016 - inference_perf.reportgen.validation - WARNING - Validation [per_stage.token_mismatches] stage_0_lifecycle_metrics.json: 1566 request(s) where the client-side token count disagrees with the server-reported completion_tokens
+2026-09-20 17:26:55,016 - inference_perf.reportgen.validation - WARNING - Report validation finished: 0 error(s), 2 warning(s). See validation.json.
+2026-09-20 17:26:55,117 - inference_perf.client.filestorage.local - INFO - Report saved to: /results/report/summary_lifecycle_metrics.json
+2026-09-20 17:26:55,118 - inference_perf.client.filestorage.local - INFO - Report saved to: /results/report/stage_0_lifecycle_metrics.json
+2026-09-20 17:27:14,184 - inference_perf.client.filestorage.local - INFO - Report saved to: /results/report/per_request_lifecycle_metrics.json
+2026-09-20 17:27:14,194 - inference_perf.client.filestorage.local - INFO - Report saved to: /results/report/inference-perf.partial.stage_0.yaml
+2026-09-20 17:27:14,195 - inference_perf.client.filestorage.local - INFO - Report saved to: /results/report/summary_session_lifecycle_metrics.json
+2026-09-20 17:27:14,196 - inference_perf.client.filestorage.local - INFO - Report saved to: /results/report/stage_0_session_lifecycle_metrics.json
+2026-09-20 17:27:14,203 - inference_perf.client.filestorage.local - INFO - Report saved to: /results/report/config.yaml
+2026-09-20 17:27:14,204 - inference_perf.client.filestorage.local - INFO - Report saved to: /results/report/validation.json
+=== START_SUMMARY ===
+{
+  "benchmark_time_seconds": 1909.7998917447403,
+  "load_summary": {
+    "count": 3754,
+    "schedule_delay": {
+      "mean": 542.5311536863356,
+      "min": 0.00639012735337019,
+      "max": 1797.0928754191846,
+      "p0.1": 0.009842805751599371,
+      "p1": 0.08961025452241302,
+      "p5": 19.740079485438763,
+      "p10": 54.56321236854419,
+      "p25": 161.6568113178946,
+      "median": 404.9594378815964,
+      "p75": 848.4039681730792,
+      "p90": 1242.3431777005085,
+      "p95": 1478.4033512509425,
+      "p99": 1728.666092143431,
+      "p99.9": 1793.7557052216553
+    }
+  },
+  "successes": {
+    "count": 3754,
+    "latency": {
+      "request_latency": {
+        "mean": 47.46324469659728,
+        "min": 0.16850486863404512,
+        "max": 980.2655088230968,
+        "p0.1": 0.19028814984299242,
+        "p1": 0.7491176799777896,
+        "p5": 3.265242790011689,
+        "p10": 4.682686222810299,
+        "p25": 9.296925593167543,
+        "median": 21.9392876829952,
+        "p75": 51.016403880901635,
+        "p90": 113.28460842110225,
+        "p95": 176.43493066439405,
+        "p99": 369.21694639095074,
+        "p99.9": 809.8736422112445
+      },
+      "normalized_time_per_output_token": {
+        "mean": 0.08233952488483066,
+        "min": 0.006931894533336163,
+        "max": 4.622918802313507,
+        "p0.1": 0.01001228758273975,
+        "p1": 0.02731648782997152,
+        "p5": 0.03287417942317366,
+        "p10": 0.03577484545025431,
+        "p25": 0.04060474387753741,
+        "median": 0.04719067328827424,
+        "p75": 0.07052610400414785,
+        "p90": 0.14415250272141578,
+        "p95": 0.21873443190164613,
+        "p99": 0.5111085832062231,
+        "p99.9": 2.4127459318404334
+      },
+      "time_per_output_token": {
+        "mean": 0.056750916450938216,
+        "min": 2.7544649415894557e-05,
+        "max": 0.37737539602443576,
+        "p0.1": 0.0036180184399709106,
+        "p1": 0.013990711929897467,
+        "p5": 0.029327203320460793,
+        "p10": 0.03290788523183475,
+        "p25": 0.037746371683621736,
+        "median": 0.04373915391784791,
+        "p75": 0.05733922890770115,
+        "p90": 0.10263677531479579,
+        "p95": 0.12815562968062127,
+        "p99": 0.21824124351901328,
+        "p99.9": 0.324273918886794
+      },
+      "time_to_first_token": {
+        "mean": 3.4981220801294914,
+        "min": 0.038051266223192215,
+        "max": 57.59822046011686,
+        "p0.1": 0.07514828822948039,
+        "p1": 0.1729108717571944,
+        "p5": 0.22502642087638378,
+        "p10": 0.26147390985861424,
+        "p25": 0.3432065173983574,
+        "median": 0.5178684322163463,
+        "p75": 2.3794557449873537,
+        "p90": 11.528834427893166,
+        "p95": 19.704963701171796,
+        "p99": 32.79072443117385,
+        "p99.9": 45.17787563811543
+      },
+      "inter_token_latency": {
+        "mean": 0.06105818025202822,
+        "min": 0.0,
+        "max": 5.44238939229399,
+        "p0.1": 1.9601308740675455e-05,
+        "p1": 0.0024316690396517515,
+        "p5": 0.018998392624780536,
+        "p10": 0.025329784024506807,
+        "p25": 0.032790586818009615,
+        "median": 0.03740598214790225,
+        "p75": 0.04094494413584471,
+        "p90": 0.07540990738198161,
+        "p95": 0.21920399996452034,
+        "p99": 0.6047512420918789,
+        "p99.9": 1.121510090376256
+      }
+    },
+    "throughput": {
+      "input_tokens_per_sec": 137059.8951918811,
+      "output_tokens_per_sec": 1504.8398590987695,
+      "total_tokens_per_sec": 138564.73505097989,
+      "requests_per_sec": 1.9656509649136327,
+      "images_per_sec": 0.0,
+      "videos_per_sec": 0.0,
+      "audios_per_sec": 0.0
+    },
+    "request_size_bytes": {
+      "mean": 278073.4693660096,
+      "min": 1206.0,
+      "max": 962684.0,
+      "p0.1": 1601.71,
+      "p1": 1736.65,
+      "p5": 12615.150000000001,
+      "p10": 106651.2,
+      "p25": 180550.0,
+      "median": 262154.0,
+      "p75": 354848.25,
+      "p90": 460478.10000000003,
+      "p95": 545224.2,
+      "p99": 793591.4299999995,
+      "p99.9": 937823.4620000013
+    },
+    "image": {
+      "count": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p0.1": 0.0,
+        "p1": 0.0,
+        "p5": 0.0,
+        "p10": 0.0,
+        "p25": 0.0,
+        "median": 0.0,
+        "p75": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "p99.9": 0.0
+      },
+      "pixels": null,
+      "bytes": null,
+      "aspect_ratio": null
+    },
+    "video": {
+      "count": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p0.1": 0.0,
+        "p1": 0.0,
+        "p5": 0.0,
+        "p10": 0.0,
+        "p25": 0.0,
+        "median": 0.0,
+        "p75": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "p99.9": 0.0
+      },
+      "frames": null,
+      "pixels": null,
+      "bytes": null,
+      "aspect_ratio": null
+    },
+    "audio": {
+      "count": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p0.1": 0.0,
+        "p1": 0.0,
+        "p5": 0.0,
+        "p10": 0.0,
+        "p25": 0.0,
+        "median": 0.0,
+        "p75": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "p99.9": 0.0
+      },
+      "seconds": null,
+      "bytes": null
+    },
+    "prompt_tokens": {
+      "total": 261756973.0,
+      "cached": 195157984.0,
+      "uncached": 66598989.0,
+      "mean": 69727.48348428342,
+      "min": 264.0,
+      "max": 244394.0,
+      "p0.1": 377.909,
+      "p1": 392.0,
+      "p5": 2934.3,
+      "p10": 26888.0,
+      "p25": 44932.0,
+      "median": 65412.0,
+      "p75": 89336.0,
+      "p90": 116055.10000000002,
+      "p95": 136878.24999999997,
+      "p99": 200390.61999999985,
+      "p99.9": 237638.81400000048
+    },
+    "output_len": {
+      "mean": 765.5681939264784,
+      "min": 3.0,
+      "max": 14554.0,
+      "p0.1": 4.0,
+      "p1": 12.0,
+      "p5": 24.0,
+      "p10": 92.0,
+      "p25": 171.0,
+      "median": 379.0,
+      "p75": 850.0,
+      "p90": 1828.5000000000014,
+      "p95": 2884.7,
+      "p99": 5837.43999999997,
+      "p99.9": 10850.241000000151
+    },
+    "output_tokens": {
+      "total": 2873943.0,
+      "mean": 765.5681939264784,
+      "min": 3.0,
+      "max": 14554.0,
+      "p0.1": 4.0,
+      "p1": 12.0,
+      "p5": 24.0,
+      "p10": 92.0,
+      "p25": 171.0,
+      "median": 379.0,
+      "p75": 850.0,
+      "p90": 1828.5000000000014,
+      "p95": 2884.7,
+      "p99": 5837.43999999997,
+      "p99.9": 10850.241000000151
+    },
+    "token_count_mismatches": 1566,
+    "client_fallback_requests": {
+      "prompt": 0,
+      "output": 0
+    }
+  },
+  "failures": {
+    "count": 0,
+    "request_latency": null,
+    "prompt_tokens": {
+      "total": 0.0,
+      "cached": 0.0,
+      "uncached": 0.0
+    },
+    "by_label": {}
+  }
+}
+=== END_SUMMARY ===
+=== START_STAGE_0 ===
+{
+  "benchmark_time_seconds": 1909.7998917447403,
+  "load_summary": {
+    "count": 3754,
+    "schedule_delay": {
+      "mean": 542.5311536863356,
+      "min": 0.00639012735337019,
+      "max": 1797.0928754191846,
+      "p0.1": 0.009842805751599371,
+      "p1": 0.08961025452241302,
+      "p5": 19.740079485438763,
+      "p10": 54.56321236854419,
+      "p25": 161.6568113178946,
+      "median": 404.9594378815964,
+      "p75": 848.4039681730792,
+      "p90": 1242.3431777005085,
+      "p95": 1478.4033512509425,
+      "p99": 1728.666092143431,
+      "p99.9": 1793.7557052216553
+    },
+    "send_duration": 1799.301705867052,
+    "requested_rate": 0.0,
+    "achieved_rate": 2.086364942443609,
+    "concurrency": 96
+  },
+  "successes": {
+    "count": 3754,
+    "latency": {
+      "request_latency": {
+        "mean": 47.46324469659728,
+        "min": 0.16850486863404512,
+        "max": 980.2655088230968,
+        "p0.1": 0.19028814984299242,
+        "p1": 0.7491176799777896,
+        "p5": 3.265242790011689,
+        "p10": 4.682686222810299,
+        "p25": 9.296925593167543,
+        "median": 21.9392876829952,
+        "p75": 51.016403880901635,
+        "p90": 113.28460842110225,
+        "p95": 176.43493066439405,
+        "p99": 369.21694639095074,
+        "p99.9": 809.8736422112445
+      },
+      "normalized_time_per_output_token": {
+        "mean": 0.08233952488483066,
+        "min": 0.006931894533336163,
+        "max": 4.622918802313507,
+        "p0.1": 0.01001228758273975,
+        "p1": 0.02731648782997152,
+        "p5": 0.03287417942317366,
+        "p10": 0.03577484545025431,
+        "p25": 0.04060474387753741,
+        "median": 0.04719067328827424,
+        "p75": 0.07052610400414785,
+        "p90": 0.14415250272141578,
+        "p95": 0.21873443190164613,
+        "p99": 0.5111085832062231,
+        "p99.9": 2.4127459318404334
+      },
+      "time_per_output_token": {
+        "mean": 0.056750916450938216,
+        "min": 2.7544649415894557e-05,
+        "max": 0.37737539602443576,
+        "p0.1": 0.0036180184399709106,
+        "p1": 0.013990711929897467,
+        "p5": 0.029327203320460793,
+        "p10": 0.03290788523183475,
+        "p25": 0.037746371683621736,
+        "median": 0.04373915391784791,
+        "p75": 0.05733922890770115,
+        "p90": 0.10263677531479579,
+        "p95": 0.12815562968062127,
+        "p99": 0.21824124351901328,
+        "p99.9": 0.324273918886794
+      },
+      "time_to_first_token": {
+        "mean": 3.4981220801294914,
+        "min": 0.038051266223192215,
+        "max": 57.59822046011686,
+        "p0.1": 0.07514828822948039,
+        "p1": 0.1729108717571944,
+        "p5": 0.22502642087638378,
+        "p10": 0.26147390985861424,
+        "p25": 0.3432065173983574,
+        "median": 0.5178684322163463,
+        "p75": 2.3794557449873537,
+        "p90": 11.528834427893166,
+        "p95": 19.704963701171796,
+        "p99": 32.79072443117385,
+        "p99.9": 45.17787563811543
+      },
+      "inter_token_latency": {
+        "mean": 0.06105818025202822,
+        "min": 0.0,
+        "max": 5.44238939229399,
+        "p0.1": 1.9601308740675455e-05,
+        "p1": 0.0024316690396517515,
+        "p5": 0.018998392624780536,
+        "p10": 0.025329784024506807,
+        "p25": 0.032790586818009615,
+        "median": 0.03740598214790225,
+        "p75": 0.04094494413584471,
+        "p90": 0.07540990738198161,
+        "p95": 0.21920399996452034,
+        "p99": 0.6047512420918789,
+        "p99.9": 1.121510090376256
+      }
+    },
+    "throughput": {
+      "input_tokens_per_sec": 137059.8951918811,
+      "output_tokens_per_sec": 1504.8398590987695,
+      "total_tokens_per_sec": 138564.73505097989,
+      "requests_per_sec": 1.9656509649136327,
+      "images_per_sec": 0.0,
+      "videos_per_sec": 0.0,
+      "audios_per_sec": 0.0
+    },
+    "request_size_bytes": {
+      "mean": 278073.4693660096,
+      "min": 1206.0,
+      "max": 962684.0,
+      "p0.1": 1601.71,
+      "p1": 1736.65,
+      "p5": 12615.150000000001,
+      "p10": 106651.2,
+      "p25": 180550.0,
+      "median": 262154.0,
+      "p75": 354848.25,
+      "p90": 460478.10000000003,
+      "p95": 545224.2,
+      "p99": 793591.4299999995,
+      "p99.9": 937823.4620000013
+    },
+    "image": {
+      "count": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p0.1": 0.0,
+        "p1": 0.0,
+        "p5": 0.0,
+        "p10": 0.0,
+        "p25": 0.0,
+        "median": 0.0,
+        "p75": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "p99.9": 0.0
+      },
+      "pixels": null,
+      "bytes": null,
+      "aspect_ratio": null
+    },
+    "video": {
+      "count": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p0.1": 0.0,
+        "p1": 0.0,
+        "p5": 0.0,
+        "p10": 0.0,
+        "p25": 0.0,
+        "median": 0.0,
+        "p75": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "p99.9": 0.0
+      },
+      "frames": null,
+      "pixels": null,
+      "bytes": null,
+      "aspect_ratio": null
+    },
+    "audio": {
+      "count": {
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "p0.1": 0.0,
+        "p1": 0.0,
+        "p5": 0.0,
+        "p10": 0.0,
+        "p25": 0.0,
+        "median": 0.0,
+        "p75": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "p99.9": 0.0
+      },
+      "seconds": null,
+      "bytes": null
+    },
+    "prompt_tokens": {
+      "total": 261756973.0,
+      "cached": 195157984.0,
+      "uncached": 66598989.0,
+      "mean": 69727.48348428342,
+      "min": 264.0,
+      "max": 244394.0,
+      "p0.1": 377.909,
+      "p1": 392.0,
+      "p5": 2934.3,
+      "p10": 26888.0,
+      "p25": 44932.0,
+      "median": 65412.0,
+      "p75": 89336.0,
+      "p90": 116055.10000000002,
+      "p95": 136878.24999999997,
+      "p99": 200390.61999999985,
+      "p99.9": 237638.81400000048
+    },
+    "output_len": {
+      "mean": 765.5681939264784,
+      "min": 3.0,
+      "max": 14554.0,
+      "p0.1": 4.0,
+      "p1": 12.0,
+      "p5": 24.0,
+      "p10": 92.0,
+      "p25": 171.0,
+      "median": 379.0,
+      "p75": 850.0,
+      "p90": 1828.5000000000014,
+      "p95": 2884.7,
+      "p99": 5837.43999999997,
+      "p99.9": 10850.241000000151
+    },
+    "output_tokens": {
+      "total": 2873943.0,
+      "mean": 765.5681939264784,
+      "min": 3.0,
+      "max": 14554.0,
+      "p0.1": 4.0,
+      "p1": 12.0,
+      "p5": 24.0,
+      "p10": 92.0,
+      "p25": 171.0,
+      "median": 379.0,
+      "p75": 850.0,
+      "p90": 1828.5000000000014,
+      "p95": 2884.7,
+      "p99": 5837.43999999997,
+      "p99.9": 10850.241000000151
+    },
+    "token_count_mismatches": 1566,
+    "client_fallback_requests": {
+      "prompt": 0,
+      "output": 0
+    }
+  },
+  "failures": {
+    "count": 0,
+    "request_latency": null,
+    "prompt_tokens": {
+      "total": 0.0,
+      "cached": 0.0,
+      "uncached": 0.0
+    },
+    "by_label": {}
+  }
+}
+=== END_STAGE_0 ===
+=== START_PARTIAL_BR_V0_2_STAGE_0 ===
+version: 0.2.1
+run:
+  uid: inference-perf-stage-0-a93a9328
+  eid: inference-perf-experiment-73b831b5
+  time:
+    start: '2026-09-20T16:44:41.641818Z'
+    end: '2026-09-20T17:14:41.653254Z'
+    duration: PT1800.011S
+results:
+  request_performance:
+    aggregate:
+      requests:
+        total: 3754
+        failures: 0
+        input_length:
+          units: count
+          mean: 69727.48348428342
+          stddev: 38734.78939415315
+          min: 264.0
+          p0p1: 377.909
+          p1: 392.0
+          p5: 2934.3
+          p10: 26888.0
+          p25: 44932.0
+          p50: 65412.0
+          p75: 89336.0
+          p90: 116055.10000000002
+          p95: 136878.24999999997
+          p99: 200390.61999999985
+          p99p9: 237638.81400000048
+          max: 244394.0
+        output_length:
+          units: count
+          mean: 765.5681939264784
+          stddev: 1158.7130384268107
+          min: 3.0
+          p0p1: 4.0
+          p1: 12.0
+          p5: 24.0
+          p10: 92.0
+          p25: 171.0
+          p50: 379.0
+          p75: 850.0
+          p90: 1828.5000000000014
+          p95: 2884.7
+          p99: 5837.43999999997
+          p99p9: 10850.241000000151
+          max: 14554.0
+      latency:
+        time_to_first_token:
+          units: s
+          mean: 3.4981220801294914
+          stddev: 6.958741838893717
+          min: 0.038051266223192215
+          p0p1: 0.07514828822948039
+          p1: 0.1729108717571944
+          p5: 0.22502642087638378
+          p10: 0.26147390985861424
+          p25: 0.3432065173983574
+          p50: 0.5178684322163463
+          p75: 2.3794557449873537
+          p90: 11.528834427893166
+          p95: 19.704963701171796
+          p99: 32.79072443117385
+          p99p9: 45.17787563811543
+          max: 57.59822046011686
+        normalized_time_per_output_token:
+          units: s/token
+          mean: 0.08233952488483066
+          stddev: 0.15666753893860416
+          min: 0.006931894533336163
+          p0p1: 0.01001228758273975
+          p1: 0.02731648782997152
+          p5: 0.03287417942317366
+          p10: 0.03577484545025431
+          p25: 0.04060474387753741
+          p50: 0.04719067328827424
+          p75: 0.07052610400414785
+          p90: 0.14415250272141578
+          p95: 0.21873443190164613
+          p99: 0.5111085832062231
+          p99p9: 2.4127459318404334
+          max: 4.622918802313507
+        time_per_output_token:
+          units: s/token
+          mean: 0.056750916450938216
+          stddev: 0.03717168555528534
+          min: 2.7544649415894557e-05
+          p0p1: 0.0036180184399709106
+          p1: 0.013990711929897467
+          p5: 0.029327203320460793
+          p10: 0.03290788523183475
+          p25: 0.037746371683621736
+          p50: 0.04373915391784791
+          p75: 0.05733922890770115
+          p90: 0.10263677531479579
+          p95: 0.12815562968062127
+          p99: 0.21824124351901328
+          p99p9: 0.324273918886794
+          max: 0.37737539602443576
+        inter_token_latency:
+          units: s/token
+          mean: 0.06105818025202822
+          stddev: 0.10875281907349676
+          min: 0.0
+          p0p1: 1.9601308740675455e-05
+          p1: 0.0024316690396517515
+          p5: 0.018998392624780536
+          p10: 0.025329784024506807
+          p25: 0.032790586818009615
+          p50: 0.03740598214790225
+          p75: 0.04094494413584471
+          p90: 0.07540990738198161
+          p95: 0.21920399996452034
+          p99: 0.6047512420918789
+          p99p9: 1.121510090376256
+          max: 5.44238939229399
+        request_latency:
+          units: s
+          mean: 47.46324469659728
+          stddev: 77.50628720195508
+          min: 0.16850486863404512
+          p0p1: 0.19028814984299242
+          p1: 0.7491176799777896
+          p5: 3.265242790011689
+          p10: 4.682686222810299
+          p25: 9.296925593167543
+          p50: 21.9392876829952
+          p75: 51.016403880901635
+          p90: 113.28460842110225
+          p95: 176.43493066439405
+          p99: 369.21694639095074
+          p99p9: 809.8736422112445
+          max: 980.2655088230968
+      throughput:
+        input_token_rate:
+          units: tokens/s
+          mean: 137059.8951918811
+        output_token_rate:
+          units: tokens/s
+          mean: 1504.8398590987695
+        total_token_rate:
+          units: tokens/s
+          mean: 138564.73505097989
+        request_rate:
+          units: queries/s
+          mean: 1.9656509649136327
+
+=== END_PARTIAL_BR_V0_2_STAGE_0 ===
+=== START_STAGE_0 ===
+{
+  "stage_metadata": {
+    "stage_id": 0,
+    "status": "TIMED_OUT",
+    "timeout_configured": 1800.0,
+    "actual_duration": 1800.0114359855652,
+    "teardown_duration": 120.46870682481676,
+    "dropped_requests": 0,
+    "concurrent_sessions": 96,
+    "session_rate": null
+  },
+  "num_sessions": 24,
+  "num_sessions_succeeded": 24,
+  "num_sessions_failed": 0,
+  "failures": {
+    "count": 0,
+    "by_label": {}
+  },
+  "total_events": 648,
+  "total_events_completed": 648,
+  "total_events_cancelled": 0,
+  "sessions_with_recorded_substitution": 0,
+  "total_recorded_substitutions": {
+    "count": 0,
+    "messages": []
+  },
+  "sessions_per_second": 0.013757478482932592,
+  "session_duration_sec": {
+    "mean": 748.6677108804384,
+    "min": 222.5069329738617,
+    "max": 1272.708431005478,
+    "p0.1": 227.53047888326645,
+    "p1": 272.74239206790924,
+    "p5": 441.61370395421983,
+    "p10": 456.2117211341858,
+    "p25": 518.4775243997574,
+    "median": 777.1563324928284,
+    "p75": 861.9341934323311,
+    "p90": 1078.8761734247207,
+    "p95": 1234.408464336395,
+    "p99": 1269.809347243309,
+    "p99.9": 1272.4185226292611
+  },
+  "num_events": {
+    "mean": 27.0,
+    "min": 18.0,
+    "max": 41.0,
+    "p0.1": 18.069,
+    "p1": 18.69,
+    "p5": 21.15,
+    "p10": 22.3,
+    "p25": 23.75,
+    "median": 26.0,
+    "p75": 30.25,
+    "p90": 33.0,
+    "p95": 33.849999999999994,
+    "p99": 39.39,
+    "p99.9": 40.83900000000003
+  },
+  "num_events_cancelled": {
+    "mean": 0.0,
+    "min": 0.0,
+    "max": 0.0,
+    "p0.1": 0.0,
+    "p1": 0.0,
+    "p5": 0.0,
+    "p10": 0.0,
+    "p25": 0.0,
+    "median": 0.0,
+    "p75": 0.0,
+    "p90": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "p99.9": 0.0
+  },
+  "total_input_tokens": {
+    "mean": 1764170.0833333333,
+    "min": 971421.0,
+    "max": 3634760.0,
+    "p0.1": 972506.876,
+    "p1": 982279.76,
+    "p5": 1028110.6,
+    "p10": 1087624.1,
+    "p25": 1151327.5,
+    "median": 1568268.5,
+    "p75": 2053267.75,
+    "p90": 2733412.8,
+    "p95": 3253670.749999999,
+    "p99": 3565599.92,
+    "p99.9": 3627843.992000001
+  },
+  "total_output_tokens": {
+    "mean": 14100.666666666666,
+    "min": 3837.0,
+    "max": 21119.0,
+    "p0.1": 3946.089,
+    "p1": 4927.89,
+    "p5": 8626.05,
+    "p10": 8930.8,
+    "p25": 10810.75,
+    "median": 14581.5,
+    "p75": 17307.0,
+    "p90": 19548.3,
+    "p95": 19920.45,
+    "p99": 20853.579999999998,
+    "p99.9": 21092.458000000006
+  },
+  "total_cached_tokens": {
+    "mean": 1527091.3333333333,
+    "min": 588560.0,
+    "max": 3406512.0,
+    "p0.1": 591740.992,
+    "p1": 620369.92,
+    "p5": 746553.6,
+    "p10": 872432.0,
+    "p25": 985264.0,
+    "median": 1342136.0,
+    "p75": 1885688.0,
+    "p90": 2378649.6,
+    "p95": 2472408.8,
+    "p99": 3194661.76,
+    "p99.9": 3385326.9760000035
+  },
+  "total_cacheable_input_tokens": {
+    "mean": 1764170.0833333333,
+    "min": 971421.0,
+    "max": 3634760.0,
+    "p0.1": 972506.876,
+    "p1": 982279.76,
+    "p5": 1028110.6,
+    "p10": 1087624.1,
+    "p25": 1151327.5,
+    "median": 1568268.5,
+    "p75": 2053267.75,
+    "p90": 2733412.8,
+    "p95": 3253670.749999999,
+    "p99": 3565599.92,
+    "p99.9": 3627843.992000001
+  },
+  "sessions_with_cache_info": 24,
+  "kv_cache_hit_percent": 86.56145729713042,
+  "kv_cache_hit_per_session_percent": {
+    "mean": 86.20174177582902,
+    "min": 51.04403529790154,
+    "max": 96.61279300557187,
+    "p0.1": 51.048532102606366,
+    "p1": 51.089003344949845,
+    "p5": 53.493413460501536,
+    "p10": 69.96992537725814,
+    "p25": 85.07951299722433,
+    "median": 90.28740911423611,
+    "p75": 94.5977463099579,
+    "p90": 95.83542881585039,
+    "p95": 96.19128618124715,
+    "p99": 96.5252570168733,
+    "p99.9": 96.60403940670201
+  },
+  "tfut_sec": {
+    "mean": 12.02956779995778,
+    "min": 0.2421057652682066,
+    "max": 32.86216010712087,
+    "p0.1": 0.24246269778348506,
+    "p1": 0.24567509042099117,
+    "p5": 0.2635892455931753,
+    "p10": 0.3005618926137686,
+    "p25": 2.3042424810118973,
+    "median": 6.520701232366264,
+    "p75": 21.05504094599746,
+    "p90": 25.89101330349222,
+    "p95": 27.91791009046137,
+    "p99": 31.80464280885644,
+    "p99.9": 32.75640837729445
+  },
+  "sessions_with_tfut": 24,
+  "tfut_none_reasons": null,
+  "num_user_facing_events": {
+    "mean": 27.0,
+    "min": 18.0,
+    "max": 41.0,
+    "p0.1": 18.069,
+    "p1": 18.69,
+    "p5": 21.15,
+    "p10": 22.3,
+    "p25": 23.75,
+    "median": 26.0,
+    "p75": 30.25,
+    "p90": 33.0,
+    "p95": 33.849999999999994,
+    "p99": 39.39,
+    "p99.9": 40.83900000000003
+  },
+  "num_structured_output_excluded": {
+    "mean": 0.0,
+    "min": 0.0,
+    "max": 0.0,
+    "p0.1": 0.0,
+    "p1": 0.0,
+    "p5": 0.0,
+    "p10": 0.0,
+    "p25": 0.0,
+    "median": 0.0,
+    "p75": 0.0,
+    "p90": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "p99.9": 0.0
+  }
+}
+=== END_STAGE_0 ===
+                         Throughput and Goodput Summary                         
+┏━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┓
+┃       ┃          ┃ Achiev… ┃    Error ┃       ┃      In ┃      Out ┃     Tot ┃
+┃ Stage ┃ Req Rate ┃    Rate ┃     Rate ┃ Req/s ┃ Tokens… ┃ Tokens/s ┃ Tokens… ┃
+┡━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━┩
+│     0 │      0.0 │     2.1 │     0.0% │   2.0 │ 137059… │   1504.8 │ 138564… │
+└───────┴──────────┴─────────┴──────────┴───────┴─────────┴──────────┴─────────┘
+                          Request & Token Latency (ms)                          
+┏━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━┓
+┃       ┃   Req ┃   Req ┃   Req ┃       ┃       ┃       ┃       ┃       ┃      ┃
+┃       ┃   Lat ┃   Lat ┃   Lat ┃  TTFT ┃  TTFT ┃  TTFT ┃   ITL ┃   ITL ┃  ITL ┃
+┃ Stage ┃  Mean ┃   Med ┃   P90 ┃  Mean ┃   Med ┃   P90 ┃  Mean ┃   Med ┃  P90 ┃
+┡━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━┩
+│     0 │ 4746… │ 2193… │ 1132… │ 3498… │ 517.9 │ 1152… │  61.1 │  37.4 │ 75.4 │
+└───────┴───────┴───────┴───────┴───────┴───────┴───────┴───────┴───────┴──────┘
+                          Token Generation Speed (ms)                           
+┏━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃       ┃           ┃          ┃          ┃ Norm TPOT ┃ Norm TPOT ┃  Norm TPOT ┃
+┃ Stage ┃ TPOT Mean ┃ TPOT Med ┃ TPOT P90 ┃      Mean ┃       Med ┃        P90 ┃
+┡━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━┩
+│     0 │      56.8 │     43.7 │    102.6 │      82.3 │      47.2 │      144.2 │
+└───────┴───────────┴──────────┴──────────┴───────────┴───────────┴────────────┘
+                            Token Length Aggregates                             
+┏━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━┓
+┃       ┃       ┃       ┃       ┃   Out ┃   Out ┃   Out ┃   Out ┃   Out ┃  Out ┃
+┃       ┃ Prom… ┃ Prom… ┃ Prom… ┃  Mean ┃   Med ┃   P90 ┃  Mean ┃   Med ┃  P90 ┃
+┃ Stage ┃  Mean ┃   Med ┃   P90 ┃ (cli… ┃ (cli… ┃ (cli… ┃ (ser… ┃ (ser… ┃ (se… ┃
+┡━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━┩
+│     0 │ 6972… │ 6541… │ 1160… │ 765.6 │ 379.0 │ 1828… │ 765.6 │ 379.0 │ 182… │
+└───────┴───────┴───────┴───────┴───────┴───────┴───────┴───────┴───────┴──────┘
+ Prompt: server-reported usage where available, client tokenization otherwise.  
+    Out (client): response text re-tokenized by the client (output_len). Out    
+  (server): the count reported in the server's usage (output_tokens), with the  
+     client count substituted for any request the server did not count. See     
+                                docs/metrics.md.                                
+                                Session Summary                                 
+┏━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━┓
+┃       ┃       ┃       ┃       ┃       ┃       ┃       ┃       ┃       ┃  Bad ┃
+┃       ┃       ┃       ┃       ┃       ┃       ┃       ┃       ┃       ┃ Tool ┃
+┃       ┃       ┃ Total ┃       ┃       ┃ Error ┃ Total ┃ Even… ┃ Even… ┃ Cal… ┃
+┃ Stage ┃ Sess… ┃ Sess… ┃ Succ… ┃ Fail… ┃     % ┃ Even… ┃ Comp… ┃ Canc… ┃ Sub… ┃
+┡━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━┩
+│     0 │  0.01 │    24 │    24 │     0 │  0.0% │   648 │   648 │     0 │    0 │
+└───────┴───────┴───────┴───────┴───────┴───────┴───────┴───────┴───────┴──────┘
+                           Session Duration & Events                            
+┏━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┓
+┃       ┃  Duration ┃  Duration ┃  Duration ┃    Events ┃   Events ┃    Events ┃
+┃ Stage ┃  Mean (s) ┃   Med (s) ┃   P90 (s) ┃      Mean ┃      Med ┃       P90 ┃
+┡━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━┩
+│     0 │    748.67 │    777.16 │   1078.88 │      27.0 │     26.0 │      33.0 │
+└───────┴───────────┴───────────┴───────────┴───────────┴──────────┴───────────┘
+                       Session Token Totals (per session)                       
+┏━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┓
+┃       ┃        In ┃        In ┃        In ┃       Out ┃       Out ┃      Out ┃
+┃       ┃  Tok/Sess ┃  Tok/Sess ┃  Tok/Sess ┃  Tok/Sess ┃  Tok/Sess ┃ Tok/Sess ┃
+┃ Stage ┃      Mean ┃       Med ┃       P90 ┃      Mean ┃       Med ┃      P90 ┃
+┡━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━┩
+│     0 │ 1764170.1 │ 1568268.5 │ 2733412.8 │   14100.7 │   14581.5 │  19548.3 │
+└───────┴───────────┴───────────┴───────────┴───────────┴───────────┴──────────┘
+                           Session KV Cache Hit Rate                            
+┏━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃       ┃       Hit % ┃  Hit %/Sess ┃  Hit %/Sess ┃   Hit %/Sess ┃ Sessions w/ ┃
+┃ Stage ┃    (pooled) ┃        Mean ┃         Med ┃          P90 ┃        Info ┃
+┡━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│     0 │        86.6 │        86.2 │        90.3 │         95.8 │          24 │
+└───────┴─────────────┴─────────────┴─────────────┴──────────────┴─────────────┘
+                    Session TFUT (Time to First User Token)                     
+┏━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃       ┃   TFUT Mean ┃    TFUT Med ┃    TFUT P90 ┃  Sessions w/ ┃   TFUT None ┃
+┃ Stage ┃         (s) ┃         (s) ┃         (s) ┃         TFUT ┃     Reasons ┃
+┡━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│     0 │      12.030 │       6.521 │      25.891 │           24 │           - │
+└───────┴─────────────┴─────────────┴─────────────┴──────────────┴─────────────┘
+Request Error Summary
+┏━━━━━━━┳━━━━━━━━━━━┓
+┃ Stage ┃ Successes ┃
+┡━━━━━━━╇━━━━━━━━━━━┩
+│     0 │      3754 │
+└───────┴───────────┘
+reports complete; stopping benchmark process
+EXIT=0
+REPORTS_COMPLETE=yes

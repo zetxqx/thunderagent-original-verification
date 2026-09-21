@@ -1,4 +1,4 @@
-# ThunderAgent scheduling: six proposals
+# ThunderAgent scheduling: seven proposals
 
 **Part 1** - why large sessions starve at admission, and four ways to bound the wait.
 **Part 2** - whether the 5-second scheduler interval is costing throughput, and why shortening it should come with signal smoothing.
@@ -6,8 +6,9 @@
 **Part 4** - why prefill/decode disaggregation does not address this workload's bottleneck, and the one experiment that would show whether it helps interactivity.
 **Part 5** - why CPU KV offloading attacks the same root cause as admission control at lower cost, and what that does to ThunderAgent's value.
 **Part 6** - three gaps the port has once chat traffic is mixed with agentic, and the fix path through priority bands.
+**Part 7** - session-level metrics for judging these schedulers under an SLO, because request-level TTFT percentiles hide who pays under overload.
 
-None has been run.
+Only Part 3 has been run (step 13); Part 7 is a measurement proposal, partly computable from existing data.
 
 ---
 
@@ -288,6 +289,8 @@ On the added wait, the arithmetic is kinder than it first looks. Today a program
 
 Like A, but after a program has waited `T` seconds for its origin pod it may take the most-room pod. `T` on the order of the tail we can tolerate (30 to 60 s). Trades some cache residency for a bounded added delay; adds one parameter and one more interaction with Part 1's starvation.
 
+Implemented 2026-09-21 (llm-d-router branch `thunder-agent`) in a stronger form that also settles the Part 1 interaction: `urgentWaitMs`. A paused or new head that has waited that long (a) is ordered ahead of every non-urgent paused or new head, oldest first, and (b) is released from the origin-only restriction. Without (a), a bounded wait alone would let a large session keep losing to smaller newcomers on every pod instead of only on its origin. It remains fit-checked; only `headWaitStarvationMs` bypasses the fit. Suggested value: the TTFT SLO minus one re-prefill, i.e. about 15 s for a 30 s SLO. Counter: `thunder_agent_urgent_promotions_total`.
+
 ### Option C: move only when the origin is clearly the worse choice
 
 Allow the move only when the most-room pod has room exceeding the origin's by a margin (for example a full program's worth), i.e. hysteresis on the placement decision. Keeps some load balancing; harder to reason about and to test than A.
@@ -458,3 +461,61 @@ One cell family on the pool: weka replay at c=192 (the level where the gate is f
 | agentic hit rate and holds, vs pure agentic | gaps 1 and 3 |
 
 Then the same with the fix path applied: chat band, `kvUsageCorrection: true`, load scorer added. About 90 minutes of pool time for both.
+
+---
+
+# Part 7: session-level metrics under an SLO
+
+Status: measurement proposal, written 2026-09-20 after the step 13 sweep. One of the three metrics is computable from the data already collected; the other two need a small inference-perf change first.
+
+## The problem with what we report today
+
+Every table in steps 08 to 13 reports TTFT as percentiles over requests. That is the wrong unit for an agentic workload. A session is a chain of turns, and a session whose one turn waited 1800 s for admission is a failed session for its user, but it is a single sample among thousands in a request-level p90. Two very different failure modes therefore look alike or even invert under request percentiles:
+
+- llm-d's default profile under overload: every request is slow and no session is singled out. At 84 sessions per pod TTFT p50 is 101 s, no request waited 300 s, and no session got past turn 30 in 30 minutes.
+- ThunderAgent (either resume policy) under the same load: most turns are fast (p50 4 s) and a minority of sessions are held for minutes. At 84 sessions per pod, 188 requests waited 300 s or more.
+
+The natural worry, that TTFT grows with turn depth until sessions cannot finish, turns out not to be the pattern. Splitting step 13's per-request data by turn index (`graph_event_id`):
+
+| c=338, 84 sessions per pod | turns 0 to 9, TTFT p50 / p90 (s) | turns 10 to 29 | turns 30 to 59 | requests with TTFT >= 300 s | share of requests with TTFT <= 30 s |
+|---|---|---|---|---|---|
+| llm-d default | 97 / 173 | 171 / 193 | none reached | 0 | 14 percent |
+| port, most-room | 4.0 / 100 | 3.0 / 33 | 3.9 / 8 | 188 | 84 percent |
+| port, origin-only | 4.5 / 94 | 4.1 / 43 | 4.3 / 10 | 190 | 85 percent |
+
+| c=192, 48 sessions per pod | turns 0 to 9 | turns 10 to 29 | turns 30 to 59 | >= 300 s | <= 30 s |
+|---|---|---|---|---|---|
+| llm-d default | 19 / 62 | 66 / 92 | none reached | 0 | 45 percent |
+| port, most-room | 2.9 / 13 | 3.6 / 11 | 4.6 / 19 | 66 | 95 percent |
+| port, origin-only | 2.3 / 18 | 3.7 / 16 | 5.6 / 21 | 55 | 94 percent |
+
+Under the port, deeper turns are faster and steadier, because a running (REASONING) program's turns dispatch unconditionally onto a warm prefix. The long waits sit in turns 0 to 9: sessions not yet admitted, or paused early and waiting to resume. So the population that pays is "sessions at the door", and the question a session-level metric must answer is how many of them, for how long, and whether they eventually progress.
+
+## The three metrics
+
+Fix an SLO threshold X on TTFT (10 s, 30 s and 60 s are the values to tabulate; 30 s is the working default). All three are per cell, over the window after warm-up.
+
+1. **Goodput within SLO**: turns completed per second whose TTFT <= X. This is throughput that a user would have experienced as acceptable. It is the request-level metric that survives the critique, because a turn that waited 1800 s counts as zero rather than as one slow sample. Computable now from `per_request_lifecycle_metrics.json` (`computed_metrics.time_to_first_token`).
+
+2. **Session SLO attainment**: the share of sessions active in the window whose turns all (strict) or 95 percent (lenient) met TTFT <= X. This is the metric that exposes "most fast, a few abandoned". Report both variants; the strict one is what a user-facing SLA would say, the lenient one tolerates one admission wait per session. Needs a session identifier per request.
+
+3. **Per-session progress distribution**: for each session active in the window, the number of turns it completed; report p10, p50, p90 across sessions, and the share of sessions with zero completed turns after warm-up. p10 is the starvation metric Part 1 is about; p50 gives the practical answer to "how long until a 60-turn session finishes" at each load (60 / p50 x window). Needs a session identifier per request.
+
+Caveat on metric 2, learned from the step 13 replicates: a strict all-turns criterion is biased against the arm whose sessions make more progress, because more turns in the window means more chances to violate. In those cells most-room and origin-only violated the 30 s SLO on the same share of turns (2 to 4 percent) but origin-only sessions completed 30 to 40 percent more turns, which alone accounts for a good part of its lower strict attainment; the rest is longer individual waits (a hold for a full origin pod lasts longer than a move). Report next to it the per-turn violation share and attainment over a fixed number of turns per session (for example the first 10 after warm-up), or a time-based form (no wait over X in any 10-minute window), so progress is not penalised.
+
+Do not use "session completion rate" as a headline. In closed-loop replay with replacement, whether a session completes depends on the window length and on which traces are short, and the faster arm finishes more sessions and pulls in more cold ones (step 13 README, caveats). If a completion rate is wanted, define it as "sessions that finished within D minutes of their first turn" on a run long enough that D fits, and quote D.
+
+## How to express capacity
+
+With these three, the scheduler comparison should be stated as capacity at SLO rather than as a throughput ratio: the largest number of active sessions per pod at which session SLO attainment (lenient, X = 30 s) stays above a target such as 90 percent, per arm. Step 13's request-level numbers suggest the port roughly doubles that capacity over llm-d's default (24 to 32 vs 64 sessions per pod at TTFT p90 <= 30 s), but that estimate is exactly the kind that metric 2 can overturn, because the port's misses are concentrated in a few sessions.
+
+## What has to change to measure 2 and 3
+
+inference-perf v0.7.0 writes no session identifier into the per-request report (`INFERENCE-PERF-BUGS.md` issue 2); only the turn index survives in `info.graph_event_id`. The fix is to attach the replay session id (the `wekatraceN_<hash>` string already used in the dispatch log lines) to each request's `info` in the replay session data generator, about ten lines on the `fix-session-replay-permits` branch, then rebuild the bench image (`12-llm-d-router-pool/build-inference-perf.sh`). Until that lands, metric 1 can be added to `13-llm-d-router-sweep/analyze_sweep.py` for the 24 existing cells; metrics 2 and 3 apply to every cell run after the fix. The replicate experiment for origin-only (step 13 README, follow-ups) should wait for the fix so its cells carry session ids from the start.
+
+## What the metrics would decide
+
+- Whether origin-only's extra holds (55 to 69 percent more than most-room) land on many sessions briefly or on a few sessions for long. The first is a TTFT p90 story; the second is a Part 1 story and calls for queue aging.
+- Whether the port's advantage over llm-d's default holds as a capacity-at-SLO claim, which is the form an operator can act on.
+- The concurrency question itself: choosing c for an experiment or a deployment becomes "the largest c at which metric 2 meets the target", instead of a guess.
+

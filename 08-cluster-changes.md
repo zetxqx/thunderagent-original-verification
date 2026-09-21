@@ -93,3 +93,15 @@ Six more per-cell upgrades (revisions 36 to 41). The last cell was `epp-thunder-
 ## 2026-09-19/20: step 13 origin arm left the main release on thunder-agent-v4 with origin-only
 
 Seven more per-cell upgrades (revisions 42 to 48) with `--set router.epp.image.tag=thunder-agent-v4`. The last cell was the `epp-thunder-origin-c192` rerun, so revision 48 runs image `thunder-agent-v4` with `thunder-origin-plugins.yaml` (`resumePlacement: origin-only`) and the 2400 s envoy `message_timeout`.
+
+## 2026-09-20: step 13 replicates left the main release on thunder-agent-v4 with the most-room config
+
+Nine more per-cell upgrades (revisions 49 to 57, including the voided and rerun c=128 replicate). The last cell was `epp-thunder-c128-r3`, so revision 57 runs image `thunder-agent-v4` with `thunder-plugins.yaml` (`resumePlacement` default, most-room) and the 2400 s envoy `message_timeout`.
+
+## 2026-09-20 midday: two baseline cells for session-level metrics
+
+Revisions 58 and 59 (`epp-baseline-c96-r2`, `epp-baseline-c128-r2`). The release now runs `thunder-agent-v4` with `baseline-plugins.yaml` and the 2400 s envoy `message_timeout`.
+
+## 2026-09-20 evening: three 90-minute cells at c=128
+
+Revisions 60 to 62 (`epp-thunder-origin-c128-w90`, `epp-baseline-c128-w90`, `epp-thunder-c128-w90`). The release now runs `thunder-agent-v4` with `thunder-plugins.yaml` (most-room) and the 2400 s envoy `message_timeout`.

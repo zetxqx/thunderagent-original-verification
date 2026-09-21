@@ -6,6 +6,7 @@ set -euo pipefail
 TAG="${1:?usage: build-inference-perf.sh <tag>}"
 REPO="${INFERENCE_PERF:-$HOME/projects/llmdthunder/inference-perf}"
 IMG=us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/inference-perf
+HERE="$(cd "$(dirname "$0")" && pwd)"  # resolved before the cd below
 cd "$REPO"
 SHA=$(git rev-parse --short HEAD); BR=$(git branch --show-current)
 if gcloud artifacts docker tags list "$IMG" --format="value(tag)" 2>/dev/null | sed 's|.*/||' | grep -qx "$TAG"; then
@@ -31,5 +32,5 @@ while :; do ST=$(gcloud builds describe "$BUILD" --format="value(status)"); echo
 [ "$ST" = SUCCESS ] || exit 1
 DIGEST=$(gcloud artifacts docker images describe "$IMG:$TAG" --format="value(image_summary.digest)")
 echo "Pushed $IMG:$TAG  digest $DIGEST"
-echo "$IMG@$DIGEST" > "$(dirname "$0")/results/inference-perf-image.txt"
+echo "$IMG@$DIGEST" > "$HERE/results/inference-perf-image.txt"
 rm -rf "$CTX"

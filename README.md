@@ -116,7 +116,7 @@ Open item, resolved in step 10: the extra errors were 600 s client timeouts on t
 
 ## Proposals (not part of the numbered steps)
 
-`proposal/PROPOSAL.md` - six ThunderAgent scheduling proposals, none run yet. Kept outside the numbered sequence.
+`proposal/PROPOSAL.md` - seven ThunderAgent proposals; Part 3 was run in step 13, the rest are unrun. Kept outside the numbered sequence.
 
 **Part 1, admission-wait starvation**: why a minority of sessions wait up to 30 minutes for admission. Measured cause: `_greedy_resume` orders the waiting pool by token count **ascending** with no aging, so large sessions lose every round to a refreshed supply of smaller newcomers. **71% of sessions above 80k tokens were held past 600s; 0% of sessions below 40k tokens were**, with holds pinned at upstream's hard-coded 1800s forced-admission backstop. Four remedies compared (lower the timeout / age the queue / head-of-line reservation / shed with Retry-After), with a one-cell experiment and pre-registered expectations.
 
@@ -129,6 +129,8 @@ Open item, resolved in step 10: the extra errors were 600 s client timeouts on t
 **Part 5, CPU KV offloading**: the c=338 working set (811 GB) fits in GPU plus host RAM, a resumed turn becomes a 0.1 s PCIe copy instead of a 2.9 s recompute, and vLLM v0.28.0 already ships the native connector (`kv_offloading_size` is just unset). Likely the largest single lever on this workload, and likely to remove much of admission control's value, which the proposal says plainly. Three arms to measure it.
 
 **Part 6, mixed chat and agentic**: anonymous chat KV is invisible to the port's fit view (`kvUsageCorrection` has never been on), all chat shares one flow that is gated as NEW behind agentic resumes, and session-bearing chat wins admission then gets paused first for no gain. Fix path: a separate priority band for chat, `kvUsageCorrection: true`, a general load scorer in the profile, plus Part 1's aging. One mixed-traffic cell family to quantify each gap.
+
+**Part 7, session-level metrics under an SLO**: request-level TTFT percentiles hide who pays under overload. llm-d's default makes every request slow; the port makes most turns fast and holds a few sessions at the door for minutes (at 84 sessions per pod: TTFT p50 101 s and no 300 s waits, vs p50 4 s and 188 waits over 300 s). Three metrics to replace the percentiles: goodput within SLO (computable now), session SLO attainment, and the per-session progress distribution (both need a session id in the inference-perf per-request report, a ten-line fix). Capacity should then be stated as the largest sessions per pod at which session attainment meets a target.
 
 ## Data note: per-request reports are not in this repo
 

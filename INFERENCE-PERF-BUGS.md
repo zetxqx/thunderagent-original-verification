@@ -90,6 +90,8 @@ timeout -s INT $((STAGE_TIMEOUT + 900)) inference-perf --config_file /etc/config
 
 ## Issue 2: the per-request report carries no session identifier
 
+**Fix (2026-09-20, local, not yet upstream)**: `RequestLifecycleMetric.session_id` is already populated by the load generator for session-based runs; `build_per_request_lifecycle_entry` in `inference_perf/reportgen/base.py` simply never wrote it. Two lines add `entry["session_id"]` when set, plus two unit tests. Built as image `inference-perf:session-id-v1` (digest `sha256:f7381b01...`, on top of the permit fix `d5a7c8c`, change uncommitted at build time); used by every cell from the step 13 replicates on. Cells before that have only `info.graph_event_id`.
+
 **Severity**: high for anyone analysing session-based replay. This one silently invalidated a whole analysis for us.
 
 ### Symptom
