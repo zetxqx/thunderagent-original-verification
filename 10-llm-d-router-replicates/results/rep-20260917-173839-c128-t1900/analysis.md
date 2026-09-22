@@ -1,6 +1,6 @@
-# Step 10: replicated A/B through the EPP, 3 run(s) of the same configuration
+# Step 10: repeated A/B through the EPP, 3 run(s) of the same configuration
 
-Each cell shows mean (min-max) over replicates.
+Each cell shows mean (min-max) over runs.
 
 | metric | epp-sticky | epp-thunder | ratio of means |
 |---|---|---|---|
@@ -11,6 +11,7 @@ Each cell shows mean (min-max) over replicates.
 | hit rate, after 10 min (STEADY) | 0.003 (0.002-0.003) | 0.489 (0.482-0.502) | 172.67x |
 | TTFT p50 (s) | 49.4 (28.4-68.6) | 4.0 (3.6-4.6) | 0.08x |
 | TTFT p90 (s) | 113.5 (88.2-136.6) | 22.0 (19.8-24.1) | 0.19x |
+| TTFT p99 (s) | 146.6 (117.8-168.3) | 409.7 (352.9-462.7) | 2.79x |
 | requests with zero cache hit | 0.86 (0.83-0.89) | 0.38 (0.36-0.41) | 0.44x |
 | errors | 0 (0-0) | 6 (5-6) | - |
 | EPP holds (paused + new) | 0 (0-0) | 648 (615-674) | - |
@@ -33,9 +34,9 @@ Each cell shows mean (min-max) over replicates.
 
 ## Same sessions only (turns completed)
 
-Restricted to the sessions BOTH arms of a replicate started, so the faster arm pulling extra traces out of the corpus cannot flatter it.
+Restricted to the sessions BOTH arms of a run started, so the faster arm pulling extra traces out of the corpus cannot flatter it.
 
-| replicate | shared sessions | turns: epp-sticky | turns: epp-thunder | ratio |
+| run | shared sessions | turns: epp-sticky | turns: epp-thunder | ratio |
 |---|---|---|---|---|
 | r1 | n/a (the EPP state dump lists no program ids) | - | - | - |
 | r2 | n/a (the EPP state dump lists no program ids) | - | - | - |

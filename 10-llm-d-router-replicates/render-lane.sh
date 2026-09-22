@@ -10,7 +10,9 @@ L=$1; ARM=$2
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="${LLM_D_ROUTER:-$HOME/projects/llmdthunder/llm-d-router}"
 CHART="$REPO/config/charts/llm-d-router-standalone"
-sed "s/__LANE__/$L/g" "$HERE/lane-values-tmpl.yaml" > "$HERE/results/lane-values-$L.yaml"
+# EPP_IMAGE_TAG selects the EPP image (default the template's thunder-agent-v3); the step 14
+# turn-priority arm runs an image built from upstream main.
+sed -e "s/__LANE__/$L/g" -e "s/tag: thunder-agent-v3/tag: ${EPP_IMAGE_TAG:-thunder-agent-v3}/" "$HERE/lane-values-tmpl.yaml" > "$HERE/results/lane-values-$L.yaml"
 helm template "thunder-lane-$L" "$CHART" -n llm-d-program-aware-scheduling \
   -f "$HERE/results/lane-values-$L.yaml" \
   --set-file "router.epp.pluginsCustomConfig.thunder-plugins\.yaml=$HERE/$ARM-plugins.yaml" \

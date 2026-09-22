@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Analysis for the replicated A/B.
+"""Analysis for the repeated A/B.
 
 Three things step 07 could not do:
   1. Error bars: the same config run N times, so the 2x claim gets a range.
@@ -25,8 +25,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 PALETTE = {"blue": "#0F4D92", "red": "#B64342", "grey": "#CFCECE"}
-ARMS = (("default", PALETTE["red"], "default (pure proxy)"),
-        ("tr-decay", PALETTE["blue"], "tr-decay (ThunderAgent)"))
+ARMS = (("default", PALETTE["red"], "passthrough"),
+        ("tr-decay", PALETTE["blue"], "ThunderAgent"))
 WARMUP_S = 600
 
 
@@ -97,6 +97,7 @@ def cell_stats(cell, window_s=2700):
         "hit_steady": hit_rate(cell, WARMUP_S),
         "ttft_p50": float(np.percentile(lat, 50)) if lat else float("nan"),
         "ttft_p90": float(np.percentile(lat, 90)) if lat else float("nan"),
+        "ttft_p99": float(np.percentile(lat, 99)) if lat else float("nan"),
         "zero_cache_share": len(zero) / len(reqs) if reqs else float("nan"),
         "sessions": sessions(cell),
     }
@@ -164,7 +165,7 @@ def make_error_figure(root, reps, client_timeout=600.0):
         ax_rate.bar(j, share, 0.55, color=col, edgecolor="black", linewidth=1.2)
         ax_rate.text(j, share + 0.06, f"{share:.1f}%\n({a['n_err']} of {a['n_ok'] + a['n_err']})",
                      ha="center", fontsize=11)
-    ax_rate.set_xticks(range(len(ARMS)), [a[0] for a in ARMS])
+    ax_rate.set_xticks(range(len(ARMS)), [a[2] for a in ARMS])
     ax_rate.set_ylabel("Requests abandoned by the client (%)")
     ax_rate.set_title("(a) Client gave up waiting", fontsize=14)
     ax_rate.set_ylim(0, 3.2)
@@ -181,7 +182,7 @@ def make_error_figure(root, reps, client_timeout=600.0):
     ax_dur.set_yscale("log")
     ax_dur.set_xlabel("Successful requests, sorted (%)")
     ax_dur.set_ylabel("End-to-end request time (s), log")
-    ax_dur.set_title("(b) Successful requests are 4x faster under tr", fontsize=13)
+    ax_dur.set_title("(b) Successful requests are 4x faster under ThunderAgent", fontsize=13)
     ax_dur.legend(fontsize=10, loc="lower right")
 
     # (c) the cause: router holds, and how many cross the client's patience
@@ -215,7 +216,7 @@ def make_error_figure(root, reps, client_timeout=600.0):
 
 
 def fmt(vals, spec="{:.3f}"):
-    """value list -> 'mean (min-max)', the honest way to show N replicates."""
+    """value list -> 'mean (min-max)', the honest way to show N runs."""
     vals = [v for v in vals if v == v]
     if not vals:
         return "-"
@@ -229,7 +230,7 @@ def main():
     reps = sorted({int(d.name.split("-r")[-1]) for d in root.iterdir()
                    if d.is_dir() and "-r" in d.name and d.name[-1].isdigit()})
     if not reps:
-        print("no replicate cells found")
+        print("no run cells found")
         return
     data = {}
     for arm, _, _ in ARMS:
@@ -239,7 +240,7 @@ def main():
             if (d / "results").exists():
                 data[arm].append(cell_stats(d))
 
-    L = [f"# Replicated A/B: {len(reps)} runs of the same configuration\n"]
+    L = [f"# Repeated A/B: {len(reps)} runs of the same configuration\n"]
     rows = [("throughput (output tok/s)", "throughput", "{:.0f}"),
             ("requests completed", "requests", "{:.0f}"),
             ("hit rate, whole window", "hit_window", "{:.3f}"),
@@ -247,9 +248,10 @@ def main():
             ("hit rate, after 10 min (STEADY)", "hit_steady", "{:.3f}"),
             ("TTFT p50 (s)", "ttft_p50", "{:.1f}"),
             ("TTFT p90 (s)", "ttft_p90", "{:.1f}"),
+            ("TTFT p99 (s)", "ttft_p99", "{:.1f}"),
             ("requests with zero cache hit", "zero_cache_share", "{:.2f}"),
             ("errors", "errors", "{:.0f}")]
-    L.append("Each cell shows mean (min-max) over replicates.\n")
+    L.append("Each cell shows mean (min-max) over runs.\n")
     L.append("| metric | default | tr-decay | ratio of means |")
     L.append("|---|---|---|---|")
     for name, key, spec in rows:
@@ -261,11 +263,11 @@ def main():
         L.append(f"| {name} | {fmt(dv, spec)} | {fmt(tv, spec)} | {ratio} |")
     L.append("")
 
-    # Same-session comparison: only sessions both arms of a replicate touched.
+    # Same-session comparison: only sessions both arms of a run touched.
     L.append("## Same sessions only (turns completed)\n")
-    L.append("Restricted to the sessions BOTH arms of a replicate started, so the "
+    L.append("Restricted to the sessions BOTH arms of a run started, so the "
              "faster arm pulling extra traces out of the corpus cannot flatter it.\n")
-    L.append("| replicate | shared sessions | turns: default | turns: tr-decay | ratio |")
+    L.append("| run | shared sessions | turns: default | turns: tr-decay | ratio |")
     L.append("|---|---|---|---|---|")
     for i, r in enumerate(reps):
         if i >= len(data["default"]) or i >= len(data["tr-decay"]):
@@ -284,14 +286,16 @@ def main():
     (root / "analysis.md").write_text("\n".join(L))
     print("\n".join(L))
 
-    # Figure: per-replicate points, so the spread is visible rather than averaged away.
+    # Figure: per-run points, so the spread is visible rather than averaged away.
     plt.rcParams.update({"font.family": ["Helvetica", "Arial", "DejaVu Sans", "sans-serif"],
                          "font.size": 13, "axes.spines.top": False, "axes.spines.right": False,
                          "legend.frameon": False, "axes.linewidth": 1.6,
                          "xtick.major.width": 1.6, "ytick.major.width": 1.6})
     panels = [("throughput", "Throughput", "output tokens / s", "{:.0f}", "higher"),
               ("hit_steady", "Prefix-cache hit rate", "steady state (after 10 min)", "{:.3f}", "higher"),
-              ("ttft_p50", "TTFT p50", "seconds", "{:.1f}", "lower")]
+              ("ttft_p50", "TTFT p50", "seconds", "{:.1f}", "lower"),
+              ("ttft_p90", "TTFT p90", "seconds", "{:.1f}", "lower"),
+              ("ttft_p99", "TTFT p99", "seconds", "{:.1f}", "lower")]
     fig, axes = plt.subplots(1, len(panels), figsize=(4.1 * len(panels), 4.3))
     for ax, (key, title, unit, spec, better) in zip(axes, panels):
         means, top = [], 0.0
@@ -311,16 +315,20 @@ def main():
                         ha="center", va="bottom", fontsize=12, fontweight="bold", color=col)
         if len(means) == 2 and all(np.isfinite(means)) and min(means) > 0:
             r = means[1] / means[0] if better == "higher" else means[0] / means[1]
-            ax.text(0.5, 0.97, f"{r:.0f}x {better}" if r >= 10 else f"{r:.1f}x {better}",
+            word = better
+            if r < 1:  # ThunderAgent is worse on this metric: say so plainly
+                r = 1 / r
+                word = "lower" if better == "higher" else "higher"
+            ax.text(0.5, 0.97, f"{r:.0f}x {word}" if r >= 10 else f"{r:.1f}x {word}",
                     transform=ax.transAxes, ha="center", va="top", fontsize=13,
                     fontweight="bold", color="#333333")
-        ax.set_xticks(range(len(ARMS)), ["default\n(proxy)", "tr-decay\n(ThunderAgent)"])
+        ax.set_xticks(range(len(ARMS)), [a[2] for a in ARMS])
         ax.set_xlim(-0.6, len(ARMS) - 0.4)
         ax.set_ylim(0, top * 1.32 if top else 1)
         ax.set_title(title, fontsize=14, fontweight="bold", loc="left")
         ax.set_ylabel(unit)
         ax.tick_params(axis="x", length=0)
-    fig.text(0.01, 0.01, f"n = {len(reps)} replicates per arm at c = 128. "
+    fig.text(0.01, 0.01, f"n = {len(reps)} runs per arm at c = 128. "
              "Bar = mean, whisker = min-max, dots = individual runs.",
              fontsize=10.5, color="#555555", ha="left", va="bottom")
     fig.tight_layout(rect=(0, 0.05, 1, 1), w_pad=2.5)

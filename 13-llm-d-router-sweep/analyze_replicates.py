@@ -26,7 +26,8 @@ pa = importlib.util.module_from_spec(spec); spec.loader.exec_module(pa)
 
 LEVELS = (96, 128)
 PODS = 4
-ARMS = (("epp-baseline", "llm-d default"), ("epp-thunder", "most-room"), ("epp-thunder-origin", "origin-only"), ("epp-thunder-origin-u15", "origin + urgent 15 s"), ("epp-thunder-origin-u15-f25", "origin + urgent 15 s + forced 25 s"), ("epp-thunder-origin-age", "origin + age-only 15 s"), ("epp-thunder-origin-age-reserve", "origin + age 15 s + reserve"), ("epp-thunder-origin-w8", "origin + wait cap 8 s"))
+TA = "ThunderAgent (llm-d router)"
+ARMS = (("epp-baseline", "llm-d default"), ("epp-thunder", f"{TA}, most-room resume"), ("epp-thunder-origin", f"{TA}, origin-only resume"), ("epp-thunder-origin-u15", f"{TA}, origin-only + urgent 15 s (move)"), ("epp-thunder-origin-u15-f25", f"{TA}, origin-only + urgent 15 s + forced 25 s"), ("epp-thunder-origin-age", f"{TA}, origin-only + age priority 15 s"), ("epp-thunder-origin-age-reserve", f"{TA}, origin-only + age 15 s + reserve"), ("epp-thunder-origin-w8", f"{TA}, origin-only + wait cap 8 s"))
 RATIOS = (("epp-thunder", "epp-baseline", "most-room / default"), ("epp-thunder-origin", "epp-thunder", "origin / most-room"), ("epp-thunder-origin-u15", "epp-thunder-origin", "u15 / origin"), ("epp-thunder-origin-u15-f25", "epp-thunder-origin", "u15-f25 / origin"), ("epp-thunder-origin-age", "epp-thunder-origin", "age / origin"), ("epp-thunder-origin-age-reserve", "epp-thunder-origin", "age-reserve / origin"), ("epp-thunder-origin-w8", "epp-thunder-origin", "w8 / origin"))
 REPS = (1, 2, 3, 4)
 WARMUP_S = 600.0
@@ -158,7 +159,7 @@ def main():
     plt.rcParams.update({"font.family": ["Helvetica", "Arial", "DejaVu Sans", "sans-serif"], "font.size": 14, "axes.linewidth": 2, "axes.spines.top": False, "axes.spines.right": False, "legend.frameon": False})
     COL = {"epp-baseline": "#B64342", "epp-thunder": "#0F4D92", "epp-thunder-origin": "#3E9B4F", "epp-thunder-origin-u15": "#42949E", "epp-thunder-origin-u15-f25": "#9A4D8E", "epp-thunder-origin-age": "#E9A6A1", "epp-thunder-origin-age-reserve": "#FFD700", "epp-thunder-origin-w8": "#3775BA"}
     panels = [("throughput", "Throughput", "output tokens / s"), ("hit_steady", "Prefix-cache hit rate", "steady state"), ("ttft_p50", "TTFT p50", "seconds"), ("attain_strict", "Session SLO attainment", f"strict: every turn TTFT <= {SLO_S:.0f} s")]
-    fig, axes = plt.subplots(1, 5, figsize=(23, 5), gridspec_kw={"width_ratios": [1, 1, 1, 1, 0.7]})
+    fig, axes = plt.subplots(1, 5, figsize=(26, 5), gridspec_kw={"width_ratios": [1, 1, 1, 1, 1.1]})
     present = [a for a in ARMS if any((a[0], c) in data for c in LEVELS)]
     x = np.arange(len(LEVELS)); w = 0.8 / max(1, len(present))
     for ax, (key, title, unit) in zip(axes, panels):
@@ -173,8 +174,8 @@ def main():
             ax.errorbar(x + (i - (len(present) - 1) / 2) * w, means, yerr=[lo, hi], fmt="none", ecolor="black", elinewidth=1.5, capsize=4, zorder=3)
         ax.set_title(title, loc="left", fontweight="bold", fontsize=15, pad=20); ax.text(0, 1.02, unit, transform=ax.transAxes, fontsize=11.5, color="0.35", va="bottom")
         ax.set_xticks(x); ax.set_xticklabels([f"{c // PODS} / pod\n(c={c})" for c in LEVELS]); ax.set_ylim(bottom=0)
-    h, l = axes[0].get_legend_handles_labels(); axes[4].set_axis_off(); axes[4].legend(h, l, loc="center left", fontsize=13)
-    fig.text(0.005, 0.005, "Bars: mean over replicates; whiskers: min to max; dots: individual 30-minute cells. Session SLO attainment uses only the cells whose report carries session ids.", fontsize=11, color="0.35")
+    h, l = axes[0].get_legend_handles_labels(); axes[4].set_axis_off(); axes[4].legend(h, l, loc="center left", fontsize=12)
+    fig.text(0.005, 0.005, "Bars: mean over runs; whiskers: min to max; dots: individual 30-minute cells. Session SLO attainment uses only the cells whose report carries session ids.", fontsize=11, color="0.35")
     fig.tight_layout(pad=1, rect=(0, 0.05, 1, 1))
     for ext in ("png", "pdf"):
         fig.savefig(root / f"replicates.{ext}", dpi=300 if ext == "png" else None, bbox_inches="tight", pad_inches=0.06)

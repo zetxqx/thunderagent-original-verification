@@ -2,7 +2,8 @@
 
 Per turn after warm-up, c=128. Idle age = this turn's first token minus the previous turn's end. Cached fraction = vLLM cached_tokens / prompt_tokens. Re-prefill = prompt tokens not cached.
 
-## most-room (3456 turns)
+## ThunderAgent (llm-d router)
+most-room resume (3456 turns)
 
 | idle age (s) | turns | share of turns | cached fraction, median | cached fraction, mean | turns with < 50% cached | re-prefill tokens, median | TTFT median (s) |
 |---|---|---|---|---|---|---|---|
@@ -15,7 +16,8 @@ Per turn after warm-up, c=128. Idle age = this turn's first token minus the prev
 | 60-120 | 26 | 0.01 | 0.00 | 0.00 | 1.00 | 122480 | 73.5 |
 | 120- | 51 | 0.01 | 0.00 | 0.00 | 1.00 | 127742 | 251.5 |
 
-## origin-only (4141 turns)
+## ThunderAgent (llm-d router)
+origin-only resume (4141 turns)
 
 | idle age (s) | turns | share of turns | cached fraction, median | cached fraction, mean | turns with < 50% cached | re-prefill tokens, median | TTFT median (s) |
 |---|---|---|---|---|---|---|---|
@@ -28,7 +30,8 @@ Per turn after warm-up, c=128. Idle age = this turn's first token minus the prev
 | 60-120 | 40 | 0.01 | 0.00 | 0.00 | 1.00 | 91044 | 69.8 |
 | 120- | 57 | 0.01 | 0.00 | 0.03 | 0.96 | 91947 | 298.5 |
 
-## origin + age-only 15 s (1697 turns)
+## ThunderAgent (llm-d router)
+origin-only + age priority 15 s (1697 turns)
 
 | idle age (s) | turns | share of turns | cached fraction, median | cached fraction, mean | turns with < 50% cached | re-prefill tokens, median | TTFT median (s) |
 |---|---|---|---|---|---|---|---|
@@ -41,7 +44,8 @@ Per turn after warm-up, c=128. Idle age = this turn's first token minus the prev
 | 60-120 | 91 | 0.05 | 0.00 | 0.00 | 1.00 | 86503 | 79.2 |
 | 120- | 54 | 0.03 | 0.00 | 0.03 | 0.96 | 101214 | 157.4 |
 
-## origin + urgent 15 s (move) (2982 turns)
+## ThunderAgent (llm-d router)
+origin-only + urgent 15 s (move) (2982 turns)
 
 | idle age (s) | turns | share of turns | cached fraction, median | cached fraction, mean | turns with < 50% cached | re-prefill tokens, median | TTFT median (s) |
 |---|---|---|---|---|---|---|---|
@@ -54,15 +58,16 @@ Per turn after warm-up, c=128. Idle age = this turn's first token minus the prev
 | 60-120 | 85 | 0.03 | 0.00 | 0.00 | 1.00 | 124506 | 73.0 |
 | 120- | 30 | 0.01 | 0.00 | 0.03 | 0.97 | 185643 | 173.8 |
 
-## origin + wait cap 8 s (1912 turns)
+## ThunderAgent (llm-d router)
+origin-only + wait cap 8 s (5697 turns)
 
 | idle age (s) | turns | share of turns | cached fraction, median | cached fraction, mean | turns with < 50% cached | re-prefill tokens, median | TTFT median (s) |
 |---|---|---|---|---|---|---|---|
-| 0-2 | 519 | 0.27 | 0.98 | 0.84 | 0.13 | 1295 | 0.4 |
-| 2-5 | 363 | 0.19 | 0.96 | 0.75 | 0.21 | 2277 | 2.6 |
-| 5-10 | 401 | 0.21 | 0.76 | 0.62 | 0.36 | 14494 | 5.9 |
-| 10-15 | 275 | 0.14 | 0.00 | 0.17 | 0.85 | 63992 | 10.0 |
-| 15-30 | 254 | 0.13 | 0.00 | 0.04 | 0.97 | 92815 | 15.6 |
-| 30-60 | 41 | 0.02 | 0.00 | 0.00 | 1.00 | 118095 | 33.1 |
-| 60-120 | 17 | 0.01 | 0.00 | 0.00 | 1.00 | 123519 | 72.4 |
-| 120- | 16 | 0.01 | 0.00 | 0.00 | 1.00 | 140432 | 679.7 |
+| 0-2 | 1497 | 0.26 | 0.98 | 0.84 | 0.13 | 1362 | 0.4 |
+| 2-5 | 1063 | 0.19 | 0.96 | 0.77 | 0.19 | 2389 | 2.6 |
+| 5-10 | 1261 | 0.22 | 0.70 | 0.59 | 0.39 | 17774 | 5.8 |
+| 10-15 | 824 | 0.14 | 0.00 | 0.18 | 0.83 | 62976 | 10.1 |
+| 15-30 | 735 | 0.13 | 0.00 | 0.03 | 0.98 | 93401 | 15.6 |
+| 30-60 | 137 | 0.02 | 0.00 | 0.00 | 1.00 | 116755 | 34.8 |
+| 60-120 | 46 | 0.01 | 0.00 | 0.00 | 1.00 | 124678 | 73.8 |
+| 120- | 61 | 0.01 | 0.00 | 0.00 | 1.00 | 137999 | 298.0 |

@@ -35,7 +35,7 @@ cat > "$OUT_ROOT/manifest-global.json" <<EOJ
 {"ab_id":"$AB_ID","kind":"epp-replicates","started":"$(date -u +%Y-%m-%dT%H:%M:%SZ)",
  "concurrency":$CONC,"replicates":$REPS,"window_s":$WINDOW,"arms":"$ARMS","client_timeout_s":$CLIENT_TIMEOUT,
  "design":"one lane per replicate; within a lane both arms sequentially on the same pod through a fresh EPP",
- "epp_image":"us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker:thunder-agent-v3",
+ "epp_image":"us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker:${EPP_IMAGE_TAG:-thunder-agent-v3}",
  "inference_perf":"$BENCH_IMAGE",
  "base_seed":20260915,
  "config_template_sha256":"$(shasum -a 256 "$HERE/config-tmpl.yaml" | cut -d' ' -f1)",
@@ -88,6 +88,11 @@ print('reset_prefix_cache:', urllib.request.urlopen(urllib.request.Request(
   case "$ARM" in
     thunder) [ "$GATE" -ge 1 ] || { echo "FATAL [$CELL]: thunder arm without flow control" >&2; return 1; } ;;
     sticky)  [ "$GATE" -eq 0 ] || { echo "FATAL [$CELL]: sticky arm started flow control" >&2; return 1; } ;;
+    turnprio*)
+      [ "$GATE" -ge 1 ] || { echo "FATAL [$CELL]: turn-priority arm without flow control" >&2; return 1; }
+      kubectl get cm "$SVC" -n "$NS" -o yaml | grep -q 'strategy: turn-priority' || { echo "FATAL [$CELL]: turn-priority not in the EPP config" >&2; return 1; }
+      local IMG; IMG=$(kubectl get pod "$EPP_POD" -n "$NS" -o jsonpath='{.spec.containers[?(@.name=="epp")].image}')
+      case "$IMG" in *":${EPP_IMAGE_TAG:-thunder-agent-v3}") ;; *) echo "FATAL [$CELL]: EPP image is $IMG" >&2; return 1 ;; esac ;;
   esac
   echo "[$CELL] epp pod $EPP_POD, flow control lines: $GATE"
 

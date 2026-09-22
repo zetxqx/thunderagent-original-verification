@@ -142,8 +142,8 @@ def make_summary_lines(root, concs, window_s=2700):
     """
     apply_style()
     fig, (ax_tp, ax_tt, ax_hr) = plt.subplots(1, 3, figsize=(17, 5.2))
-    ARMS = {"default": (PALETTE["red"], "default"),
-            "tr-decay": (PALETTE["blue"], "tr-decay")}
+    ARMS = {"default": (PALETTE["red"], "passthrough"),
+            "tr-decay": (PALETTE["blue"], "ThunderAgent")}
     # p50 / p90 / mean share a colour per arm and differ by line style.
     STATS = (("p50", "-", "o", lambda v: np.percentile(v, 50)),
              ("p90", "--", "s", lambda v: np.percentile(v, 90)),
@@ -207,7 +207,7 @@ def make_summary_lines(root, concs, window_s=2700):
                            xytext=(0, 10), ha="center", fontsize=11,
                            color=PALETTE["blue"])
 
-    fig.suptitle("Weka replay, single vLLM pod: original ThunderAgent vs pure proxy",
+    fig.suptitle("Weka replay, single vLLM pod: ThunderAgent vs passthrough",
                  fontsize=15, y=0.99)
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     for ext in ("png", "pdf"):
@@ -262,8 +262,8 @@ def make_fairness_figure(root, concs):
     """
     apply_style()
     fig, axes = plt.subplots(2, len(concs), figsize=(5.6 * len(concs), 9), squeeze=False)
-    styles = {"default": ("--", PALETTE["red"], "default (pure proxy)"),
-              "tr-decay": ("-", PALETTE["blue"], "tr-decay (ThunderAgent)")}
+    styles = {"default": ("--", PALETTE["red"], "passthrough"),
+              "tr-decay": ("-", PALETTE["blue"], "ThunderAgent")}
 
     for col, c in enumerate(concs):
         ax_hit, ax_tail = axes[0][col], axes[1][col]
@@ -318,8 +318,8 @@ def make_timeseries_figure(root, concs, arms=("default", "tr-decay")):
     apply_style()
     n = len(concs)
     fig, axes = plt.subplots(n, 4, figsize=(20, 4.2 * n), squeeze=False)
-    styles = {"default": ("--", PALETTE["red"], "default (pure proxy)"),
-              "tr-decay": ("-", PALETTE["blue"], "tr-decay (ThunderAgent)")}
+    styles = {"default": ("--", PALETTE["red"], "passthrough"),
+              "tr-decay": ("-", PALETTE["blue"], "ThunderAgent")}
 
     for row, c in enumerate(concs):
         ax_hr, ax_kv, ax_q, ax_p = axes[row]
@@ -360,7 +360,7 @@ def make_timeseries_figure(root, concs, arms=("default", "tr-decay")):
                 ax.set_xlabel("Time (min)")
 
     fig.suptitle("Weka replay, per-concurrency time series: "
-                 "dashed = default (pure proxy), solid = tr-decay (ThunderAgent)",
+                 "dashed = passthrough, solid = ThunderAgent",
                  fontsize=15, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.98))
     for ext in ("png", "pdf"):
@@ -438,12 +438,12 @@ def main():
     ax_d.set_xlim(-1.05, 1.05)
     ax_d.set_ylim(0, 100)
     ax_d.set_xlabel("Fraction of the prompt ThunderAgent served from cache,\n"
-                    "minus what the pure proxy served for the SAME request")
+                    "minus what the passthrough served for the SAME request")
     ax_d.set_ylabel("Share of matched requests at or below this value (%)")
     ax_d.set_title("Request by request: who got more cache hits?\n"
                    "same trace replayed twice, each request matched to its twin "
                    "in the other run", fontsize=14)
-    ax_d.text(-0.52, 95, "pure proxy better", ha="center", fontsize=13,
+    ax_d.text(-0.52, 95, "passthrough better", ha="center", fontsize=13,
               color=PALETTE["red"])
     ax_d.text(0.52, 95, "ThunderAgent better", ha="center", fontsize=13,
               color=PALETTE["blue"])

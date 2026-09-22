@@ -113,3 +113,11 @@ Five per-cell upgrades for the u15 and u15-f25 arms. The last cell was `epp-thun
 ## 2026-09-21 midday: age-only (v6) and wait-cap (v7) cells
 
 Revisions 68 and 69. The release now runs image `thunder-agent-v7` with `thunder-origin-w8-plugins.yaml` (`resumePlacement: origin-only`, `originWaitMaxMs: 8000`) and the 2400 s envoy `message_timeout`.
+
+## 2026-09-21 afternoon: two more wait-cap cells
+
+Revisions 70 and 71 (`epp-thunder-origin-w8-c128-r3`, `-r4`). The release still runs `thunder-agent-v7` with `thunder-origin-w8-plugins.yaml`.
+
+## 2026-09-21 evening: lanes recreated for step 14
+
+`10-llm-d-router-replicates/deploy-lanes.sh turnprio-005-ttl60` with `EPP_IMAGE_TAG=upstream-main-dc6538a1` recreated `thunder-lane-a/b/c` (pod labels, `lane-rbac.yaml`). They are still running after the step 14 cells; remove with `teardown-lanes.sh`.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Analysis for step 10: the step 08 replicate protocol through the llm-d-router EPP.
+"""Analysis for step 10: the step 08 run protocol through the llm-d-router EPP.
 
 Arms: epp-sticky (plugin as scorer only, no admission) vs epp-thunder (the
 upstream tr-decay port). Same cells layout as step 08 plus epp-metrics.csv
@@ -29,9 +29,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 PALETTE = {"blue": "#0F4D92", "red": "#B64342", "grey": "#CFCECE"}
-ARMS = (("epp-sticky", PALETTE["red"], "epp-sticky (no admission)"),
-        ("epp-thunder", PALETTE["blue"], "epp-thunder (ThunderAgent port)"))
-# Step 08 reference (3 replicates, c=128, one pod per lane, Python router).
+ARMS = (("epp-sticky", PALETTE["red"], "passthrough\n(llm-d router)"),
+        ("epp-thunder", PALETTE["blue"], "ThunderAgent\n(llm-d router)"))
+# Step 08 reference (3 runs, c=128, one pod per lane, Python router).
 STEP08 = {"default": {"throughput": 221, "hit_steady": 0.008, "ttft_p50": 52.7, "ttft_p90": 92.5, "requests": 1059},
           "tr-decay": {"throughput": 469, "hit_steady": 0.685, "ttft_p50": 3.0, "ttft_p90": 18.0, "requests": 1994}}
 WARMUP_S = 600
@@ -139,6 +139,7 @@ def cell_stats(cell, window_s=None):
         "hit_steady": hit_rate(cell, WARMUP_S),
         "ttft_p50": float(np.percentile(lat, 50)) if lat else float("nan"),
         "ttft_p90": float(np.percentile(lat, 90)) if lat else float("nan"),
+        "ttft_p99": float(np.percentile(lat, 99)) if lat else float("nan"),
         "zero_cache_share": len(zero) / len(reqs) if reqs else float("nan"),
         "sessions": sessions(cell),
         **epp_stats(cell),
@@ -207,7 +208,7 @@ def make_error_figure(root, reps, client_timeout=1900.0):
         ax_rate.bar(j, share, 0.55, color=col, edgecolor="black", linewidth=1.2)
         ax_rate.text(j, share + 0.06, f"{share:.1f}%\n({a['n_err']} of {a['n_ok'] + a['n_err']})",
                      ha="center", fontsize=11)
-    ax_rate.set_xticks(range(len(ARMS)), [a[0] for a in ARMS])
+    ax_rate.set_xticks(range(len(ARMS)), [a[2] for a in ARMS])
     ax_rate.set_ylabel("Requests abandoned by the client (%)")
     ax_rate.set_title("(a) Client gave up waiting", fontsize=14)
     ax_rate.set_ylim(0, 3.2)
@@ -220,15 +221,24 @@ def make_error_figure(root, reps, client_timeout=1900.0):
                         "-" if arm == "epp-thunder" else "--", color=col, linewidth=2.6,
                         label=f"{lab} (median {np.median(d):.0f}s)")
     ax_dur.axhline(client_timeout, color="0.35", linestyle=":", linewidth=2)
-    ax_dur.text(2, client_timeout * 1.05, "client timeout 600s", fontsize=11, color="0.35")
+    ax_dur.text(2, client_timeout * 1.05, f"client timeout {client_timeout:.0f}s", fontsize=11, color="0.35")
     ax_dur.set_yscale("log")
     ax_dur.set_xlabel("Successful requests, sorted (%)")
     ax_dur.set_ylabel("End-to-end request time (s), log")
-    ax_dur.set_title("(b) Successful requests are 4x faster under tr", fontsize=13)
+    med = {arm: float(np.median(agg[arm]["ok_dur"])) for arm, _, _ in ARMS if agg[arm]["ok_dur"]}
+    speedup = med.get("epp-sticky", np.nan) / med.get("epp-thunder", np.nan)
+    ax_dur.set_title(f"(b) Median successful request is {speedup:.1f}x faster under the llm-d ThunderAgent", fontsize=13)
     ax_dur.legend(fontsize=10, loc="lower right")
 
-    # (c) the cause: router holds, and how many cross the client's patience
+    # (c) the cause: router holds, and how many cross the client's patience.
+    # The llm-d router exposes no per-program hold timeline, so when no arm
+    # has hold intervals this panel is dropped instead of drawn empty (an
+    # empty log axis with the annotation text made the figure 25,000 px wide).
+    if not any(agg[a]["pauses"] for a, _, _ in ARMS):
+        fig.delaxes(ax_pause)
     for arm, col, lab in ARMS:
+        if not any(agg[a]["pauses"] for a, _, _ in ARMS):
+            break
         p = np.sort(agg[arm]["pauses"])
         if not len(p):
             ax_pause.plot([], [], color=col, label=f"{lab}: never pauses")
@@ -237,18 +247,18 @@ def make_error_figure(root, reps, client_timeout=1900.0):
         ax_pause.plot(100 * np.arange(1, len(p) + 1) / len(p), np.maximum(p, 1),
                       "-", color=col, linewidth=2.6,
                       label=f"{lab}: {len(p)} holds, {over} over 600s")
-    ax_pause.axhline(client_timeout, color="0.35", linestyle=":", linewidth=2)
-    ax_pause.axhline(1800, color=PALETTE["red"], linestyle="--", linewidth=1.5)
-    ax_pause.text(2, 1900, "router's own forced-admission limit 1800s",
-                  fontsize=10, color=PALETTE["red"])
-    ax_pause.set_yscale("log")
-    ax_pause.set_xlabel("Router hold intervals, sorted (%)")
-    ax_pause.set_ylabel("Hold duration (s), log")
-    ax_pause.set_title("(c) Cause: a few holds outlast the client", fontsize=13)
-    ax_pause.legend(fontsize=10, loc="lower right")
+    if any(agg[a]["pauses"] for a, _, _ in ARMS):
+      ax_pause.axhline(client_timeout, color="0.35", linestyle=":", linewidth=2)
+      ax_pause.axhline(1800, color=PALETTE["red"], linestyle="--", linewidth=1.5)
+      ax_pause.text(2, 1900, "router's own forced-admission limit 1800s",
+                    fontsize=10, color=PALETTE["red"])
+      ax_pause.set_yscale("log")
+      ax_pause.set_xlabel("Router hold intervals, sorted (%)")
+      ax_pause.set_ylabel("Hold duration (s), log")
+      ax_pause.set_title("(c) Cause: a few holds outlast the client", fontsize=13)
+      ax_pause.legend(fontsize=10, loc="lower right")
 
-    fig.suptitle("Errors and request durations by arm (client timeout 1900 s > 1800 s backstop; "
-                 "admission holds - not failures", fontsize=14, y=0.99)
+    fig.suptitle(f"Failed requests and request durations by arm (client timeout {client_timeout:.0f} s)", fontsize=14, y=0.99)
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     for ext in ("png", "pdf"):
         fig.savefig(root / f"errors.{ext}", dpi=300 if ext == "png" else None,
@@ -258,7 +268,7 @@ def make_error_figure(root, reps, client_timeout=1900.0):
 
 
 def fmt(vals, spec="{:.3f}"):
-    """value list -> 'mean (min-max)', the honest way to show N replicates."""
+    """value list -> 'mean (min-max)', the honest way to show N runs."""
     vals = [v for v in vals if v == v]
     if not vals:
         return "-"
@@ -272,7 +282,7 @@ def main():
     reps = sorted({int(d.name.split("-r")[-1]) for d in root.iterdir()
                    if d.is_dir() and "-r" in d.name and d.name[-1].isdigit()})
     if not reps:
-        print("no replicate cells found")
+        print("no run cells found")
         return
     data = {}
     for arm, _, _ in ARMS:
@@ -282,7 +292,7 @@ def main():
             if (d / "results").exists():
                 data[arm].append(cell_stats(d))
 
-    L = [f"# Step 10: replicated A/B through the EPP, {len(reps)} run(s) of the same configuration\n"]
+    L = [f"# Step 10: repeated A/B through the EPP, {len(reps)} run(s) of the same configuration\n"]
     rows = [("throughput (output tok/s)", "throughput", "{:.0f}"),
             ("requests completed", "requests", "{:.0f}"),
             ("hit rate, whole window", "hit_window", "{:.3f}"),
@@ -290,6 +300,7 @@ def main():
             ("hit rate, after 10 min (STEADY)", "hit_steady", "{:.3f}"),
             ("TTFT p50 (s)", "ttft_p50", "{:.1f}"),
             ("TTFT p90 (s)", "ttft_p90", "{:.1f}"),
+            ("TTFT p99 (s)", "ttft_p99", "{:.1f}"),
             ("requests with zero cache hit", "zero_cache_share", "{:.2f}"),
             ("errors", "errors", "{:.0f}"),
             ("EPP holds (paused + new)", "holds", "{:.0f}"),
@@ -299,7 +310,7 @@ def main():
             ("EPP forced admissions", "starved", "{:.0f}"),
             ("EPP mean queue wait (s)", "queue_wait_mean", "{:.1f}"),
             ("EPP max queue size", "max_queue", "{:.0f}")]
-    L.append("Each cell shows mean (min-max) over replicates.\n")
+    L.append("Each cell shows mean (min-max) over runs.\n")
     L.append("| metric | epp-sticky | epp-thunder | ratio of means |")
     L.append("|---|---|---|---|")
     for name, key, spec in rows:
@@ -326,11 +337,11 @@ def main():
                  f"{spec.format(STEP08['tr-decay'][key])} | {fmt(tv, spec)} |")
     L.append("")
 
-    # Same-session comparison: only sessions both arms of a replicate touched.
+    # Same-session comparison: only sessions both arms of a run touched.
     L.append("## Same sessions only (turns completed)\n")
-    L.append("Restricted to the sessions BOTH arms of a replicate started, so the "
+    L.append("Restricted to the sessions BOTH arms of a run started, so the "
              "faster arm pulling extra traces out of the corpus cannot flatter it.\n")
-    L.append("| replicate | shared sessions | turns: epp-sticky | turns: epp-thunder | ratio |")
+    L.append("| run | shared sessions | turns: epp-sticky | turns: epp-thunder | ratio |")
     L.append("|---|---|---|---|---|")
     for i, r in enumerate(reps):
         if i >= len(data["epp-sticky"]) or i >= len(data["epp-thunder"]):
@@ -349,14 +360,16 @@ def main():
     (root / "analysis.md").write_text("\n".join(L))
     print("\n".join(L))
 
-    # Figure: per-replicate points, so the spread is visible rather than averaged away.
+    # Figure: per-run points, so the spread is visible rather than averaged away.
     plt.rcParams.update({"font.family": ["Helvetica", "Arial", "DejaVu Sans", "sans-serif"],
                          "font.size": 13, "axes.spines.top": False, "axes.spines.right": False,
                          "legend.frameon": False, "axes.linewidth": 1.6,
                          "xtick.major.width": 1.6, "ytick.major.width": 1.6})
     panels = [("throughput", "Throughput", "output tokens / s", "{:.0f}", "higher"),
               ("hit_steady", "Prefix-cache hit rate", "steady state (after 10 min)", "{:.3f}", "higher"),
-              ("ttft_p50", "TTFT p50", "seconds", "{:.1f}", "lower")]
+              ("ttft_p50", "TTFT p50", "seconds", "{:.1f}", "lower"),
+              ("ttft_p90", "TTFT p90", "seconds", "{:.1f}", "lower"),
+              ("ttft_p99", "TTFT p99", "seconds", "{:.1f}", "lower")]
     fig, axes = plt.subplots(1, len(panels), figsize=(4.1 * len(panels), 4.3))
     for ax, (key, title, unit, spec, better) in zip(axes, panels):
         means, top = [], 0.0
@@ -376,16 +389,20 @@ def main():
                         ha="center", va="bottom", fontsize=12, fontweight="bold", color=col)
         if len(means) == 2 and all(np.isfinite(means)) and min(means) > 0:
             r = means[1] / means[0] if better == "higher" else means[0] / means[1]
-            ax.text(0.5, 0.97, f"{r:.0f}x {better}" if r >= 10 else f"{r:.1f}x {better}",
+            word = better
+            if r < 1:  # ThunderAgent is worse on this metric: say so plainly
+                r = 1 / r
+                word = "lower" if better == "higher" else "higher"
+            ax.text(0.5, 0.97, f"{r:.0f}x {word}" if r >= 10 else f"{r:.1f}x {word}",
                     transform=ax.transAxes, ha="center", va="top", fontsize=13,
                     fontweight="bold", color="#333333")
-        ax.set_xticks(range(len(ARMS)), ["epp-sticky\n(no admission)", "epp-thunder\n(port)"])
+        ax.set_xticks(range(len(ARMS)), [a[2] for a in ARMS])
         ax.set_xlim(-0.6, len(ARMS) - 0.4)
         ax.set_ylim(0, top * 1.32 if top else 1)
         ax.set_title(title, fontsize=14, fontweight="bold", loc="left")
         ax.set_ylabel(unit)
         ax.tick_params(axis="x", length=0)
-    fig.text(0.01, 0.01, f"n = {len(reps)} replicate(s) per arm at c = 128 through the llm-d-router EPP. "
+    fig.text(0.01, 0.01, f"n = {len(reps)} runs per arm at c = 128 through the llm-d-router EPP. "
              "Bar = mean, whisker = min-max, dots = individual runs.",
              fontsize=10.5, color="#555555", ha="left", va="bottom")
     fig.tight_layout(rect=(0, 0.05, 1, 1), w_pad=2.5)
@@ -394,7 +411,14 @@ def main():
                     bbox_inches="tight", pad_inches=0.06)
     plt.close(fig)
     print(f"figure: {root}/replicates.png")
-    make_error_figure(root, reps)
+    ct = 1900.0
+    gm = root / "manifest-global.json"
+    if gm.exists():
+        try:
+            ct = float(json.loads(gm.read_text()).get("client_timeout_s") or ct)
+        except Exception:
+            pass
+    make_error_figure(root, reps, client_timeout=ct)
 
 
 if __name__ == "__main__":

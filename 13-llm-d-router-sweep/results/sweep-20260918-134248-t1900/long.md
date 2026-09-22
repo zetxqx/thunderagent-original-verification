@@ -4,7 +4,10 @@ Slice 1 is the warm-up-plus-first-half; later slices see deeper sessions (longer
 
 ## throughput (tok/s)
 
-| slice | llm-d default | most-room | origin-only | origin + urgent 15 s | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
+| slice | llm-d default | ThunderAgent (llm-d router)
+most-room resume | ThunderAgent (llm-d router)
+origin-only resume | ThunderAgent (llm-d router)
+origin-only + urgent 15 s (move) | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 981 | 1238 | 1536 | 1157 | 1.26x | 1.24x | 0.75x | - |
 | 2 | 761 | 1101 | 1167 | 913 | 1.45x | 1.06x | 0.78x | - |
@@ -12,7 +15,10 @@ Slice 1 is the warm-up-plus-first-half; later slices see deeper sessions (longer
 
 ## prefix-cache hit rate
 
-| slice | llm-d default | most-room | origin-only | origin + urgent 15 s | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
+| slice | llm-d default | ThunderAgent (llm-d router)
+most-room resume | ThunderAgent (llm-d router)
+origin-only resume | ThunderAgent (llm-d router)
+origin-only + urgent 15 s (move) | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 0.333 | 0.482 | 0.688 | 0.449 | 1.45x | 1.43x | 0.65x | - |
 | 2 | 0.002 | 0.328 | 0.515 | 0.189 | 154.58x | 1.57x | 0.37x | - |
@@ -20,7 +26,10 @@ Slice 1 is the warm-up-plus-first-half; later slices see deeper sessions (longer
 
 ## TTFT p50 (s)
 
-| slice | llm-d default | most-room | origin-only | origin + urgent 15 s | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
+| slice | llm-d default | ThunderAgent (llm-d router)
+most-room resume | ThunderAgent (llm-d router)
+origin-only resume | ThunderAgent (llm-d router)
+origin-only + urgent 15 s (move) | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 5.8 | 2.2 | 1.1 | 3.1 | 0.38x | 0.48x | 2.89x | - |
 | 2 | 41.2 | 4.6 | 5.6 | 27.1 | 0.11x | 1.22x | 4.84x | - |
@@ -28,7 +37,10 @@ Slice 1 is the warm-up-plus-first-half; later slices see deeper sessions (longer
 
 ## TTFT p90 (s)
 
-| slice | llm-d default | most-room | origin-only | origin + urgent 15 s | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
+| slice | llm-d default | ThunderAgent (llm-d router)
+most-room resume | ThunderAgent (llm-d router)
+origin-only resume | ThunderAgent (llm-d router)
+origin-only + urgent 15 s (move) | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 32.2 | 8.9 | 11.2 | 26.6 | 0.28x | 1.25x | 2.38x | - |
 | 2 | 66.6 | 13.8 | 27.2 | 88.4 | 0.21x | 1.97x | 3.25x | - |
@@ -36,7 +48,10 @@ Slice 1 is the warm-up-plus-first-half; later slices see deeper sessions (longer
 
 ## mean prompt tokens
 
-| slice | llm-d default | most-room | origin-only | origin + urgent 15 s | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
+| slice | llm-d default | ThunderAgent (llm-d router)
+most-room resume | ThunderAgent (llm-d router)
+origin-only resume | ThunderAgent (llm-d router)
+origin-only + urgent 15 s (move) | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 60045 | 60151 | 63177 | 59792 | 1.00x | 1.05x | 0.95x | - |
 | 2 | 79254 | 76344 | 79442 | 77584 | 0.96x | 1.04x | 0.98x | - |
@@ -44,7 +59,10 @@ Slice 1 is the warm-up-plus-first-half; later slices see deeper sessions (longer
 
 ## turns per second
 
-| slice | llm-d default | most-room | origin-only | origin + urgent 15 s | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
+| slice | llm-d default | ThunderAgent (llm-d router)
+most-room resume | ThunderAgent (llm-d router)
+origin-only resume | ThunderAgent (llm-d router)
+origin-only + urgent 15 s (move) | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 1.60 | 1.95 | 2.22 | 1.81 | 1.22x | 1.14x | 0.82x | - |
 | 2 | 0.81 | 1.07 | 1.17 | 0.92 | 1.33x | 1.09x | 0.79x | - |
@@ -52,7 +70,10 @@ Slice 1 is the warm-up-plus-first-half; later slices see deeper sessions (longer
 
 ## goodput within SLO (turns/s)
 
-| slice | llm-d default | most-room | origin-only | origin + urgent 15 s | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
+| slice | llm-d default | ThunderAgent (llm-d router)
+most-room resume | ThunderAgent (llm-d router)
+origin-only resume | ThunderAgent (llm-d router)
+origin-only + urgent 15 s (move) | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 1.40 | 1.93 | 2.15 | 1.67 | 1.38x | 1.12x | 0.78x | - |
 | 2 | 0.12 | 1.03 | 1.06 | 0.48 | 8.67x | 1.02x | 0.45x | - |
@@ -60,7 +81,10 @@ Slice 1 is the warm-up-plus-first-half; later slices see deeper sessions (longer
 
 ## session SLO attainment, strict
 
-| slice | llm-d default | most-room | origin-only | origin + urgent 15 s | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
+| slice | llm-d default | ThunderAgent (llm-d router)
+most-room resume | ThunderAgent (llm-d router)
+origin-only resume | ThunderAgent (llm-d router)
+origin-only + urgent 15 s (move) | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 0.16 | 0.87 | 0.67 | 0.45 | 5.39x | 0.78x | 0.67x | - |
 | 2 | 0.01 | 0.70 | 0.45 | 0.09 | 102.51x | 0.64x | 0.20x | - |
@@ -68,7 +92,10 @@ Slice 1 is the warm-up-plus-first-half; later slices see deeper sessions (longer
 
 ## session SLO attainment, lenient
 
-| slice | llm-d default | most-room | origin-only | origin + urgent 15 s | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
+| slice | llm-d default | ThunderAgent (llm-d router)
+most-room resume | ThunderAgent (llm-d router)
+origin-only resume | ThunderAgent (llm-d router)
+origin-only + urgent 15 s (move) | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 0.24 | 0.89 | 0.78 | 0.57 | 3.65x | 0.88x | 0.72x | - |
 | 2 | 0.01 | 0.72 | 0.51 | 0.11 | 105.41x | 0.71x | 0.22x | - |
@@ -76,7 +103,10 @@ Slice 1 is the warm-up-plus-first-half; later slices see deeper sessions (longer
 
 ## sessions active in the slice
 
-| slice | llm-d default | most-room | origin-only | origin + urgent 15 s | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
+| slice | llm-d default | ThunderAgent (llm-d router)
+most-room resume | ThunderAgent (llm-d router)
+origin-only resume | ThunderAgent (llm-d router)
+origin-only + urgent 15 s (move) | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 143 | 150 | 156 | 150 | 1.05x | 1.04x | 0.96x | - |
 | 2 | 147 | 152 | 148 | 144 | 1.03x | 0.97x | 0.97x | - |
@@ -84,7 +114,10 @@ Slice 1 is the warm-up-plus-first-half; later slices see deeper sessions (longer
 
 ## sessions with zero turns in the slice
 
-| slice | llm-d default | most-room | origin-only | origin + urgent 15 s | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
+| slice | llm-d default | ThunderAgent (llm-d router)
+most-room resume | ThunderAgent (llm-d router)
+origin-only resume | ThunderAgent (llm-d router)
+origin-only + urgent 15 s (move) | most-room / default | origin / most-room | u15 / origin | u15-f25 / origin |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 0.01 | 0.00 | 0.01 | 0.00 | 0.00x | - | 0.00x | - |
 | 2 | 0.00 | 0.04 | 0.03 | 0.01 | - | 0.86x | 0.21x | - |

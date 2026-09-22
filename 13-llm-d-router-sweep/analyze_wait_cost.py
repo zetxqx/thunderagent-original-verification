@@ -18,11 +18,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-ARMS = [("most-room", ["epp-thunder-c128-r2", "epp-thunder-c128-r3"], "#0F4D92", "o"),
-        ("origin-only", ["epp-thunder-origin-c128-r2", "epp-thunder-origin-c128-r3"], "#3E9B4F", "^"),
-        ("origin + age-only 15 s", ["epp-thunder-origin-age-c128-r2"], "#E9A6A1", "P"),
-        ("origin + urgent 15 s (move)", ["epp-thunder-origin-u15-c128-r2", "epp-thunder-origin-u15-c128-r3"], "#42949E", "D"),
-        ("origin + wait cap 8 s", ["epp-thunder-origin-w8-c128-r2", "epp-thunder-origin-w8-c128-r3", "epp-thunder-origin-w8-c128-r4"], "#3775BA", "X")]
+TA = "ThunderAgent (llm-d router)"
+ARMS = [(f"{TA}\nmost-room resume", ["epp-thunder-c128-r2", "epp-thunder-c128-r3"], "#0F4D92", "o"),
+        (f"{TA}\norigin-only resume", ["epp-thunder-origin-c128-r2", "epp-thunder-origin-c128-r3"], "#3E9B4F", "^"),
+        (f"{TA}\norigin-only + age priority 15 s", ["epp-thunder-origin-age-c128-r2"], "#E9A6A1", "P"),
+        (f"{TA}\norigin-only + urgent 15 s (move)", ["epp-thunder-origin-u15-c128-r2", "epp-thunder-origin-u15-c128-r3"], "#42949E", "D"),
+        (f"{TA}\norigin-only + wait cap 8 s", ["epp-thunder-origin-w8-c128-r2", "epp-thunder-origin-w8-c128-r3", "epp-thunder-origin-w8-c128-r4"], "#3775BA", "X")]
 BINS = [(0, 2), (2, 5), (5, 10), (10, 15), (15, 30), (30, 60), (60, 120), (120, 1e9)]
 WARMUP_S = 600.0
 
@@ -72,7 +73,7 @@ def main():
     (root / "wait-cost.md").write_text("\n".join(L)); print("\n".join(L))
 
     plt.rcParams.update({"font.family": ["Helvetica", "Arial", "DejaVu Sans", "sans-serif"], "font.size": 14, "axes.linewidth": 2, "axes.spines.top": False, "axes.spines.right": False, "legend.frameon": False})
-    fig, axes = plt.subplots(1, 4, figsize=(20, 5), gridspec_kw={"width_ratios": [1, 1, 1, 0.7]})
+    fig, axes = plt.subplots(1, 4, figsize=(22, 5), gridspec_kw={"width_ratios": [1, 1, 1, 1.0]})
     centers = [np.sqrt(lo * max(hi if hi < 1e8 else 300, lo + 1)) if lo > 0 else 1.0 for lo, hi in BINS]
     for label, (a, col, marker) in data.items():
         med, share, refill = [], [], []
@@ -86,7 +87,7 @@ def main():
         ax.set_xscale("log"); ax.set_xticks([1, 3, 7, 12, 21, 42, 85, 190]); ax.set_xticklabels(["0-2", "2-5", "5-10", "10-15", "15-30", "30-60", "60-120", "120+"], fontsize=11)
         ax.set_xlabel("prefix idle age (s): previous turn end to this turn's first token"); ax.set_title(title, loc="left", fontweight="bold", fontsize=15, pad=20); ax.text(0, 1.02, unit, transform=ax.transAxes, fontsize=11.5, color="0.35", va="bottom"); ax.set_ylim(bottom=0)
     axes[0].set_ylim(0, 1.02)
-    h, l = axes[0].get_legend_handles_labels(); axes[3].set_axis_off(); axes[3].legend(h, l, loc="center left", fontsize=12)
+    h, l = axes[0].get_legend_handles_labels(); axes[3].set_axis_off(); axes[3].legend(h, l, loc="center left", fontsize=12, labelspacing=1.0)
     fig.text(0.005, 0.005, "c=128 (32 sessions per pod), 30-minute cells with session ids, turns after warm-up. A moved turn under most-room shows up as a low cached fraction at short idle age.", fontsize=11, color="0.35")
     fig.tight_layout(pad=1, rect=(0, 0.05, 1, 1))
     for ext in ("png", "pdf"):

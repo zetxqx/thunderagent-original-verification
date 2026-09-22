@@ -63,37 +63,41 @@ data:
       - pluginRef: session-affinity-scorer
         weight: 1
   thunder-plugins.yaml: |
-    # epp-sticky arm: the same thunder-agent plugin with the flow-control gate
-    # off, so it only does sticky placement (bound pod 1.0) and least-token
-    # spreading for new programs. No holds, no pauses. This is the EPP twin of
-    # step 08's "default" (pure proxy) arm and isolates admission control, the
-    # same design as step 06.
+    # Step 14 arm: llm-d-router upstream main (PR 2116) program-aware-fairness with
+    # the turn-priority strategy at its documented defaults: turnPriorityTimeWeight
+    # 0.05, inactivity reset 120 s, and the flow controller's default request TTL of
+    # 60 s, so under sustained contention a new session is shed (429) rather than
+    # dispatched ahead of deeper ones. Contention comes from the flow controller's
+    # default utilization saturation detector (queue depth >= 5 or KV >= 80 percent).
+    # agent-identity maps the bench's x-session-id header to the fairness ID, so
+    # one fairness ID is one session as the strategy requires. Placement follows
+    # the upstream sample (queue-scorer); on a single pod it is moot.
     apiVersion: inference.networking.x-k8s.io/v1alpha1
     kind: EndpointPickerConfig
+    featureGates:
+    - flowControl
     plugins:
     - type: agent-identity
       parameters:
         additionalSessionHeaders:
         - x-session-id
-    - type: thunder-agent
-      name: thunder
+    - type: program-aware-fairness
       parameters:
-        capacityTokens: 2237040
-        utilThreshold: 1.0
-        actingHalfLifeSeconds: 1
-        bufferTokensPerProgram: 100
-        pauseSweepSeconds: 5
-        kvUsageCorrection: false
-        headWaitStarvationMs: 1800000
+        strategy: turn-priority
+        turnPriorityTimeWeight: 0.05
+        turnPriorityInactivitySeconds: 120
         evictionTtlSeconds: 3600
         evictionSweepSeconds: 300
-        sessionFinalHeader: x-session-final
+    - type: queue-scorer
     - type: max-score-picker
     - type: single-profile-handler
+    flowControl:
+      defaultPriorityBand:
+        fairnessPolicyRef: program-aware-fairness
     schedulingProfiles:
     - name: default
       plugins:
-      - pluginRef: thunder
+      - pluginRef: queue-scorer
       - pluginRef: max-score-picker
 ---
 # Source: llm-d-router-standalone/templates/epp.yaml
@@ -456,7 +460,7 @@ spec:
               name: config
               readOnly: true
         - name: epp
-          image: us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker:thunder-agent-v3
+          image: us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker:upstream-main-dc6538a1
           imagePullPolicy: IfNotPresent
           args:
               - --endpoint-selector

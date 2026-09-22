@@ -1,6 +1,6 @@
-# Step 12: three EPP policies on the 4-pod pool, 3 replicate(s)
+# Step 12: three EPP policies on the 4-pod pool, 3 runs
 
-Each cell shows mean (min-max) over replicates; ratios are against the baseline arm.
+Each cell shows mean (min-max) over runs; ratios are against the baseline arm.
 
 | metric | epp-baseline | epp-affinity | epp-thunder | affinity / baseline | thunder / baseline |
 |---|---|---|---|---|---|
@@ -12,6 +12,7 @@ Each cell shows mean (min-max) over replicates; ratios are against the baseline 
 | hit rate, after 10 min (STEADY) | 0.002 (0.002-0.002) | 0.002 (0.002-0.002) | 0.248 (0.237-0.255) | 1.09x | 139.35x |
 | TTFT p50 (s) | 122.9 (120.8-124.6) | 126.1 (123.9-129.0) | 3.7 (3.7-3.8) | 1.03x | 0.03x |
 | TTFT p90 (s) | 217.2 (213.9-219.5) | 217.0 (214.0-218.5) | 113.3 (112.1-115.6) | 1.00x | 0.52x |
+| TTFT p99 (s) | 259.5 (257.7-262.5) | 256.3 (253.9-257.9) | 1231.2 (1196.2-1262.5) | 0.99x | 4.74x |
 | requests with zero cache hit | 0.90 (0.89-0.92) | 0.92 (0.91-0.93) | 0.67 (0.66-0.67) | 1.01x | 0.74x |
 | errors | 1 (1-1) | 1 (1-1) | 25 (25-25) | 1.00x | 25.00x |
 | pool in-flight requests (mean) | 122.9 (122.2-123.5) | 123.1 (122.5-123.7) | 129.0 (128.2-129.5) | 1.00x | 1.05x |
@@ -22,7 +23,7 @@ Each cell shows mean (min-max) over replicates; ratios are against the baseline 
 | EPP max programs paused | - | - | 250 (247-253) | - | - |
 | EPP forced admissions | - | - | 55 (53-58) | - | - |
 
-## Per pod (steady-state hit rate / mean KV / mean in flight), first replicate of each arm
+## Per pod (steady-state hit rate / mean KV / mean in flight), first run of each arm
 
 | pod | epp-baseline | epp-affinity | epp-thunder |
 |---|---|---|---|

@@ -21,9 +21,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 PALETTE = {"grey": "#767676", "red": "#B64342", "blue": "#0F4D92"}
-ARMS = (("epp-baseline", PALETTE["grey"], "baseline\n(llm-d default)"),
-        ("epp-affinity", PALETTE["red"], "affinity\n(session pin)"),
-        ("epp-thunder", PALETTE["blue"], "thunder\n(port)"))
+ARMS = (("epp-baseline", PALETTE["grey"], "llm-d\ndefault"),
+        ("epp-affinity", PALETTE["red"], "session\naffinity"),
+        ("epp-thunder", PALETTE["blue"], "ThunderAgent\n(llm-d router)"))
 WARMUP_S = 600
 
 
@@ -85,6 +85,7 @@ def cell_stats(cell):
            "hit_steady": hit_rate(res / "vllm-metrics.csv", WARMUP_S),
            "ttft_p50": float(np.percentile(lat, 50)) if lat else float("nan"),
            "ttft_p90": float(np.percentile(lat, 90)) if lat else float("nan"),
+           "ttft_p99": float(np.percentile(lat, 99)) if lat else float("nan"),
            "zero_cache_share": sum(1 for r in ok if r["cached"] == 0) / len(ok) if ok else float("nan"),
            "sessions_started": sum(1 for r in reqs if r["gid"].startswith("event_000_")),
            "inflight": series_mean(res / "vllm-metrics.csv", "num_requests_running"),
@@ -123,12 +124,12 @@ def main():
             ("sessions that issued a request", "sessions_started", "{:.0f}"),
             ("hit rate, whole window", "hit_window", "{:.3f}"), ("hit rate, first 10 min", "hit_warmup", "{:.3f}"),
             ("hit rate, after 10 min (STEADY)", "hit_steady", "{:.3f}"),
-            ("TTFT p50 (s)", "ttft_p50", "{:.1f}"), ("TTFT p90 (s)", "ttft_p90", "{:.1f}"),
+            ("TTFT p50 (s)", "ttft_p50", "{:.1f}"), ("TTFT p90 (s)", "ttft_p90", "{:.1f}"), ("TTFT p99 (s)", "ttft_p99", "{:.1f}"),
             ("requests with zero cache hit", "zero_cache_share", "{:.2f}"), ("errors", "errors", "{:.0f}"),
             ("pool in-flight requests (mean)", "inflight", "{:.1f}"), ("pool KV usage (mean)", "kv", "{:.2f}"),
             ("EPP holds", "holds", "{:.0f}"), ("EPP pauses", "pauses", "{:.0f}"), ("EPP resumes", "resumes", "{:.0f}"),
             ("EPP max programs paused", "max_paused", "{:.0f}"), ("EPP forced admissions", "forced", "{:.0f}")]
-    L = [f"# Step 12: three EPP policies on the 4-pod pool, {len(reps)} replicate(s)\n", "Each cell shows mean (min-max) over replicates; ratios are against the baseline arm.\n",
+    L = [f"# Step 12: three EPP policies on the 4-pod pool, {len(reps)} runs\n", "Each cell shows mean (min-max) over runs; ratios are against the baseline arm.\n",
          "| metric | epp-baseline | epp-affinity | epp-thunder | affinity / baseline | thunder / baseline |", "|---|---|---|---|---|---|"]
     for name, key, spec in rows:
         cols = [[c[key] for c in data[arm]] for arm, _, _ in ARMS]
@@ -137,7 +138,7 @@ def main():
             return f"{st.mean(a) / st.mean(b):.2f}x" if a and b and st.mean(b) else "-"
         L.append(f"| {name} | " + " | ".join(fmt(c, spec) for c in cols) + f" | {ratio(cols[1], cols[0])} | {ratio(cols[2], cols[0])} |")
     L.append("")
-    L.append("## Per pod (steady-state hit rate / mean KV / mean in flight), first replicate of each arm\n")
+    L.append("## Per pod (steady-state hit rate / mean KV / mean in flight), first run of each arm\n")
     L.append("| pod | " + " | ".join(a for a, _, _ in ARMS) + " |"); L.append("|---|---|---|---|")
     pods = sorted({p for arm in data for c in data[arm][:1] for p in c["pods"]})
     for p in pods:
@@ -152,8 +153,9 @@ def main():
     plt.rcParams.update({"font.family": ["Helvetica", "Arial", "DejaVu Sans", "sans-serif"], "font.size": 13,
                          "axes.spines.top": False, "axes.spines.right": False, "legend.frameon": False, "axes.linewidth": 1.6})
     panels = [("throughput", "Throughput", "output tokens / s", "{:.0f}"), ("hit_steady", "Prefix-cache hit rate", "steady state (after 10 min)", "{:.3f}"),
-              ("ttft_p50", "TTFT p50", "seconds", "{:.1f}")]
-    fig, axes = plt.subplots(1, 3, figsize=(12.6, 4.4))
+              ("ttft_p50", "TTFT p50", "seconds", "{:.1f}"), ("ttft_p90", "TTFT p90", "seconds", "{:.1f}"),
+              ("ttft_p99", "TTFT p99", "seconds", "{:.1f}")]
+    fig, axes = plt.subplots(1, len(panels), figsize=(4.8 * len(panels), 4.6))
     for ax, (key, title, unit, spec) in zip(axes, panels):
         top = 0.0
         for j, (arm, col, _) in enumerate(ARMS):
@@ -168,7 +170,7 @@ def main():
             ax.annotate(spec.format(m), (j, vals.max()), xytext=(0, 7), textcoords="offset points", ha="center", fontsize=12, fontweight="bold", color=col)
         ax.set_xticks(range(len(ARMS)), [a[2] for a in ARMS]); ax.set_xlim(-0.6, len(ARMS) - 0.4); ax.set_ylim(0, top * 1.28 if top else 1)
         ax.set_title(title, fontsize=14, fontweight="bold", loc="left"); ax.set_ylabel(unit); ax.tick_params(axis="x", length=0)
-    fig.text(0.01, 0.01, f"n = {len(reps)} replicate(s) per arm, c = whole corpus on the 4-pod pool through one EPP. Bar = mean, whisker = min-max, dots = individual runs.", fontsize=10.5, color="#555555")
+    fig.text(0.01, 0.01, f"n = {len(reps)} runs per arm, c = whole corpus on the 4-pod pool through one EPP. Bar = mean, whisker = min-max, dots = individual runs.", fontsize=10.5, color="#555555")
     fig.tight_layout(rect=(0, 0.05, 1, 1), w_pad=2.5)
     for ext in ("png", "pdf"):
         fig.savefig(root / f"pool.{ext}", dpi=300 if ext == "png" else None, bbox_inches="tight", pad_inches=0.06)

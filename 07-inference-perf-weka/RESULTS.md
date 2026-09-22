@@ -1,6 +1,6 @@
 # Weka trace replay through the original ThunderAgent: results index
 
-Everything for this experiment lives in this folder: tooling, calibration evidence, incident write-ups, and every run's raw artifacts under `results/`. This file says which run means what.
+Everything for this experiment lives in this folder: tooling, calibration evidence, incident write-ups, and every run's raw artifacts under `results/`. This file says which run means what. For a self-contained write-up of the authoritative run, with the ThunderAgent background, the KV-capacity and over-subscription arithmetic, and the three figures, read `REPORT.md`.
 
 ## Headline
 

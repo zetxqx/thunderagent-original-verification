@@ -2,6 +2,8 @@
 
 Run `results/sweep-20260918-134248-t1900`: two arms (`epp-baseline`, `epp-thunder`) at six concurrency levels (48, 96, 128, 192, 256, 338 active sessions on the 4-pod pool), one 30-minute cell each, 10-minute warm-up, client timeout 1900 s, prefix caches reset and the EPP restarted before every cell. Twelve cells, no preemptions, no errors. Auto-generated tables in `results/sweep-20260918-134248-t1900/sweep.md`, figure in `sweep.png`.
 
+A one-page version of the whole step in the standard benchmarking-report format (sweep, origin-only resume, replicates, variants, long window, wait-cost curve; ITL, requests per second and TTFT p99 added) is `BENCHMARK-REPORT.md`.
+
 The measured curve is non-monotonic and, read naively, says the system gets slower the more work you give it:
 
 | output throughput (tok/s) | c=48 | c=96 | c=128 | c=192 | c=256 | c=338 |

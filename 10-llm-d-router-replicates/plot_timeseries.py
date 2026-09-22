@@ -16,8 +16,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 PALETTE = {"red": "#B64342", "blue": "#0F4D92", "grey": "#767676"}
-ARMS = (("epp-sticky", PALETTE["red"], "epp-sticky (no admission)"),
-        ("epp-thunder", PALETTE["blue"], "epp-thunder (port)"))
+ARMS = (("epp-sticky", PALETTE["red"], "passthrough (llm-d router)"),
+        ("epp-thunder", PALETTE["blue"], "ThunderAgent (llm-d router)"))
 STEP08 = Path(__file__).resolve().parent.parent / "08-weka-replicates" / "results" / "rep-20260917-031427-c128"
 WARMUP_MIN = 10
 ROLL_S = 60
@@ -63,7 +63,7 @@ def main():
     cols = [("Prefix-cache hit rate", f"token-weighted, {ROLL_S} s window"),
             ("KV cache usage", "fraction of blocks in use"),
             ("Requests in flight", "vllm:num_requests_running"),
-            ("Paused programs and queue", "EPP, thunder arm only")]
+            ("Paused programs and queue", "llm-d router, ThunderAgent arm only")]
     fig, axes = plt.subplots(len(reps), len(cols), figsize=(4.6 * len(cols), 3.3 * len(reps)), sharex=True)
     axes = np.atleast_2d(axes)
 
@@ -89,11 +89,11 @@ def main():
                     axes[i, 3].plot(x, q, color=col, linewidth=1.2, linestyle=":", label="requests queued")
         if ref:
             x, hr = rolling_hit_rate(ref)
-            axes[i, 0].plot(x, hr, color=PALETTE["grey"], linewidth=1.2, linestyle="--", label="py tr-decay (step 08)")
+            axes[i, 0].plot(x, hr, color=PALETTE["grey"], linewidth=1.2, linestyle="--", label="ThunderAgent, Python router (step 08)")
             x, kv = series(ref, "kv_cache_usage_perc")
-            axes[i, 1].plot(x, kv, color=PALETTE["grey"], linewidth=1.0, linestyle="--", label="py tr-decay (step 08)")
+            axes[i, 1].plot(x, kv, color=PALETTE["grey"], linewidth=1.0, linestyle="--", label="ThunderAgent, Python router (step 08)")
             x, run = series(ref, "num_requests_running")
-            axes[i, 2].plot(x, run, color=PALETTE["grey"], linewidth=1.0, linestyle="--", label="py tr-decay (step 08)")
+            axes[i, 2].plot(x, run, color=PALETTE["grey"], linewidth=1.0, linestyle="--", label="ThunderAgent, Python router (step 08)")
 
         for j, (title, sub) in enumerate(cols):
             ax = axes[i, j]
@@ -105,12 +105,12 @@ def main():
             if i == len(reps) - 1:
                 ax.set_xlabel("minutes since start")
         axes[i, 0].set_ylim(0, 1); axes[i, 1].set_ylim(0, 1.02); axes[i, 2].set_ylim(0, 60); axes[i, 3].set_ylim(0, 70)
-        axes[i, 0].set_ylabel(f"replicate r{r}", fontsize=12, fontweight="bold")
+        axes[i, 0].set_ylabel(f"run r{r}", fontsize=12, fontweight="bold")
 
     h0, l0 = axes[0, 0].get_legend_handles_labels()
     h3, l3 = axes[0, 3].get_legend_handles_labels()
     fig.legend(h0 + h3, l0 + l3, loc="lower center", ncol=5, fontsize=11, bbox_to_anchor=(0.5, -0.01))
-    fig.text(0.01, -0.035, f"c = 128, 45 min per cell, one vLLM pod per replicate. Dotted vertical line: end of the {WARMUP_MIN}-minute warm-up. "
+    fig.text(0.01, -0.035, f"c = 128, 45 min per cell, one vLLM pod per run. Dotted vertical line: end of the {WARMUP_MIN}-minute warm-up. "
              "Hit rate is hits / queries in tokens over the trailing window, from the pod's own counters.",
              fontsize=10, color="#555555")
     fig.tight_layout(rect=(0, 0.04, 1, 1), h_pad=1.5, w_pad=2.0)

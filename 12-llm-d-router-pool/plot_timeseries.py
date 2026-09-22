@@ -3,7 +3,7 @@
 
 Columns: rolling token-weighted prefix-cache hit rate (pool, 60 s window),
 pool KV usage (mean over pods), pool requests in flight (sum over pods),
-and the EPP's paused programs and queue depth (thunder arm). Rows: replicates.
+and the EPP's paused programs and queue depth (thunder arm). Rows: runs.
 Usage: plot_timeseries.py <run_dir>
 """
 import csv
@@ -15,9 +15,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-ARMS = (("epp-baseline", "#767676", "baseline (llm-d default)"),
-        ("epp-affinity", "#B64342", "affinity (session pin)"),
-        ("epp-thunder", "#0F4D92", "thunder (port)"))
+ARMS = (("epp-baseline", "#767676", "llm-d default"),
+        ("epp-affinity", "#B64342", "session affinity"),
+        ("epp-thunder", "#0F4D92", "ThunderAgent (llm-d router)"))
 WARMUP_MIN, ROLL_S = 10, 60
 
 
@@ -52,7 +52,7 @@ def main():
     plt.rcParams.update({"font.family": ["Helvetica", "Arial", "DejaVu Sans", "sans-serif"], "font.size": 12,
                          "axes.spines.top": False, "axes.spines.right": False, "legend.frameon": False, "axes.linewidth": 1.4})
     cols = [("Prefix-cache hit rate", f"pool, token-weighted, {ROLL_S} s window"), ("KV cache usage", "mean over the 4 pods"),
-            ("Requests in flight", "sum over the 4 pods"), ("Paused programs and queue", "EPP, thunder arm only")]
+            ("Requests in flight", "sum over the 4 pods"), ("Paused programs and queue", "llm-d router, ThunderAgent arm only")]
     fig, axes = plt.subplots(len(reps), 4, figsize=(18.4, 3.3 * len(reps)), sharex=True); axes = np.atleast_2d(axes)
     for i, r in enumerate(reps):
         for arm, col, label in ARMS:
@@ -75,7 +75,7 @@ def main():
             if i == len(reps) - 1:
                 ax.set_xlabel("minutes since start")
         axes[i, 0].set_ylim(0, 1.02); axes[i, 1].set_ylim(0, 1.02); axes[i, 2].set_ylim(0, 200); axes[i, 3].set_ylim(0, 400)
-        axes[i, 0].set_ylabel(f"replicate r{r}", fontsize=12, fontweight="bold")
+        axes[i, 0].set_ylabel(f"run r{r}", fontsize=12, fontweight="bold")
     h0, l0 = axes[0, 0].get_legend_handles_labels(); h3, l3 = axes[0, 3].get_legend_handles_labels()
     fig.legend(h0 + h3, l0 + l3, loc="lower center", ncol=5, fontsize=11, bbox_to_anchor=(0.5, -0.01))
     fig.text(0.01, -0.035, "c = 338 (whole corpus), 45 min per cell, 4-pod pool through one EPP. Dotted vertical line: end of the 10-minute warm-up.", fontsize=10, color="#555555")

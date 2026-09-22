@@ -51,3 +51,7 @@ Built 2026-09-21 16:47 UTC from llm-d-router commit `8283ece1` (tag `thunder-age
 ## thunder-agent-v7
 
 Built 2026-09-21 from llm-d-router commit `e79fd6c3` (tag `thunder-agent-v7`; adds `originWaitMaxMs`, a cap on the origin-only wait without reordering, and `thunder_agent_origin_wait_moves_total`; the tag was moved once before any image was built from it, because `db81e205` lacked the Pick change), amd64. Used by the step 13 arm `thunder-origin-w8`.
+
+## upstream-main-dc6538a1
+
+Built 2026-09-22 00:41 UTC from llm-d-router upstream `main` at `dc6538a1` (a git worktree, not the fork branch; includes PR 2116 `449637db`, turn-priority fairness), amd64, entrypoint `/app/epp`. Used by step 14 (`epp-turnprio-005-ttl60` lanes).

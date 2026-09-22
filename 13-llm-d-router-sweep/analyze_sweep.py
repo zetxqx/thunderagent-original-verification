@@ -100,13 +100,14 @@ def main():
     make_figure(root, levels, data)
 
 
+TA = "ThunderAgent (llm-d router)"
 PALETTE = {"blue_main": "#0F4D92", "red_strong": "#B64342", "green_3": "#3E9B4F", "neutral": "#CFCECE"}  # green darkened from the skill palette for line legibility
 STYLE = {"font.family": ["Helvetica", "Arial", "DejaVu Sans", "sans-serif"], "font.size": 15, "axes.linewidth": 2,
          "axes.spines.top": False, "axes.spines.right": False, "legend.frameon": False, "svg.fonttype": "none",
          "xtick.major.width": 2, "ytick.major.width": 2, "xtick.major.size": 5, "ytick.major.size": 5}
 # semantic colours: blue for the proposed method, red for the baseline; square vs circle markers keep them apart in print
-SERIES = (("epp-baseline", PALETTE["red_strong"], "s", "llm-d default (baseline)"), ("epp-thunder", PALETTE["blue_main"], "o", "ThunderAgent port"),
-          ("epp-thunder-origin", PALETTE["green_3"], "^", "ThunderAgent port,\norigin-only resume"))
+SERIES = (("epp-baseline", PALETTE["red_strong"], "s", "llm-d default"), ("epp-thunder", PALETTE["blue_main"], "o", f"{TA}\nmost-room resume"),
+          ("epp-thunder-origin", PALETTE["green_3"], "^", f"{TA}\norigin-only resume"))
 CROSSOVER = (24, 32)  # observed: the arms tie at 24 sessions per pod and separate by 32
 
 
@@ -133,7 +134,7 @@ def make_figure(root, levels, data):
             for i, (xi, b, t) in enumerate(zip(x, ys["epp-baseline"], ys["epp-thunder"])):
                 if b == b and t == t and b:  # ratio row along the bottom, staggered so neighbours (24, 32) do not touch
                     ax.annotate(f"{t / b:.2f}x", (xi, 0), xytext=(0, 6 + 15 * (i % 2)), textcoords="offset points", ha="center", fontsize=11, color=PALETTE["blue_main"])
-            ax.text(0.01, 0.15, "port / baseline", transform=ax.transAxes, fontsize=10.5, color=PALETTE["blue_main"], va="bottom")
+            ax.text(0.01, 0.15, "most-room / llm-d default", transform=ax.transAxes, fontsize=10.5, color=PALETTE["blue_main"], va="bottom")
         ax.set_title(f"{letter}  {title}", loc="left", fontweight="bold", fontsize=16, pad=22)
         ax.text(0, 1.02, unit, transform=ax.transAxes, fontsize=12, color="0.35", va="bottom")
         ax.set_xlabel("active sessions per pod (log scale)")
@@ -147,7 +148,7 @@ def make_figure(root, levels, data):
     handles, labels = axes[0].get_legend_handles_labels()
     handles.append(plt.Rectangle((0, 0), 1, 1, color=PALETTE["neutral"], alpha=0.45)); labels.append("observed crossover\n(24 to 32 sessions per pod)")
     axes[4].set_axis_off(); axes[4].legend(handles, labels, loc="center left", fontsize=13, handlelength=2.2, labelspacing=1.1)
-    fig.text(0.005, 0.005, "4 vLLM pods behind one EPP; one 30-minute cell per arm and level (first 10 minutes warm-up); client timeout 1900 s; x = c / 4 for c in 16, 32, 48, 64, 96, 128, 192, 256, 338.",
+    fig.text(0.005, 0.005, "4 vLLM pods behind one llm-d router (EPP); one 30-minute cell per arm and level (first 10 minutes warm-up); client timeout 1900 s; x = c / 4 for c in 16, 32, 48, 64, 96, 128, 192, 256, 338.",
              fontsize=11.5, color="0.35")
     fig.tight_layout(pad=1, rect=(0, 0.05, 1, 1))
     for ext in ("png", "pdf"):

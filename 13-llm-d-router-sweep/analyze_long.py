@@ -19,9 +19,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-ARMS = (("epp-baseline", "#B64342", "s", "llm-d default"), ("epp-thunder", "#0F4D92", "o", "most-room"), ("epp-thunder-origin", "#3E9B4F", "^", "origin-only"),
-        ("epp-thunder-origin-u15", "#42949E", "D", "origin + urgent 15 s"), ("epp-thunder-origin-u15-f25", "#9A4D8E", "v", "origin + urgent 15 s + forced 25 s"),
-        ("epp-thunder-origin-age", "#E9A6A1", "P", "origin + age-only 15 s"), ("epp-thunder-origin-age-reserve", "#FFD700", "X", "origin + age 15 s + reserve"))
+TA = "ThunderAgent (llm-d router)"
+ARMS = (("epp-baseline", "#B64342", "s", "llm-d default"), ("epp-thunder", "#0F4D92", "o", f"{TA}\nmost-room resume"), ("epp-thunder-origin", "#3E9B4F", "^", f"{TA}\norigin-only resume"),
+        ("epp-thunder-origin-u15", "#42949E", "D", f"{TA}\norigin-only + urgent 15 s (move)"), ("epp-thunder-origin-u15-f25", "#9A4D8E", "v", f"{TA}\norigin-only + urgent 15 s + forced 25 s"),
+        ("epp-thunder-origin-age", "#E9A6A1", "P", f"{TA}\norigin-only + age priority 15 s"), ("epp-thunder-origin-age-reserve", "#FFD700", "X", f"{TA}\norigin-only + age 15 s + reserve"))
 SLO_S = 30.0
 
 
@@ -107,7 +108,7 @@ def main():
 
     plt.rcParams.update({"font.family": ["Helvetica", "Arial", "DejaVu Sans", "sans-serif"], "font.size": 14, "axes.linewidth": 2, "axes.spines.top": False, "axes.spines.right": False, "legend.frameon": False})
     panels = [("throughput", "Throughput", "output tokens / s"), ("hit", "Prefix-cache hit rate", "token-weighted, per slice"), ("ttft_p50", "TTFT p50", "seconds"), ("attain_strict", "Session SLO attainment", f"strict, TTFT <= {SLO_S:.0f} s"), ("prompt_mean", "Mean prompt length", "tokens per request")]
-    fig, axes = plt.subplots(1, len(panels) + 1, figsize=(4.3 * len(panels) + 3.2, 4.8), gridspec_kw={"width_ratios": [1] * len(panels) + [0.75]})
+    fig, axes = plt.subplots(1, len(panels) + 1, figsize=(4.3 * len(panels) + 4.4, 4.8), gridspec_kw={"width_ratios": [1] * len(panels) + [1.05]})
     for ax, (key, title, unit) in zip(axes, panels):
         for arm, col, marker, label in ARMS:
             if arm not in data:
@@ -116,7 +117,7 @@ def main():
             ax.plot(x, y, color=col, marker=marker, markersize=7, linewidth=2.2, label=label)
         ax.set_title(title, loc="left", fontweight="bold", fontsize=15, pad=20); ax.text(0, 1.02, unit, transform=ax.transAxes, fontsize=11.5, color="0.35", va="bottom")
         ax.set_xlabel("end of slice (min)"); ax.set_xticks([r["slice"] * slice_s / 60 for r in next(iter(data.values()))]); ax.set_ylim(bottom=0)
-    h, l = axes[0].get_legend_handles_labels(); axes[-1].set_axis_off(); axes[-1].legend(h, l, loc="center left", fontsize=13)
+    h, l = axes[0].get_legend_handles_labels(); axes[-1].set_axis_off(); axes[-1].legend(h, l, loc="center left", fontsize=12, labelspacing=1.0)
     fig.text(0.005, 0.005, f"c=128 (32 sessions per pod), one 90-minute cell per arm, values per {slice_s / 60:.0f}-minute slice; session attainment over sessions active in the slice.", fontsize=11, color="0.35")
     fig.tight_layout(pad=1, rect=(0, 0.05, 1, 1))
     for ext in ("png", "pdf"):

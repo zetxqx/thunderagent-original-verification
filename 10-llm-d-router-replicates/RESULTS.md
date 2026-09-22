@@ -2,6 +2,8 @@
 
 Two runs: `results/rep-20260917-173839-c128-t1900` (client timeout 1900 s, above the forced-admission backstop) and `results/rep-20260917-221857-c128-t600` (client timeout 600 s, step 08's client). Run 1 first.
 
+For a self-contained write-up of both runs in the same format as step 08, with the ThunderAgent and llm-d port background, the KV-capacity arithmetic, the permit bug, the per-arm router parameters and the figures, read `REPORT.md`. A one-page version in the standard benchmarking-report format, with ITL, requests per second and TTFT p99 added, is `BENCHMARK-REPORT.md`.
+
 ## Run 1: client timeout 1900 s
 
 Run `results/rep-20260917-173839-c128-t1900`: c=128, 45 minutes per cell, three lanes (one vLLM pod each), both arms per lane, prefix cache reset and a fresh EPP between arms, arm order alternated across lanes. Image `thunder-agent-v3` (llm-d-router commit `ae371354`). All six cells completed with complete reports. Figure: `results/rep-20260917-173839-c128-t1900/replicates.png`.

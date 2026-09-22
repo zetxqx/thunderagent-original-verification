@@ -2,6 +2,8 @@
 
 Run `results/rep-20260918-012350-c338-t1900`: one EPP (image `thunder-agent-v3`) over the four vLLM pods, c=338 (the whole kept corpus), 45 minutes per cell, client timeout 1900 s, three replicates per arm in Latin-square order, prefix caches reset and the EPP restarted before every cell, load generator with the session-replay permit fix (`results/inference-perf-image.txt`). Nine cells; `epp-baseline-r2` was lost to a transient API-server timeout during its Helm upgrade (the arm check refused to run under the wrong config) and was rerun as a make-up cell after the others, under the same conditions. Figures: `pool.png` (bars) and `timeseries.png` (per replicate) in the run directory.
 
+A one-page version in the standard benchmarking-report format, with ITL, requests per second, TTFT p99 and the per-run table, is `BENCHMARK-REPORT.md`.
+
 ## Headline
 
 | metric | epp-baseline (llm-d default) | epp-affinity (session pin) | epp-thunder (port) | thunder / baseline |
