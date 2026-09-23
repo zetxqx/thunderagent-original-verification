@@ -121,3 +121,7 @@ Revisions 70 and 71 (`epp-thunder-origin-w8-c128-r3`, `-r4`). The release still 
 ## 2026-09-21 evening: lanes recreated for step 14
 
 `10-llm-d-router-replicates/deploy-lanes.sh turnprio-005-ttl60` with `EPP_IMAGE_TAG=upstream-main-dc6538a1` recreated `thunder-lane-a/b/c` (pod labels, `lane-rbac.yaml`). They are still running after the step 14 cells; remove with `teardown-lanes.sh`.
+
+## 2026-09-22: step 14 lanes removed
+
+`teardown-lanes.sh` removed `thunder-lane-a/b/c` (deployments, services, configmaps, service accounts, roles), the `thunder-lane` pod labels and the `thunder-lane-auth-delegator` cluster role binding. Note: the first attempt ran against another cluster because the laptop's current kubectl context had changed; it deleted nothing there. The main release, the four vLLM pods and `thunderagent-original` are unchanged.

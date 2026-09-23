@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session level admission control for agentic workload: adding ThunderAgent to llm-d-router</title>
+<style>
+  :root {
+    --ink: #1c1c1c; --ink-2: #4a4a4a; --ink-3: #7a7a7a;
+    --surface: #fcfcfb; --panel: #f3f3f0; --line: #d9d9d4;
+    --c-base: #B64342; --c-thunder: #2F6BB0; --c-affinity: #B7791F; --c-origin: #3E9B4F;
+    --c-hold: #E9DDB8; --c-evict: #F2C9C7; --c-hit: #D6E8D6; --c-miss: #F6E3B4;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+  body { margin: 0; font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--ink); background: var(--surface); font-size: 19px; line-height: 1.4; }
+  section.slide { min-height: 100vh; scroll-snap-align: start; padding: 52px 72px 64px; display: flex; flex-direction: column; border-bottom: 1px solid var(--line); position: relative; }
+  section.slide > .num { position: absolute; top: 20px; right: 28px; font-size: 13px; color: var(--ink-3); }
+  h1 { font-size: 46px; line-height: 1.15; margin: 0 0 16px; font-weight: 700; }
+  h2 { font-size: 34px; margin: 0 0 14px; font-weight: 700; }
+  .sub { color: var(--ink-2); font-size: 20px; margin: 0 0 18px; }
+  ul, ol { margin: 0 0 0 22px; padding: 0; } li { margin: 7px 0; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+  .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 22px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; }
+  .card h3 { margin: 0 0 8px; font-size: 18px; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--ink-2); font-weight: 600; background: var(--panel); }
+  code, pre { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow: auto; margin: 0; }
+  code { background: var(--panel); padding: 1px 5px; border-radius: 4px; }
+  .stat { display: flex; gap: 20px; flex-wrap: wrap; margin: 10px 0 16px; }
+  .stat .tile { flex: 1 1 160px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .stat .tile .v { font-size: 36px; font-weight: 700; line-height: 1.1; }
+  .stat .tile .l { color: var(--ink-2); font-size: 14px; margin-top: 4px; }
+  img.fig { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .caption { color: var(--ink-3); font-size: 14px; margin-top: 6px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; color: var(--ink-2); margin: 8px 0; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--sw); }
+  svg text { font-family: inherit; }
+  .chart { width: 100%; height: auto; max-height: 340px; display: block; }
+  .chart.tall { max-height: 560px; }
+  .cols.wide { grid-template-columns: 1fr 1.5fr; }
+  .tip { position: fixed; pointer-events: none; background: #1c1c1c; color: #fff; font-size: 13px; padding: 6px 9px; border-radius: 6px; opacity: 0; transition: opacity .1s; z-index: 9; white-space: nowrap; }
+  .nav { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 7px; z-index: 5; }
+  .nav a { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: block; }
+  .nav a.on { background: var(--ink); }
+  .foot { position: absolute; bottom: 18px; left: 72px; right: 72px; color: var(--ink-3); font-size: 13px; display: flex; justify-content: space-between; }
+  .btns { display: flex; gap: 8px; margin: 0 0 12px; align-items: center; }
+  button { font: inherit; font-size: 14px; padding: 6px 12px; border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer; }
+  button:hover { background: var(--panel); }
+  .mermaid { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .mermaid svg { max-height: 660px; height: auto; display: block; margin: 0 auto; }
+  .small { font-size: 15px; color: var(--ink-2); }
+  .tag { display: inline-block; font-size: 12px; padding: 2px 7px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); color: var(--ink-2); margin-left: 6px; vertical-align: middle; }
+  .big { font-size: 22px; }
+  @media screen and (max-width: 1100px) { .cols, .cols3 { grid-template-columns: 1fr; } section.slide { padding: 40px 28px 60px; } h1 { font-size: 34px; } }
+  @media print { @page { size: 1440px 900px; margin: 0; } html { scroll-snap-type: none; } body { font-size: 16px; } section.slide { page-break-after: always; break-after: page; min-height: 900px; height: 900px; overflow: hidden; padding: 40px 56px 56px; } .nav, .btns { display: none; } }
+</style>
+</head>
+<body>
+<div class="tip" id="tip"></div>
+<nav class="nav" id="nav"></nav>
+
+<section class="slide" id="s1">
+  <div class="small" style="text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Proposal</div>
+  <h1>Session level admission control for agentic workload:<br>adding ThunderAgent to llm-d-router</h1>
+  <p class="sub">Hold sessions in the router, so the ones on the GPU keep their prefix cache.</p>
+  <div class="stat">
+    <div class="tile"><div class="v">1.42x</div><div class="l">throughput on a 4 pod pool vs llm-d default</div></div>
+    <div class="tile"><div class="v">33x</div><div class="l">lower median TTFT, 123 s to 3.7 s</div></div>
+    <div class="tile"><div class="v">0.002 to 0.25</div><div class="l">steady state prefix cache hit rate</div></div>
+    <div class="tile"><div class="v">1 header</div><div class="l">is all a client sends: <code>x-session-id</code></div></div>
+  </div>
+  <div class="foot"><span>llm-d-router + ThunderAgent</span><span>2026-09-22</span></div>
+</section>
+
+<section class="slide" id="s2">
+  <div class="num">2</div>
+  <h2>Goal</h2>
+  <div class="cols big">
+    <div class="card"><h3>We want</h3><ul>
+      <li>More work from the same GPUs</li>
+      <li>Low TTFT for most requests</li>
+      <li>No client change</li>
+      <li>No cost when the pool is not full</li>
+    </ul></div>
+    <div class="card"><h3>This is not</h3><ul>
+      <li>A new placement scorer</li>
+      <li>A change to vLLM</li>
+      <li>A replacement for autoscaling</li>
+    </ul></div>
+  </div>
+</section>
+
+<section class="slide" id="s3">
+  <div class="num">3</div>
+  <h2>Agentic workload</h2>
+  <div class="cols">
+    <div class="big">
+      <ul>
+        <li>About 100 prompt tokens per output token</li>
+        <li>Each turn repeats the previous prompt</li>
+        <li>The agent waits for the whole response</li>
+        <li>REASONING, then ACTING, then again</li>
+      </ul>
+      <p class="small" style="margin-top:14px">Between turns the engine sees the session as idle. Its KV blocks are still valuable.</p>
+    </div>
+    <div>
+      <div class="card"><h3>Tokens per request</h3><svg class="chart" id="ch-ratio" viewBox="0 0 560 170"></svg></div>
+      <div class="card" style="margin-top:14px"><h3>One session</h3><svg class="chart" id="ch-react" viewBox="0 0 560 110"></svg></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s4">
+  <div class="num">4</div>
+  <h2>KV thrashing</h2>
+  <div class="btns"><button id="t-prev">Previous</button><button id="t-next">Next step</button><button id="t-play">Play</button><span id="t-label" class="small" style="margin-left:8px"></span></div>
+  <div class="cols">
+    <div class="card"><h3 style="color:var(--c-base)">Without admission control</h3><svg class="chart" id="thr-a" viewBox="0 0 560 300"></svg></div>
+    <div class="card"><h3 style="color:var(--c-thunder)">With ThunderAgent</h3><svg class="chart" id="thr-b" viewBox="0 0 560 300"></svg></div>
+  </div>
+  <div class="legend">
+    <span style="--sw:var(--c-hit)">prefix hit</span>
+    <span style="--sw:var(--c-miss)">full prefill</span>
+    <span style="--sw:var(--c-evict)">evicted</span>
+    <span style="--sw:var(--c-hold)">held in the router</span>
+  </div>
+</section>
+
+<section class="slide" id="s5">
+  <div class="num">5</div>
+  <h2>Thrashing is a loop</h2>
+  <div class="cols">
+    <div><svg class="chart tall" id="cycle" viewBox="0 0 560 330"></svg></div>
+    <div>
+      <div class="card"><h3>One pod, passthrough (Benchmark A)</h3>
+        <div class="stat" style="margin:8px 0 4px">
+          <div class="tile"><div class="v">1.7x</div><div class="l">working set vs KV pool</div></div>
+          <div class="tile"><div class="v">0.008</div><div class="l">steady state hit rate</div></div>
+          <div class="tile"><div class="v">53 s</div><div class="l">median TTFT</div></div>
+        </div></div>
+      <div class="card" style="margin-top:14px"><h3>Placement does not fix it (Benchmark C, 4 pods)</h3><svg class="chart" id="ch-place" viewBox="0 0 560 170"></svg></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s6">
+  <div class="num">6</div>
+  <h2>Saturation detection</h2>
+  <div class="cols wide">
+    <div class="big">
+      <ul>
+        <li>Track every session's KV footprint in tokens</li>
+        <li>Working set = all sessions on the pod, running or idle</li>
+        <li>Saturated = working set &gt; KV capacity</li>
+        <li>Idle footprint decays for admission: <code>2^-t</code></li>
+      </ul>
+      <p class="small" style="margin-top:14px">Engine KV utilization cannot do this. It counts running requests only; idle sessions look free.</p>
+    </div>
+    <div><svg class="chart tall" id="views" viewBox="0 0 560 360"></svg></div>
+  </div>
+</section>
+
+<section class="slide" id="s7">
+  <div class="num">7</div>
+  <h2>Admission order</h2>
+  <div class="cols wide">
+    <div class="big"><ol>
+      <li><b>Admitted</b> session: pass through, always</li>
+      <li><b>Not saturated</b>: new session to the pod with most room</li>
+      <li><b>Saturated</b>: pause idle sessions, smallest first</li>
+      <li><b>Held</b> requests wait in the router; paused first, then new</li>
+      <li><b>Backstop</b>: admit after 1800 s anyway</li>
+    </ol></div>
+    <div><svg class="chart tall" id="flow" viewBox="0 0 560 260"></svg></div>
+  </div>
+</section>
+
+<section class="slide" id="s8">
+  <div class="num">8</div>
+  <h2>Design in llm-d: one plugin, four extension points</h2>
+  <svg class="chart tall" id="arch" viewBox="0 0 1200 420"></svg>
+  <div class="cols3" style="margin-top:8px">
+    <div class="card small"><b>Simpler than the Python router.</b> Admission runs on every dispatch cycle, not every 5 s. A client disconnect returns the session to idle.</div>
+    <div class="card small"><b>Pause sweep.</b> Runs inside the <code>Saturation</code> hook, per pod, at most every <code>pauseSweepSeconds</code>. No background thread.</div>
+    <div class="card small"><b>Session ledger.</b> Same idea as the <code>session-state-producer</code> of llm-d-router issue 2524, plus the KV fields.</div>
+  </div>
+</section>
+
+<section class="slide" id="s9">
+  <div class="num">9</div>
+  <h2>Request path</h2>
+  <div class="mermaid" id="seq">
+sequenceDiagram
+    participant C as Agent client
+    participant E as Envoy
+    participant G as flow control gate<br/>(thunder-agent fairness policy)
+    participant S as scheduler<br/>(thunder-agent scorer)
+    participant T as session ledger
+    participant P as vLLM pod
+    C->>E: POST /v1/chat/completions, x-session-id: s42
+    E->>G: ext_proc request, FairnessID = s42
+    G->>T: is s42 admitted and bound?
+    alt s42 is admitted
+        G-->>S: dispatch now
+    else s42 is paused or new
+        G->>T: does a pod have room for s42?
+        alt room on some pod
+            G->>T: reserve the room
+            G-->>S: dispatch
+        else no room
+            G-->>G: hold in queue, re-check every cycle
+        end
+    end
+    S-->>E: pick the bound or reserved pod
+    E->>T: PreRequest: bind s42, add in-flight estimate
+    E->>P: forward request
+    P-->>E: streamed response with usage
+    E->>T: ResponseBody: footprint = usage.total_tokens, s42 idle
+    E-->>C: response
+  </div>
+</section>
+
+<section class="slide" id="s10">
+  <div class="num">10</div>
+  <h2>Shipped configuration</h2>
+  <div class="cols">
+<pre>- type: agent-identity
+  parameters:
+    additionalSessionHeaders: [x-session-id]
+- type: thunder-agent
+  name: thunder
+  parameters:
+    capacityTokens: 2237040   # fallback; real value scraped
+    utilThreshold: 1.0
+    actingHalfLifeSeconds: 1
+    bufferTokensPerProgram: 100
+    pauseSweepSeconds: 5
+    headWaitStarvationMs: 1800000
+    evictionTtlSeconds: 3600
+    sessionFinalHeader: x-session-final
+flowControl:
+  defaultRequestTTL: "0s"     # never reject a held request
+  saturationDetector: {pluginRef: thunder}
+  defaultPriorityBand: {fairnessPolicyRef: thunder}</pre>
+    <div class="card"><h3>Same values as upstream ThunderAgent</h3><ul class="small">
+      <li>capacity: scraped from the engine, config is a fallback</li>
+      <li>decay half life 1 s, buffer 100 tokens, sweep every 5 s</li>
+      <li>backstop 1800 s</li>
+      <li>new: <code>utilThreshold</code>, <code>evictionTtlSeconds</code>, a request TTL that is off</li>
+    </ul></div>
+  </div>
+</section>
+
+<section class="slide" id="s11">
+  <div class="num">11</div>
+  <h2>Three benchmarks</h2>
+  <p class="small">Qwen3-Coder-30B-A3B-FP8, vLLM v0.28.0, 2x H100 per pod, 2.24M tokens KV per pod. 338 real Claude Code sessions replayed. 45 minutes, three runs per arm.</p>
+  <table>
+    <tr><th>name</th><th>compares</th><th>pods</th><th>folder</th></tr>
+    <tr><td><b>A: ThunderAgent, 1 replica</b></td><td>paper's Python router, passthrough vs ThunderAgent</td><td>1</td><td><code>08-weka-replicates</code></td></tr>
+    <tr><td><b>B: llm-d-router + ThunderAgent, 1 replica</b></td><td>llm-d router, passthrough vs ThunderAgent plugin</td><td>1</td><td><code>10-llm-d-router-replicates</code></td></tr>
+    <tr><td><b>C: llm-d-router + ThunderAgent, 4 replicas</b></td><td>llm-d default vs session affinity vs ThunderAgent plugin</td><td>4</td><td><code>12-llm-d-router-pool</code></td></tr>
+  </table>
+  <div class="card" style="margin-top:16px"><h3>How over-subscribed the pods were</h3><svg class="chart" id="ch-oversub" viewBox="0 0 1000 150"></svg></div>
+</section>
+
+<section class="slide" id="s12">
+  <div class="num">12</div>
+  <h2>Benchmark A: ThunderAgent, 1 replica <span class="tag">Python router, reference</span></h2>
+  <div class="cols">
+    <div><svg class="chart tall" id="ch-a" viewBox="0 0 560 320"></svg></div>
+    <div><img class="fig" src="../08-weka-replicates/results/rep-20260917-031427-c128/replicates.png" alt="Benchmark A runs">
+      <ul class="small" style="margin-top:12px"><li>2.12x, but the 600 s client dropped the largest held sessions</li><li>Under equal load: 2.06x</li></ul></div>
+  </div>
+</section>
+
+<section class="slide" id="s13">
+  <div class="num">13</div>
+  <h2>Benchmark B: llm-d-router + ThunderAgent, 1 replica</h2>
+  <div class="cols">
+    <div><svg class="chart tall" id="ch-b" viewBox="0 0 560 320"></svg></div>
+    <div><img class="fig" src="../10-llm-d-router-replicates/results/rep-20260917-173839-c128-t1900/replicates.png" alt="Benchmark B runs">
+      <ul class="small" style="margin-top:12px"><li>llm-d path is free: passthrough 227 vs Python 221 tok/s</li><li>Port matches the Python router under equal load</li><li>p99 is the cost: 8 to 11 sessions per run wait 1800 s</li></ul></div>
+  </div>
+</section>
+
+<section class="slide" id="s14">
+  <div class="num">14</div>
+  <h2>Benchmark C: llm-d-router + ThunderAgent, 4 replicas <span class="tag">338 sessions at once</span></h2>
+  <div class="cols">
+    <div><svg class="chart tall" id="ch-c" viewBox="0 0 560 320"></svg></div>
+    <div><img class="fig" src="../12-llm-d-router-pool/results/rep-20260918-012350-c338-t1900/pool.png" alt="Benchmark C bars">
+      <ul class="small" style="margin-top:12px"><li>llm-d default and session affinity: identical</li><li>ThunderAgent: 1.42x, hit rate 0.25, TTFT p50 3.7 s</li><li>70% of resumes moved pod: hit rate half of one pod's 0.49</li></ul></div>
+  </div>
+</section>
+
+<section class="slide" id="s15">
+  <div class="num">15</div>
+  <h2>Benchmark C: where requests wait</h2>
+  <div class="cols">
+    <div><img class="fig" src="../12-llm-d-router-pool/results/rep-20260918-012350-c338-t1900/waiting.png" alt="where requests wait"><div class="caption">llm-d policies: 150 to 240 waiting inside vLLM. ThunderAgent: engine queue empty, about 370 held in the router.</div></div>
+    <div><img class="fig" src="../12-llm-d-router-pool/results/rep-20260918-012350-c338-t1900/timeseries.png" alt="time series"><div class="caption">KV is full for every arm. The arms differ in what the pool holds.</div></div>
+  </div>
+</section>
+
+<section class="slide" id="s16">
+  <div class="num">16</div>
+  <h2>Who gains, who pays</h2>
+  <div class="cols3">
+    <div class="card"><h3>Operator</h3><div style="font-size:40px;font-weight:700">1.4x to 1.5x</div><div class="small">more work from the same GPUs</div></div>
+    <div class="card"><h3>One agent</h3><div style="font-size:40px;font-weight:700">about 1.3x</div><div class="small">more turns for the same session</div></div>
+    <div class="card"><h3>A few sessions</h3><div style="font-size:40px;font-weight:700">minutes</div><div class="small">of waiting, up to the 1800 s backstop</div></div>
+  </div>
+  <div class="card" style="margin-top:18px"><h3>TTFT, Benchmark C</h3><svg class="chart" id="ch-ttft" viewBox="0 0 1000 210"></svg></div>
+</section>
+
+<section class="slide" id="s17">
+  <div class="num">17</div>
+  <h2>Limitations and next improvements</h2>
+  <table>
+    <tr><th style="width:4%">#</th><th style="width:32%">limitation</th><th style="width:24%">measured</th><th>one improvement</th></tr>
+    <tr><td>1</td><td>Resumed sessions move between pods</td><td>C: 70% of resumes, hit rate 0.25 vs 0.49</td><td><code>resumePlacement: origin-only</code>; later decide by cost of a move</td></tr>
+    <tr><td>2</td><td>A few sessions wait very long</td><td>C: 55 forced admissions, p99 1231 s</td><td>hold only while the prefix is still cached</td></tr>
+    <tr><td>3</td><td>KV footprint is an estimate</td><td>about 7 bytes per token</td><td>engine KV usage now, KV block index later</td></tr>
+    <tr><td>4</td><td>No active-active EPP</td><td>not measured</td><td>pin a session to one EPP; then a shared ledger</td></tr>
+    <tr><td>5</td><td>Chat and agentic not separated</td><td>not measured</td><td>own priority band for chat, count its KV</td></tr>
+    <tr><td>6</td><td>Benchmarks are narrow</td><td>one model, request percentiles</td><td>goodput and session SLO metrics, a large dense model</td></tr>
+    <tr><td>7</td><td>No CPU KV offloading test</td><td>not measured</td><td>benchmark with the CPU tier; make the ledger tier-aware</td></tr>
+    <tr><td>8</td><td>No prefill/decode test</td><td>not measured</td><td>bind to the decode pod, gate on decode KV</td></tr>
+    <tr><td>9</td><td>Held demand only waits</td><td>C: 180 sessions paused, 4 pods of demand</td><td><b>autoscaling signal from ThunderAgent:</b> <code>held_tokens</code>, <code>demand_pods</code></td></tr>
+  </table>
+  <div class="card" style="margin-top:14px"><h3>Demand vs capacity, Benchmark C</h3><svg class="chart" id="ch-demand" viewBox="0 0 1000 120"></svg></div>
+</section>
+
+<section class="slide" id="s18">
+  <div class="num">18</div>
+  <h2>Summary</h2>
+  <div class="card big"><ul>
+    <li>Over-subscribed agent sessions thrash the KV cache</li>
+    <li>Placement does not help; admission control does</li>
+    <li>1.54x on one pod, 1.42x on four, TTFT p50 12x to 33x lower</li>
+    <li>Cost: a long tail for a few sessions</li>
+  </ul></div>
+  <div class="foot"><span>Details: <code>proposal/LLM-D-THUNDERAGENT-PROPOSAL.md</code>, steps 08, 10, 12</span><span>llm-d-router <code>pkg/epp/framework/plugins/thunderagent</code></span></div>
+</section>
+
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+mermaid.initialize({ startOnLoad: true, theme: "neutral", sequence: { actorMargin: 18, width: 170, height: 40, messageMargin: 28, messageFontSize: 14, noteFontSize: 13, actorFontSize: 14, useMaxWidth: true } });
+</script>
+<script>
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const C = { base: css("--c-base"), thunder: css("--c-thunder"), affinity: css("--c-affinity"), origin: css("--c-origin"), hold: css("--c-hold"), evict: css("--c-evict"), hit: css("--c-hit"), miss: css("--c-miss"), ink: css("--ink"), ink2: css("--ink-2"), ink3: css("--ink-3"), line: css("--line"), panel: css("--panel") };
+const NS = "http://www.w3.org/2000/svg";
+const el = (n, a = {}, t) => { const e = document.createElementNS(NS, n); for (const k in a) if (a[k] != null) e.setAttribute(k, a[k]); if (t != null) e.textContent = t; return e; };
+const tip = document.getElementById("tip");
+const hover = (node, text) => { node.addEventListener("mousemove", e => { tip.textContent = text; tip.style.opacity = 1; tip.style.left = (e.clientX + 12) + "px"; tip.style.top = (e.clientY + 12) + "px"; }); node.addEventListener("mouseleave", () => tip.style.opacity = 0); };
+const arrowDef = (svg, id, color) => { const d = el("defs"); d.innerHTML = `<marker id="${id}" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="${color}"/></marker>`; svg.appendChild(d); };
+const box = (svg, x, y, w, h, t, fill, fs = 13, stroke) => { svg.appendChild(el("rect", { x, y, width: w, height: h, rx: 8, fill, stroke: stroke || C.line })); const ls = t.split("\n"); ls.forEach((l, i) => svg.appendChild(el("text", { x: x + w / 2, y: y + h / 2 + (i - (ls.length - 1) / 2) * (fs + 3) + fs / 3, "text-anchor": "middle", "font-size": fs, fill: C.ink }, l))); };
+
+function bars(svgId, cats, series, opts = {}) {
+  const svg = document.getElementById(svgId); const W = +svg.viewBox.baseVal.width, H = +svg.viewBox.baseVal.height;
+  const m = { l: 56, r: 12, t: 26, b: 40 }; const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const max = opts.max || Math.max(...series.flatMap(s => s.values)) * 1.15;
+  const log = !!opts.log; const y = v => log ? m.t + ih - (Math.log10(v) - Math.log10(opts.min)) / (Math.log10(max) - Math.log10(opts.min)) * ih : m.t + ih - v / max * ih;
+  const ticks = log ? opts.ticks : [0, .25, .5, .75, 1].map(f => f * max);
+  ticks.forEach(t => { const yy = y(t); svg.appendChild(el("line", { x1: m.l, x2: W - m.r, y1: yy, y2: yy, stroke: C.line })); svg.appendChild(el("text", { x: m.l - 8, y: yy + 4, "text-anchor": "end", "font-size": 12, fill: C.ink3 }, opts.fmt ? opts.fmt(t) : Math.round(t))); });
+  const gw = iw / cats.length, bw = Math.min(50, (gw - 16) / series.length - 2);
+  cats.forEach((c, i) => {
+    const gx = m.l + gw * i + gw / 2 - (series.length * (bw + 2)) / 2;
+    series.forEach((s, j) => {
+      const v = s.values[i]; if (v == null) return; const x = gx + j * (bw + 2), yy = y(v), h = m.t + ih - yy;
+      const r = el("path", { d: `M${x},${m.t + ih} v${-h + 4} a4,4 0 0 1 4,-4 h${bw - 8} a4,4 0 0 1 4,4 v${h - 4} z`, fill: s.color }); svg.appendChild(r);
+      hover(r, `${s.name}, ${c}: ${opts.fmt ? opts.fmt(v) : v}${opts.unit || ""}`);
+      svg.appendChild(el("text", { x: x + bw / 2, y: yy - 5, "text-anchor": "middle", "font-size": 12, fill: C.ink2 }, opts.fmt ? opts.fmt(v) : v));
+    });
+    svg.appendChild(el("text", { x: m.l + gw * i + gw / 2, y: H - 14, "text-anchor": "middle", "font-size": 13, fill: C.ink2 }, c));
+  });
+  svg.appendChild(el("line", { x1: m.l, x2: W - m.r, y1: m.t + ih, y2: m.t + ih, stroke: C.ink3 }));
+  let lx = W - m.r; series.slice().reverse().forEach(s => { const t = el("text", { x: lx, y: m.t - 8, "text-anchor": "end", "font-size": 12, fill: C.ink2 }, s.name); svg.appendChild(t); const w = t.getBBox().width; svg.appendChild(el("rect", { x: lx - w - 18, y: m.t - 18, width: 12, height: 12, rx: 3, fill: s.color })); lx -= w + 30; });
+}
+
+/* 3 */
+(() => {
+  const svg = document.getElementById("ch-ratio"); const rows = [["prompt tokens, median", 53000, C.thunder], ["output tokens, median", 350, C.base]];
+  rows.forEach((r, i) => { const y = 34 + i * 58, w = 420 * r[1] / 53000; svg.appendChild(el("text", { x: 10, y: y - 8, "font-size": 14, fill: C.ink2 }, r[0])); const b = el("rect", { x: 10, y, width: Math.max(w, 4), height: 26, rx: 4, fill: r[2] }); svg.appendChild(b); hover(b, `${r[0]}: ${r[1].toLocaleString()}`); svg.appendChild(el("text", { x: 18 + Math.max(w, 4), y: y + 18, "font-size": 14, fill: C.ink }, r[1].toLocaleString())); });
+  svg.appendChild(el("text", { x: 10, y: 158, "font-size": 14, fill: C.ink3 }, "about 100 to 170 prompt tokens per output token"));
+})();
+(() => {
+  const svg = document.getElementById("ch-react"); let x = 10; const turns = [60, 90, 120, 150];
+  turns.forEach((w, i) => { const r = el("rect", { x, y: 24, width: w, height: 30, rx: 4, fill: C.thunder }); svg.appendChild(r); hover(r, `turn ${i + 1}: request in flight, prompt = whole history`); svg.appendChild(el("text", { x: x + w / 2, y: 44, "text-anchor": "middle", "font-size": 12, fill: "#fff" }, `turn ${i + 1}`)); x += w; if (i < turns.length - 1) { const g = el("rect", { x, y: 24, width: 34, height: 30, rx: 4, fill: C.hold }); svg.appendChild(g); hover(g, "tool call: no request, KV still on the pod"); x += 34; } });
+  svg.appendChild(el("text", { x: 10, y: 84, "font-size": 13, fill: C.ink3 }, "blue: request in flight. beige: idle for the engine, KV blocks still there. Prompt grows every turn."));
+})();
+
+/* 4 */
+const stepsA = [
+  { t: "A: turn 1. Full prefill.", cache: ["A", null], flash: ["A"], cost: 1, hits: 0 },
+  { t: "B: turn 1. Full prefill. Both go idle.", cache: ["A", "B"], flash: ["B"], cost: 2, hits: 0 },
+  { t: "C: turn 1. No room. Evicts A.", cache: ["C", "B"], flash: ["C"], evicted: ["A"], cost: 3, hits: 0 },
+  { t: "A: turn 2. Prefix gone. Full prefill. Evicts B.", cache: ["C", "A"], flash: ["A"], evicted: ["B"], cost: 4, hits: 0 },
+  { t: "B: turn 2. Prefix gone. Full prefill. Evicts C.", cache: ["B", "A"], flash: ["B"], evicted: ["C"], cost: 5, hits: 0 },
+  { t: "C: turn 2. Prefix gone. Full prefill. Evicts A. Forever.", cache: ["B", "C"], flash: ["C"], evicted: ["A"], cost: 6, hits: 0 },
+];
+const stepsB = [
+  { t: "A: turn 1. Admitted. Full prefill.", cache: ["A", null], flash: ["A"], held: [], cost: 1, hits: 0 },
+  { t: "B: turn 1. Admitted. Pod is now full.", cache: ["A", "B"], flash: ["B"], held: [], cost: 2, hits: 0 },
+  { t: "C: turn 1. No room. Held in the router.", cache: ["A", "B"], flash: [], held: ["C"], cost: 2, hits: 0 },
+  { t: "A: turn 2. Passes through. Prefix hit.", cache: ["A", "B"], flash: [], hit: ["A"], held: ["C"], cost: 2, hits: 1 },
+  { t: "B: turn 2. Prefix hit.", cache: ["A", "B"], flash: [], hit: ["B"], held: ["C"], cost: 2, hits: 2 },
+  { t: "A finishes. Room frees. C admitted, one full prefill.", cache: ["C", "B"], flash: ["C"], held: [], cost: 3, hits: 2 },
+];
+function drawState(svgId, st, hasRouter) {
+  const svg = document.getElementById(svgId); svg.innerHTML = "";
+  svg.appendChild(el("text", { x: 10, y: 22, "font-size": 14, fill: C.ink2 }, "pod KV cache, room for 2 sessions"));
+  for (let i = 0; i < 2; i++) {
+    const x = 10 + i * 130, s = st.cache[i]; const fill = !s ? "#fff" : (st.flash || []).includes(s) ? C.miss : (st.hit || []).includes(s) ? C.hit : "#e6e6e2";
+    svg.appendChild(el("rect", { x, y: 34, width: 120, height: 70, rx: 8, fill, stroke: C.line }));
+    svg.appendChild(el("text", { x: x + 60, y: 76, "text-anchor": "middle", "font-size": 26, "font-weight": 700, fill: s ? C.ink : C.ink3 }, s || "free"));
+    if (s && (st.flash || []).includes(s)) svg.appendChild(el("text", { x: x + 60, y: 96, "text-anchor": "middle", "font-size": 11, fill: C.ink2 }, "full prefill"));
+    if (s && (st.hit || []).includes(s)) svg.appendChild(el("text", { x: x + 60, y: 96, "text-anchor": "middle", "font-size": 11, fill: C.ink2 }, "prefix hit"));
+  }
+  (st.evicted || []).forEach((s, i) => { const x = 290 + i * 60; svg.appendChild(el("rect", { x, y: 44, width: 50, height: 50, rx: 8, fill: C.evict, stroke: C.line })); svg.appendChild(el("text", { x: x + 25, y: 76, "text-anchor": "middle", "font-size": 20, "font-weight": 700, fill: C.base }, s)); svg.appendChild(el("text", { x: x + 25, y: 108, "text-anchor": "middle", "font-size": 11, fill: C.ink2 }, "evicted")); });
+  svg.appendChild(el("text", { x: 10, y: 140, "font-size": 14, fill: C.ink2 }, hasRouter ? "held in the router" : "engine queue"));
+  if (hasRouter) { const held = st.held || []; if (!held.length) svg.appendChild(el("text", { x: 10, y: 172, "font-size": 13, fill: C.ink3 }, "empty")); held.forEach((s, i) => { const x = 10 + i * 60; svg.appendChild(el("rect", { x, y: 150, width: 50, height: 40, rx: 8, fill: C.hold, stroke: C.line })); svg.appendChild(el("text", { x: x + 25, y: 177, "text-anchor": "middle", "font-size": 18, "font-weight": 700, fill: C.ink }, s)); }); }
+  else svg.appendChild(el("text", { x: 10, y: 172, "font-size": 13, fill: C.ink3 }, "requests wait behind each other's prefills"));
+  svg.appendChild(el("text", { x: 10, y: 222, "font-size": 14, fill: C.ink2 }, "full prefills"));
+  for (let i = 0; i < 6; i++) svg.appendChild(el("rect", { x: 10 + i * 40, y: 232, width: 34, height: 22, rx: 4, fill: i < st.cost ? C.miss : "#fff", stroke: C.line }));
+  svg.appendChild(el("text", { x: 260, y: 249, "font-size": 20, "font-weight": 700, fill: C.ink }, st.cost));
+  svg.appendChild(el("text", { x: 300, y: 222, "font-size": 14, fill: C.ink2 }, "prefix hits"));
+  for (let i = 0; i < 4; i++) svg.appendChild(el("rect", { x: 300 + i * 40, y: 232, width: 34, height: 22, rx: 4, fill: i < st.hits ? C.hit : "#fff", stroke: C.line }));
+  svg.appendChild(el("text", { x: 470, y: 249, "font-size": 20, "font-weight": 700, fill: C.ink }, st.hits));
+  svg.appendChild(el("text", { x: 10, y: 285, "font-size": 14, fill: C.ink }, st.t));
+}
+let step = 0, timer = null;
+function showStep() { drawState("thr-a", stepsA[step], false); drawState("thr-b", stepsB[step], true); document.getElementById("t-label").textContent = `step ${step + 1} of ${stepsA.length}`; }
+document.getElementById("t-next").onclick = () => { step = (step + 1) % stepsA.length; showStep(); };
+document.getElementById("t-prev").onclick = () => { step = (step + stepsA.length - 1) % stepsA.length; showStep(); };
+document.getElementById("t-play").onclick = function () { if (timer) { clearInterval(timer); timer = null; this.textContent = "Play"; } else { this.textContent = "Stop"; timer = setInterval(() => { step = (step + 1) % stepsA.length; showStep(); }, 1800); } };
+showStep();
+
+/* 5 */
+(() => {
+  const svg = document.getElementById("cycle"); const cx = 280, cy = 165, R = 118;
+  const nodes = ["working set > KV pool", "a new turn needs blocks", "LRU evicts an idle prefix", "that session re-prefills fully", "re-prefill evicts others"];
+  const pts = nodes.map((n, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / nodes.length; return { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a), n }; });
+  arrowDef(svg, "arr", C.base);
+  pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length]; const dx = q.x - p.x, dy = q.y - p.y, L = Math.hypot(dx, dy); svg.appendChild(el("line", { x1: p.x + dx / L * 46, y1: p.y + dy / L * 46, x2: q.x - dx / L * 48, y2: q.y - dy / L * 48, stroke: C.base, "stroke-width": 2.5, "marker-end": "url(#arr)" })); });
+  pts.forEach(p => { svg.appendChild(el("circle", { cx: p.x, cy: p.y, r: 44, fill: C.evict, stroke: C.base, "stroke-width": 1.5 })); const words = p.n.split(" "); let lines = [""]; words.forEach(w => { if ((lines[lines.length - 1] + " " + w).trim().length > 13) lines.push(w); else lines[lines.length - 1] = (lines[lines.length - 1] + " " + w).trim(); }); lines.forEach((l, k) => svg.appendChild(el("text", { x: p.x, y: p.y - (lines.length - 1) * 6.5 + k * 13 + 4, "text-anchor": "middle", "font-size": 11, fill: C.ink }, l))); });
+  svg.appendChild(el("text", { x: cx, y: cy + 5, "text-anchor": "middle", "font-size": 16, "font-weight": 700, fill: C.base }, "KV thrashing"));
+})();
+bars("ch-place", ["output tok/s", "hit rate x 1000"], [{ name: "llm-d default", color: C.base, values: [1020, 2] }, { name: "session affinity", color: C.affinity, values: [1023, 2] }, { name: "ThunderAgent (llm-d router)", color: C.thunder, values: [1447, 248] }], { max: 1700 });
+
+/* 6: two views of a pod */
+(() => {
+  const svg = document.getElementById("views"); const x0 = 40, W = 480, cap = 100;
+  const seg = (y, from, to, fill, label, sub) => { const x = x0 + W * from / cap, w = W * (to - from) / cap; const r = el("rect", { x, y, width: w, height: 40, fill, stroke: "#fff", "stroke-width": 2 }); svg.appendChild(r); hover(r, label); if (w > 40 && sub) svg.appendChild(el("text", { x: x + w / 2, y: y + 25, "text-anchor": "middle", "font-size": 12, fill: C.ink }, sub)); };
+  const row = (y, title, note) => { svg.appendChild(el("text", { x: x0, y: y - 10, "font-size": 15, "font-weight": 600, fill: C.ink }, title)); svg.appendChild(el("rect", { x: x0, y, width: W, height: 40, fill: "#fff", stroke: C.line })); svg.appendChild(el("text", { x: x0, y: y + 62, "font-size": 13, fill: C.ink3 }, note)); };
+  const capX = x0 + W, idle = "#9FB8DA";
+  row(40, "Undecayed view: decides pausing", "full footprints > capacity, so pause the smallest idle session");
+  seg(40, 0, 30, C.thunder, "R1 running", "R1 running"); seg(40, 30, 55, C.thunder, "R2 running", "R2 running"); seg(40, 55, 78, idle, "I1 idle, full footprint", "I1 idle"); seg(40, 78, 96, idle, "I2 idle, full footprint", "I2 idle"); seg(40, 96, 112, idle, "I3 idle, full footprint", "I3");
+  row(150, "Decayed view: decides admission", "idle footprints shrink with 2^-t, so room appears for a held session");
+  seg(150, 0, 30, C.thunder, "R1 running", "R1 running"); seg(150, 30, 55, C.thunder, "R2 running", "R2 running"); seg(150, 55, 68, idle, "I1 idle, decayed", "I1"); seg(150, 68, 76, idle, "I2 idle, decayed", "I2"); seg(150, 76, 80, idle, "I3 idle, decayed"); seg(150, 80, 100, C.hit, "room for a held session", "room");
+  row(260, "What the engine reports", "counts running requests only; idle sessions look free");
+  seg(260, 0, 30, C.thunder, "R1 running", "R1 running"); seg(260, 30, 55, C.thunder, "R2 running", "R2 running"); seg(260, 55, 100, "#f6f6f4", "reported free, but holds I1 to I3", "looks free");
+  svg.appendChild(el("line", { x1: capX, x2: capX, y1: 22, y2: 330, stroke: C.ink, "stroke-dasharray": "4 3" })); svg.appendChild(el("text", { x: capX, y: 348, "text-anchor": "middle", "font-size": 13, fill: C.ink2 }, "KV capacity"));
+})();
+
+/* 7 */
+(() => {
+  const svg = document.getElementById("flow"); arrowDef(svg, "arr2", C.ink2);
+  const arrow = (x1, y1, x2, y2, label) => { svg.appendChild(el("line", { x1, y1, x2, y2, stroke: C.ink2, "stroke-width": 1.5, "marker-end": "url(#arr2)" })); if (label) svg.appendChild(el("text", { x: (x1 + x2) / 2 + 6, y: (y1 + y2) / 2 - 4, "font-size": 12, fill: C.ink3 }, label)); };
+  box(svg, 10, 20, 140, 44, "request arrives", "#fff"); box(svg, 200, 20, 160, 44, "session admitted\nand bound?", "#fff"); box(svg, 410, 20, 140, 44, "dispatch to its pod", C.hit);
+  box(svg, 200, 104, 160, 44, "a pod has room?", "#fff"); box(svg, 410, 104, 140, 44, "dispatch, bind\nto that pod", C.hit); box(svg, 200, 196, 160, 44, "hold in router queue", C.hold);
+  arrow(150, 42, 200, 42); arrow(360, 42, 410, 42, "yes"); arrow(280, 64, 280, 104, "no"); arrow(360, 126, 410, 126, "yes"); arrow(280, 148, 280, 196, "no");
+  arrow(360, 218, 480, 148, "room freed or backstop");
+})();
+
+/* 8: architecture */
+(() => {
+  const svg = document.getElementById("arch"); arrowDef(svg, "arr3", C.ink2);
+  const line = (x1, y1, x2, y2, dash) => svg.appendChild(el("line", { x1, y1, x2, y2, stroke: C.ink2, "stroke-width": 1.6, "marker-end": "url(#arr3)", "stroke-dasharray": dash ? "5 4" : null }));
+  box(svg, 20, 150, 130, 60, "Agent client\nx-session-id", "#fff", 14);
+  box(svg, 200, 150, 110, 60, "Envoy\next_proc", "#fff", 14);
+  svg.appendChild(el("rect", { x: 360, y: 40, width: 620, height: 340, rx: 12, fill: C.panel, stroke: C.line }));
+  svg.appendChild(el("text", { x: 380, y: 68, "font-size": 16, "font-weight": 700, fill: C.ink }, "llm-d router (EPP)"));
+  box(svg, 385, 150, 150, 60, "agent-identity\nFairnessID = session", "#fff", 13);
+  box(svg, 570, 150, 170, 60, "flow control gate\nfairnessPolicy", C.hold, 13, C.thunder);
+  box(svg, 780, 150, 170, 60, "scheduler\nScorer: sticky pod", C.hold, 13, C.thunder);
+  box(svg, 570, 290, 170, 60, "saturationDetector\nfit view + pause sweep", C.hold, 13, C.thunder);
+  box(svg, 780, 290, 170, 60, "PreRequest /\nResponseBody hooks", C.hold, 13, C.thunder);
+  svg.appendChild(el("rect", { x: 610, y: 215, width: 300, height: 46, rx: 23, fill: C.thunder })); svg.appendChild(el("text", { x: 760, y: 244, "text-anchor": "middle", "font-size": 15, "font-weight": 700, fill: "#fff" }, "session ledger: footprint, pod, paused"));
+  box(svg, 1030, 100, 150, 50, "vLLM pod 1", "#fff", 14); box(svg, 1030, 170, 150, 50, "vLLM pod 2", "#fff", 14); box(svg, 1030, 240, 150, 50, "vLLM pod 3", "#fff", 14); box(svg, 1030, 310, 150, 50, "vLLM pod 4", "#fff", 14);
+  line(150, 180, 200, 180); line(310, 180, 385, 180); line(535, 180, 570, 180); line(740, 180, 780, 180); line(950, 180, 1030, 195);
+  line(655, 210, 690, 218, true); line(830, 210, 810, 218, true); line(655, 290, 690, 260, true); line(830, 290, 810, 260, true);
+  svg.appendChild(el("text", { x: 670, y: 402, "text-anchor": "middle", "font-size": 13, fill: C.ink3 }, "one plugin, thunder-agent, referenced from all four blue slots. dashed = reads and writes the ledger"));
+  svg.appendChild(el("text", { x: 255, y: 232, "text-anchor": "middle", "font-size": 12, fill: C.ink3 }, "cancels on client disconnect"));
+})();
+
+/* 11 */
+(() => {
+  const svg = document.getElementById("ch-oversub"); const rows = [["A, passthrough: live sessions", 1.7, C.base], ["A, ThunderAgent: admitted sessions", 0.98, C.thunder], ["C, llm-d default: live sessions per pod", 2.0, C.base], ["C, ThunderAgent: admitted per pod", 0.91, C.thunder]];
+  const x0 = 380, w1 = 240; rows.forEach((r, i) => { const y = 14 + i * 32; svg.appendChild(el("text", { x: x0 - 10, y: y + 15, "text-anchor": "end", "font-size": 13, fill: C.ink2 }, r[0])); const b = el("rect", { x: x0, y, width: w1 * r[1], height: 20, rx: 4, fill: r[2] }); svg.appendChild(b); hover(b, `${r[0]}: ${r[1]}x the KV pool`); svg.appendChild(el("text", { x: x0 + w1 * r[1] + 8, y: y + 15, "font-size": 13, fill: C.ink }, r[1] + "x pool")); });
+  svg.appendChild(el("line", { x1: x0 + w1, x2: x0 + w1, y1: 6, y2: 142, stroke: C.ink, "stroke-dasharray": "4 3" })); svg.appendChild(el("text", { x: x0 + w1, y: 148, "text-anchor": "middle", "font-size": 12, fill: C.ink3 }, "1.0 = the KV pool"));
+})();
+
+/* 12 to 14, 16 */
+bars("ch-a", ["output tok/s", "hit rate x 1000", "TTFT p50 (s)"], [{ name: "passthrough", color: C.base, values: [221, 8, 52.7] }, { name: "ThunderAgent (Python)", color: C.thunder, values: [469, 685, 3.0] }], { max: 800 });
+bars("ch-b", ["output tok/s", "hit rate x 1000", "TTFT p50 (s)"], [{ name: "passthrough (llm-d)", color: C.base, values: [227, 3, 49.4] }, { name: "ThunderAgent (llm-d router)", color: C.thunder, values: [351, 489, 4.0] }], { max: 600 });
+bars("ch-c", ["output tok/s", "hit rate x 1000", "TTFT p50 (s)"], [{ name: "llm-d default", color: C.base, values: [1020, 2, 122.9] }, { name: "session affinity", color: C.affinity, values: [1023, 2, 126.1] }, { name: "ThunderAgent (llm-d router)", color: C.thunder, values: [1447, 248, 3.7] }], { max: 1700 });
+bars("ch-ttft", ["p50", "p90", "p99"], [{ name: "llm-d default", color: C.base, values: [122.9, 217.2, 259.5] }, { name: "session affinity", color: C.affinity, values: [126.1, 217.0, 256.3] }, { name: "ThunderAgent (llm-d router)", color: C.thunder, values: [3.7, 113.3, 1231] }], { log: true, min: 1, max: 3000, ticks: [1, 10, 100, 1000], unit: " s", fmt: v => v >= 100 ? Math.round(v) : v });
+
+/* 17 */
+(() => {
+  const svg = document.getElementById("ch-demand"); const x0 = 240, unit = 62;
+  const row = (y, label, pods, color, note) => { svg.appendChild(el("text", { x: x0 - 10, y: y + 16, "text-anchor": "end", "font-size": 13, fill: C.ink2 }, label)); for (let i = 0; i < Math.ceil(pods); i++) { const w = Math.min(1, pods - i) * (unit - 4); const b = el("rect", { x: x0 + i * unit, y, width: w, height: 22, rx: 4, fill: color }); svg.appendChild(b); hover(b, `${label}: ${pods} pods of KV`); } svg.appendChild(el("text", { x: x0 + Math.ceil(pods) * unit + 6, y: y + 16, "font-size": 13, fill: C.ink }, note)); };
+  row(14, "pods we had", 4, C.ink3, "4 x 2.24M tokens"); row(50, "admitted footprint", 3.6, C.thunder, "about 0.9 per pod"); row(86, "demand incl. held sessions", 7.6, C.base, "about 8 pods: the signal");
+})();
+
+/* nav */
+(() => {
+  const slides = [...document.querySelectorAll("section.slide")], nav = document.getElementById("nav");
+  slides.forEach((s, i) => { const a = document.createElement("a"); a.href = "#" + s.id; a.title = "page " + (i + 1); nav.appendChild(a); });
+  const dots = [...nav.children]; const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { dots.forEach(d => d.classList.remove("on")); dots[slides.indexOf(e.target)].classList.add("on"); } }), { threshold: .6 }); slides.forEach(s => io.observe(s));
+  document.addEventListener("keydown", e => { const cur = dots.findIndex(d => d.classList.contains("on")); if (["ArrowDown", "PageDown", " "].includes(e.key)) { e.preventDefault(); slides[Math.min(cur + 1, slides.length - 1)].scrollIntoView(); } if (["ArrowUp", "PageUp"].includes(e.key)) { e.preventDefault(); slides[Math.max(cur - 1, 0)].scrollIntoView(); } });
+})();
+</script>
+</body>
+</html>
