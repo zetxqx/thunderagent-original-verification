@@ -38,8 +38,9 @@ WARMUP_S = s15.WARMUP_S
 ARMS = [("baseline", "step 13 llm-d default", "epp-baseline-c128*", "#999999"),
         ("mostroom", "step 13 v4 most-room", "epp-thunder-c128*", "#B64342"),
         ("origin", "step 13 v4 origin-only", "epp-thunder-origin-c128*", "#0F4D92"),
-        ("min", "step 16 thunder-min (half-life 1 s)", "epp-thunder-min-c128", "#2E8B57"),
-        ("min10", "step 16 thunder-min (half-life 10 s)", "epp-thunder-min-hl10-c128", "#E08A00")]
+        ("min", "step 16 thunder-min (half-life 1 s)", "epp-thunder-min-c128*", "#2E8B57"),
+        ("min10", "step 16 thunder-min (half-life 10 s)", "epp-thunder-min-hl10-c128*", "#E08A00"),
+        ("min10s1", "step 16 thunder-min (half-life 10 s, sweep 1 s)", "epp-thunder-min-hl10-s1-c128*", "#7B3FA0")]
 
 
 def cells_for(root, pattern):

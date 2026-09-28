@@ -120,7 +120,7 @@ Open item, resolved in step 10: the extra errors were 600 s client timeouts on t
 
 ### 16. Minimal thunder-agent rewrite on the 4-pod pool (done)
 
-`16-thunder-minimal-pool/` runs the same build through step 13's pool protocol at c=128, one cell with upstream's 1 s idle decay half-life and one with 10 s, against step 13's origin-only arm. **At 1 s the minimal build reproduces origin-only (1752 tok/s vs 1693 (1571-1807), steady-state hit rate 0.69 vs 0.68, goodput within SLO 1.50 vs 1.53, no forced admissions, pods balanced), with a third of the pauses and slightly lower strict session attainment (0.64 vs 0.70). At 10 s efficiency improves (1817 tok/s, hit rate 0.73, goodput 1.63) and the tail worsens (strict attainment 0.58).** One cell per arm; the half-life effect is inside origin-only's cell-to-cell spread. Details: `16-thunder-minimal-pool/README.md`.
+`16-thunder-minimal-pool/` runs the same build through step 13's pool protocol at c=128, three cells per configuration, against step 13's three origin-only cells. **At upstream's settings (half-life 1 s, sweep 5 s) the minimal build reproduces origin-only on every main metric (1770 vs 1693 tok/s, steady-state hit rate 0.71 vs 0.68, strict session attainment 0.68 vs 0.70) with under a third of the pauses, and a 90-minute cell shows no drift against origin-only's. Half-life 10 s trades the tail for efficiency (1846 tok/s, attainment 0.55). Adding a 1 s pause sweep keeps the pods under the line and gives the best c=128 result so far: 1945 tok/s, hit rate 0.80, goodput within SLO 1.77 turns/s (1.15x and 1.16x origin-only), with attainment back to 0.64.** Details: `16-thunder-minimal-pool/README.md`.
 
 ## Proposals (not part of the numbered steps)
 
