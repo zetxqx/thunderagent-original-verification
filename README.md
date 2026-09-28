@@ -114,6 +114,10 @@ Open item, resolved in step 10: the extra errors were 600 s client timeouts on t
 
 `12-llm-d-router-pool/` compares, through one EPP over the four pods, llm-d's default profile (prefix-cache, queue and KV scorers), plain session affinity, and the ThunderAgent port, at c=338 (the whole corpus) for 45 minutes, three replicates each, with the load generator fixed first (inference-perf v0.7.0 lets only about half of the sessions start; see `INFERENCE-PERF-BUGS.md` issue 4). **The two llm-d policies are indistinguishable (1020 tok/s, hit rate 0.002, TTFT p50 123 s). The port gives 1.42x throughput, a 0.25 steady-state hit rate and a 3.7 s median TTFT.** Admission control is the entire effect; placement alone does nothing under oversubscription. The port loses half its single-pod hit rate to pod hopping on resume (70 percent of resumes move), identified before the run; an origin-only resume policy is the next step. Details: `12-llm-d-router-pool/RESULTS.md`.
 
+### 15. Minimal thunder-agent rewrite on one pod (done)
+
+`15-thunder-minimal-single-pod/` runs the minimal rewrite of the plugin (llm-d-router `thunder-agent-minimal` at `33dde5d2`) through step 10's single-pod protocol, one cell, against step 10's v3 cells. **The gate works and the ledger closes (smoke test 20 of 20; vLLM waiting 0.5, no EPP errors). The cell reached 397 tok/s and a 0.57 steady-state hit rate against v3's 351 (327-367) and 0.49, with a heavier long-wait tail (TTFT p99 712 s vs 410 s).** Both follow from the intended removal of `markedForPause`: 345 pauses instead of 971, and the working set over capacity 65 percent of the time instead of 24. One cell, no same-day control. Details: `15-thunder-minimal-single-pod/README.md`.
+
 ## Proposals (not part of the numbered steps)
 
 `proposal/PROPOSAL.md` - eight ThunderAgent proposals; Part 3 and its Option B were run in step 13, the rest are unrun. Kept outside the numbered sequence.

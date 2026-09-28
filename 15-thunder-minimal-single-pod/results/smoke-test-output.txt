@@ -1,0 +1,43 @@
+
+=== 1. running build ===
+llm_d_epp_info{build_ref="v0.10.0-rc.1",commit="33dde5d2ee75ee31319bccdac35ccb16a45f8c55"} 1
+PASS  build info reports commit 33dde5d2
+
+=== 2. metric set of the minimal plugin ===
+metrics: thunder_agent_pauses_total thunder_agent_pod_capacity_tokens thunder_agent_pod_working_set_tokens thunder_agent_programs thunder_agent_releases_total thunder_agent_resumes_total thunder_agent_starvation_promotions_total 
+PASS  pod_working_set_tokens exists (minimal build)
+PASS  pod_utilization absent (removed in the minimal build)
+PASS  rebinds_total absent (removed in the minimal build)
+PASS  session_final_releases_total absent (removed in the minimal build)
+PASS  reserved_pods absent (removed in the minimal build)
+
+=== 3. capacity is the real scraped value ===
+thunder_agent_pod_capacity_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-dk9ld-rank-0",source="real"} 2.23704e+06
+PASS  the lane pod reports source=real with 2,237,040 tokens (got 1 series)
+
+=== 4. counters before traffic ===
+programs=2 releases new=2 reasoning=1
+
+=== 5. traffic: two turns of smoke-a-1790555723, one of smoke-b-1790555723 ===
+PASS  smoke-a-1790555723 turn 1 answered: Hello from turn one.
+PASS  smoke-a-1790555723 turn 2 answered: Hello from turn two.
+PASS  smoke-b-1790555723 answered: Hello from b
+
+=== 6. accounting after traffic (gauges refresh at most once per second) ===
+thunder_agent_pod_working_set_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-dk9ld-rank-0",view="decayed"} 8.542290477060693
+thunder_agent_pod_working_set_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-dk9ld-rank-0",view="undecayed"} 124
+thunder_agent_programs{state="idle"} 4
+thunder_agent_programs{state="paused"} 0
+thunder_agent_programs{state="running"} 0
+PASS  2 new sessions tracked (programs 2 -> 4)
+PASS  no session running after the turns ended (in-flight closed)
+PASS  no session paused
+PASS  undecayed working set > 0
+
+=== 7. class accounting ===
+deltas: releases new=2 reasoning=1; totals holds=0 pauses=0
+PASS  two first turns dispatched as class=new
+PASS  one follow-up turn dispatched as class=reasoning
+PASS  no holds, no pauses at real capacity
+
+=== 0 check(s) failed ===

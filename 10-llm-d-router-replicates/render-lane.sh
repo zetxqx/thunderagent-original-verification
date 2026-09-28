@@ -8,19 +8,22 @@
 set -euo pipefail
 L=$1; ARM=$2
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# RESULTS_DIR holds lanes.env, the rendered lanes and the runs (step 15 points it at its own folder).
+RESULTS_DIR="${RESULTS_DIR:-$HERE/results}"
 REPO="${LLM_D_ROUTER:-$HOME/projects/llmdthunder/llm-d-router}"
 CHART="$REPO/config/charts/llm-d-router-standalone"
 # EPP_IMAGE_TAG selects the EPP image (default the template's thunder-agent-v3); the step 14
 # turn-priority arm runs an image built from upstream main.
-sed -e "s/__LANE__/$L/g" -e "s/tag: thunder-agent-v3/tag: ${EPP_IMAGE_TAG:-thunder-agent-v3}/" "$HERE/lane-values-tmpl.yaml" > "$HERE/results/lane-values-$L.yaml"
+sed -e "s/__LANE__/$L/g" -e "s/tag: thunder-agent-v3/tag: ${EPP_IMAGE_TAG:-thunder-agent-v3}/" "$HERE/lane-values-tmpl.yaml" > "$RESULTS_DIR/lane-values-$L.yaml"
 helm template "thunder-lane-$L" "$CHART" -n llm-d-program-aware-scheduling \
-  -f "$HERE/results/lane-values-$L.yaml" \
+  -f "$RESULTS_DIR/lane-values-$L.yaml" \
   --set-file "router.epp.pluginsCustomConfig.thunder-plugins\.yaml=$HERE/$ARM-plugins.yaml" \
   | python3 -c "
 import sys, re
 doc = sys.stdin.read()
 # Only the volume reference: '        - configMap:\n ... name: envoy' -> lane map.
-fixed, n = re.subn(r'(- configMap:\n(?:[^\n]*\n){0,4}?\s+name: )envoy\b', r'\g<1>thunder-lane-$L-envoy', doc)
+# Newer charts quote the name ('envoy').
+fixed, n = re.subn(r'(- configMap:\n(?:[^\n]*\n){0,4}?\s+name: )\x27?envoy\x27?(?=\s)', r'\g<1>thunder-lane-$L-envoy', doc)
 assert n == 1, f'expected exactly one envoy volume reference, found {n}'
 sys.stdout.write(fixed)
 "

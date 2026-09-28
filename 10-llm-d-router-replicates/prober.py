@@ -12,13 +12,20 @@ Every INTERVAL seconds, appends (with flush):
    starvation promotions, pod utilization, and the flow-control queue size
    and queue-wait histogram sum/count.
 
+3. raw-vllm-metrics.txt.gz, raw-epp-metrics.txt.gz - every RAW_INTERVAL
+   seconds (0 disables) the full text of both scrapes, one gzip member per
+   snapshot preceded by a "# ts=<epoch>" line, so any metric not in the CSVs
+   can be recovered afterwards (step 15).
+
 There is no per-program timeline: the EPP's state dump is sanitized and does
 not list program ids, so the step 08 "same sessions" comparison is not
 available here.
 
-Env: VLLM_URL, EPP_METRICS_URL, TOKEN_FILE, OUT_DIR, INTERVAL, MAX_SECONDS.
+Env: VLLM_URL, EPP_METRICS_URL, TOKEN_FILE, OUT_DIR, INTERVAL, RAW_INTERVAL,
+MAX_SECONDS.
 """
 import csv
+import gzip
 import os
 import re
 import time
@@ -29,6 +36,7 @@ EPP_URL = os.environ["EPP_METRICS_URL"]
 TOKEN_FILE = os.environ.get("TOKEN_FILE", "/var/run/secrets/kubernetes.io/serviceaccount/token")
 OUT_DIR = os.environ.get("OUT_DIR", "/results")
 INTERVAL = float(os.environ.get("INTERVAL", "2"))
+RAW_INTERVAL = float(os.environ.get("RAW_INTERVAL", "10") or 0)
 MAX_SECONDS = float(os.environ.get("MAX_SECONDS", "0") or 0)
 
 VLLM_FIELDS = ["ts", "kv_cache_usage_perc", "num_requests_running",
@@ -39,7 +47,9 @@ EPP_FIELDS = ["ts", "programs_running", "programs_idle", "programs_marked", "pro
               "holds_reasoning", "holds_paused", "holds_new",
               "releases_reasoning", "releases_paused", "releases_new",
               "pauses_total", "resumes_total", "rebinds_total", "starvation_promotions_total",
-              "pod_utilization", "fc_queue_size", "fc_queue_wait_sum", "fc_queue_wait_count"]
+              "pod_utilization", "fc_queue_size", "fc_queue_wait_sum", "fc_queue_wait_count",
+              # step 15: minimal plugin (pod_utilization is gone there)
+              "working_set_undecayed", "working_set_decayed", "capacity_tokens"]
 
 
 def prom_value(text, name, labels=""):
@@ -57,6 +67,12 @@ def get(url, timeout=10, token=None):
         req.add_header("Authorization", f"Bearer {token}")
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read().decode()
+
+
+def save_raw(name, ts, text):
+    # One complete gzip member per snapshot: a killed pod loses at most one.
+    with gzip.open(os.path.join(OUT_DIR, name), "at") as f:
+        f.write(f"# ts={ts}\n{text}")
 
 
 class Csv:
@@ -81,10 +97,16 @@ def main():
     done_path = os.path.join(OUT_DIR, "DONE")
     started = time.time()
     final = False
+    last_raw = 0.0
     while True:
         ts = round(time.time(), 1)
+        raw = RAW_INTERVAL > 0 and (final or ts - last_raw >= RAW_INTERVAL)
+        if raw:
+            last_raw = ts
         try:
             text = get(f"{VLLM_URL}/metrics")
+            if raw:
+                save_raw("raw-vllm-metrics.txt.gz", ts, text)
             q = prom_value(text, "vllm:prefix_cache_queries_total") or 0
             h = prom_value(text, "vllm:prefix_cache_hits_total") or 0
             dq = q - prev_q if prev_q is not None else 0
@@ -104,6 +126,8 @@ def main():
             print(f"vllm probe failed: {e}", flush=True)
         try:
             m = get(EPP_URL, token=token)
+            if raw:
+                save_raw("raw-epp-metrics.txt.gz", ts, m)
             g = lambda name, labels="": prom_value(m, name, labels)
             epp_csv.row({
                 "ts": ts,
@@ -125,6 +149,9 @@ def main():
                 "fc_queue_size": prom_sum(m, "flow_control_queue_size"),
                 "fc_queue_wait_sum": prom_sum(m, "flow_control_request_queue_duration_seconds_sum"),
                 "fc_queue_wait_count": prom_sum(m, "flow_control_request_queue_duration_seconds_count"),
+                "working_set_undecayed": g("thunder_agent_pod_working_set_tokens", 'view="undecayed"'),
+                "working_set_decayed": g("thunder_agent_pod_working_set_tokens", 'view="decayed"'),
+                "capacity_tokens": g("thunder_agent_pod_capacity_tokens"),
             })
         except Exception as e:
             print(f"epp probe failed: {e}", flush=True)

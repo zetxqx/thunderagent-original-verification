@@ -15,6 +15,8 @@ set -euo pipefail
 
 NS=llm-d-program-aware-scheduling
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# RESULTS_DIR holds lanes.env, the rendered lanes and the runs (step 15 points it at its own folder).
+RESULTS_DIR="${RESULTS_DIR:-$HERE/results}"
 REPO="${LLM_D_ROUTER:-$HOME/projects/llmdthunder/llm-d-router}"
 CHART="$REPO/config/charts/llm-d-router-standalone"
 CONC="${1:-128}"; REPS="${2:-3}"; WINDOW="${3:-2700}"; ARMS="${4:-sticky,thunder}"; CLIENT_TIMEOUT="${5:-1900}"
@@ -24,10 +26,10 @@ BENCH_IMAGE="${BENCH_IMAGE:-quay.io/inference-perf/inference-perf@sha256:d247e6a
 LANES=(a b c)
 
 # shellcheck disable=SC1091
-source "$HERE/results/lanes.env"
+source "$RESULTS_DIR/lanes.env"
 PREFIX="rep"; [ "$WINDOW" -lt 1800 ] && PREFIX="cal"
 AB_ID="$PREFIX-$(date +%Y%m%d-%H%M%S)-c$CONC-t$CLIENT_TIMEOUT"
-OUT_ROOT="$HERE/results/$AB_ID"
+OUT_ROOT="$RESULTS_DIR/$AB_ID"
 mkdir -p "$OUT_ROOT"
 echo "run id: $AB_ID  concurrency=$CONC replicates=$REPS window=${WINDOW}s arms=$ARMS client_timeout=${CLIENT_TIMEOUT}s"
 
@@ -42,7 +44,7 @@ cat > "$OUT_ROOT/manifest-global.json" <<EOJ
  "thunder_plugins_sha256":"$(shasum -a 256 "$HERE/thunder-plugins.yaml" | cut -d' ' -f1)",
  "sticky_plugins_sha256":"$(shasum -a 256 "$HERE/sticky-plugins.yaml" | cut -d' ' -f1)",
  "prober_sha256":"$(shasum -a 256 "$HERE/prober.py" | cut -d' ' -f1)",
- "lanes":"$(tr '\n' ' ' < "$HERE/results/lanes.env")"}
+ "lanes":"$(tr '\n' ' ' < "$RESULTS_DIR/lanes.env")"}
 EOJ
 
 kubectl create configmap weka-bench-scripts \
@@ -77,8 +79,8 @@ print('reset_prefix_cache:', urllib.request.urlopen(urllib.request.Request(
 
   # Fresh EPP on this arm's config: re-render the lane with the arm's plugin
   # config, apply, and restart so the program table starts empty.
-  "$HERE/render-lane.sh" "$L" "$ARM" > "$HERE/results/lane-$L-manifest.yaml"
-  kubectl apply -f "$HERE/results/lane-$L-manifest.yaml" >/dev/null
+  "$HERE/render-lane.sh" "$L" "$ARM" > "$RESULTS_DIR/lane-$L-manifest.yaml"
+  kubectl apply -f "$RESULTS_DIR/lane-$L-manifest.yaml" >/dev/null
   kubectl rollout restart "deploy/$SVC" -n "$NS" >/dev/null
   kubectl rollout status "deploy/$SVC" -n "$NS" --timeout=300s >/dev/null
   sleep 5
@@ -88,6 +90,10 @@ print('reset_prefix_cache:', urllib.request.urlopen(urllib.request.Request(
   case "$ARM" in
     thunder) [ "$GATE" -ge 1 ] || { echo "FATAL [$CELL]: thunder arm without flow control" >&2; return 1; } ;;
     sticky)  [ "$GATE" -eq 0 ] || { echo "FATAL [$CELL]: sticky arm started flow control" >&2; return 1; } ;;
+    thunder-min)
+      [ "$GATE" -ge 1 ] || { echo "FATAL [$CELL]: thunder-min arm without flow control" >&2; return 1; }
+      local IMG; IMG=$(kubectl get pod "$EPP_POD" -n "$NS" -o jsonpath='{.spec.containers[?(@.name=="epp")].image}')
+      case "$IMG" in *":${EPP_IMAGE_TAG:-thunder-agent-v3}") ;; *) echo "FATAL [$CELL]: EPP image is $IMG" >&2; return 1 ;; esac ;;
     turnprio*)
       [ "$GATE" -ge 1 ] || { echo "FATAL [$CELL]: turn-priority arm without flow control" >&2; return 1; }
       kubectl get cm "$SVC" -n "$NS" -o yaml | grep -q 'strategy: turn-priority' || { echo "FATAL [$CELL]: turn-priority not in the EPP config" >&2; return 1; }
@@ -131,6 +137,8 @@ print('reset_prefix_cache:', urllib.request.urlopen(urllib.request.Request(
 
   kubectl logs "$EPP_POD" -n "$NS" -c epp --tail=200000 > "$CELL_DIR/epp.log" 2>/dev/null || true
   kubectl logs "$POD" -n "$NS" -c prober --tail=1000 > "$CELL_DIR/prober.log" 2>/dev/null || true
+  kubectl logs "$VP" -n "$NS" -c modelserver --since="$(( $(date +%s) - T0 + 120 ))s" 2>/dev/null | gzip > "$CELL_DIR/vllm.log.gz" || true
+  kubectl get cm "$SVC" -n "$NS" -o yaml > "$CELL_DIR/epp-configmap.yaml" 2>/dev/null || true
   retry kubectl cp "$NS/$POD:/results" "$CELL_DIR/results" -c bench >/dev/null
   cat > "$CELL_DIR/manifest.json" <<EOJ
 {"cell":"$CELL","arm":"$ARM","lane":"$L","concurrency":$CONC,"window_s":$WINDOW,"client_timeout_s":$CLIENT_TIMEOUT,
