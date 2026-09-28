@@ -160,6 +160,9 @@ def main():
                 save_raw("raw-epp-metrics.txt.gz", ts, m)
             g = lambda name, labels="": prom_value(m, name, labels)
             ws = prom_by_pod(m, "thunder_agent_pod_working_set_tokens")
+            # The lease build exports one full-footprint series with no view
+            # label: the minimal build's undecayed view.
+            ws = {(p, k or "undecayed"): v for (p, k), v in ws.items()}
             cap = {pod: v for (pod, _), v in prom_by_pod(m, "thunder_agent_pod_capacity_tokens").items()}
             for pod in sorted({p for p, _ in ws} | set(cap)):
                 pods_csv.row({"ts": ts, "pod": pod, "working_set_undecayed": ws.get((pod, "undecayed")),

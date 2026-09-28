@@ -34,6 +34,8 @@ Written 2026-09-18 so a fresh session can continue without replaying the history
 
 8. **Step 14 (llm-d PR 2116 turn-priority fairness, upstream defaults, single pod, step 10 protocol and generator).** 264 tok/s vs sticky 227 and the port 351; hit rate 0.05 vs 0.49; TTFT p50 40 s vs 4 s; and it sheds 44 new sessions per cell with 429 (3,000+ turns skipped), so its gain over sticky is partly trimming. Depth ordering does not limit the resident set, so the cache still thrashes; it is a tiebreaker on top of admission control, not a substitute. Details in `14-turn-priority/README.md`.
 
+9. **Step 17 (lease thunder-agent on the 4-pod pool, 2026-09-28, one cell per arm; steps 15 and 16, the minimal build, are in their own READMEs).** Branch `thunder-agent-lease-main` (one commit `20e3b1ee` on upstream `8a2f37d3`, tag of the same name on `zetxqx/llm-d-router`), image `thunder-agent-lease-20e3b1ee`: one working-set view, idle sessions paused on demand in the gate (`idleLeaseSeconds`), three config keys. Smoke 18/18; both cells pass all six correctness criteria. Throughput 1871 / 1863 tok/s and hit rate 0.778 / 0.766 (lease 30 s / 5 s), inside or at the edge of step 16's best arm (1945, 0.795); per-session worst TTFT p90 435 / 386 s vs 275 s. Details in `17-thunder-lease-pool/README.md`.
+
 ## Decisions taken (and by whom)
 
 - Resume placement: `most-room` stays the plugin default (faithful to upstream); `origin-only` was implemented 2026-09-19 as a config knob and measured better on the pool (step 13). Making it the default is an open decision.

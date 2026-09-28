@@ -108,6 +108,11 @@ print('reset_prefix_cache $VP:', urllib.request.urlopen(urllib.request.Request('
         LINE=$(grep -oE "$KEY: [^ #]+" "$HERE/$ARM-plugins.yaml")
         echo "$CM" | grep -q "$LINE" || { echo "FATAL [$CELL]: '$LINE' not in the EPP config" >&2; return 1; }
       done ;;
+    thunder-lease*)  # lease thunder-agent: must run with the arm's idle lease
+      [ "$GATE" -ge 1 ] && echo "$PARSED" | grep -q thunder-agent || { echo "FATAL [$CELL]: $ARM arm not active" >&2; return 1; }
+      local CM; CM=$(kubectl get cm "$DEPLOY" -n "$NS" -o yaml)
+      LINE=$(grep -oE "idleLeaseSeconds: [^ #]+" "$HERE/$ARM-plugins.yaml")
+      echo "$CM" | grep -q "$LINE" || { echo "FATAL [$CELL]: '$LINE' not in the EPP config" >&2; return 1; } ;;
     affinity) echo "$PARSED" | grep -q session-affinity || { echo "FATAL [$CELL]: affinity arm not active" >&2; return 1; } ;;
     baseline) echo "$PARSED" | grep -q prefix-cache-scorer || { echo "FATAL [$CELL]: baseline arm not active" >&2; return 1; } ;;
   esac

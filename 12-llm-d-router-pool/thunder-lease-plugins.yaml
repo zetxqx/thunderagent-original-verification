@@ -1,0 +1,36 @@
+# Step 17 arm thunder-lease: the lease thunder-agent (llm-d-router
+# thunder-agent-lease-main, image thunder-agent-lease-*): one working-set
+# view, no periodic sweep; idle sessions are paused on demand in the gate.
+# idleLeaseSeconds 30: a paused or new session may take the room of sessions
+# idle for at least 30 s (the replay caps tool-call gaps at 10 s); an
+# admitted turn that pushes its pod over the ceiling may take any idle
+# session's room. Capacity is scraped from vLLM (no fallback key), the idle
+# TTL is derived (no key). Only these three keys are accepted.
+apiVersion: llm-d.ai/v1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- type: agent-identity
+  parameters:
+    additionalSessionHeaders:
+    - x-session-id
+- type: thunder-agent
+  name: thunder
+  parameters:
+    idleLeaseSeconds: 30
+    utilThreshold: 1.0
+    headWaitStarvationMs: 1800000
+- type: max-score-picker
+- type: single-profile-handler
+flowControl:
+  defaultRequestTTL: "0s"
+  saturationDetector:
+    pluginRef: thunder
+  defaultPriorityBand:
+    fairnessPolicyRef: thunder
+schedulingProfiles:
+- name: default
+  plugins:
+  - pluginRef: thunder
+  - pluginRef: max-score-picker

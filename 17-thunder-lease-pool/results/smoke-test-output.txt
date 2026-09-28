@@ -1,0 +1,60 @@
+
+=== 0. deploy the thunder-lease arm on the main release (image thunder-agent-lease-20e3b1ee) ===
+Waiting for deployment "program-aware-scheduling-epp" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "program-aware-scheduling-epp" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "program-aware-scheduling-epp" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "program-aware-scheduling-epp" rollout to finish: 0 of 1 updated replicas are available...
+deployment "program-aware-scheduling-epp" successfully rolled out
+epp pod program-aware-scheduling-epp-7c848fc779-dfqbl
+
+=== 1. running build and config ===
+llm_d_epp_info{build_ref="v0.10.0-rc.1",commit="20e3b1ee8412a2e500da36c0cea86e36692ece9f"} 1
+PASS  build info reports commit 20e3b1ee
+PASS  live ConfigMap has idleLeaseSeconds: 30
+
+=== 2. metric set of the lease build ===
+metrics: thunder_agent_pauses_total thunder_agent_pod_capacity_tokens thunder_agent_pod_working_set_tokens thunder_agent_programs thunder_agent_starvation_promotions_total 
+PASS  pod_working_set_tokens exists
+PASS  resumes_total absent (removed in the lease build)
+PASS  working set has no view label
+PASS  capacity has no source label
+
+=== 3. every pod reports its scraped capacity ===
+thunder_agent_pod_capacity_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-dk9ld-rank-0"} 2.23704e+06
+thunder_agent_pod_capacity_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-mrh7k-rank-0"} 2.23704e+06
+thunder_agent_pod_capacity_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-qzfn7-rank-0"} 2.23704e+06
+thunder_agent_pod_capacity_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-tvkv7-rank-0"} 2.23704e+06
+PASS  4 pods at 2,237,040 tokens (got 4 series)
+
+=== 4. counters before traffic ===
+programs=0 releases new=0 reasoning=0
+
+=== 5. traffic: two turns of smoke-a-1790621484, one of smoke-b-1790621484 ===
+PASS  smoke-a-1790621484 turn 1 answered: Hello from turn one.
+PASS  smoke-a-1790621484 turn 2 answered: Hello from turn two.
+PASS  smoke-b-1790621484 answered: Hello from b
+
+=== 6. accounting after traffic (gauges refresh at most once per second) ===
+thunder_agent_pod_working_set_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-dk9ld-rank-0"} 0
+thunder_agent_pod_working_set_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-mrh7k-rank-0"} 44
+thunder_agent_pod_working_set_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-qzfn7-rank-0"} 0
+thunder_agent_pod_working_set_tokens{pod="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-tvkv7-rank-0"} 18
+thunder_agent_programs{state="idle"} 2
+thunder_agent_programs{state="paused"} 0
+thunder_agent_programs{state="running"} 0
+PASS  2 new sessions tracked (programs 0 -> 2)
+PASS  no session running after the turns ended (in-flight closed)
+PASS  no session paused
+PASS  pool working set > 0
+
+=== 7. class accounting ===
+deltas: releases new=2 reasoning=1; totals holds=0 pauses=0
+PASS  two first turns dispatched as class=new
+PASS  one follow-up turn dispatched as class=reasoning
+PASS  no holds, no pauses on an idle pool
+
+=== 8. EPP log ===
+EPP log: 73 lines
+PASS  no error or panic lines in the EPP log (got 0 of 73 lines)
+
+=== 0 check(s) failed ===

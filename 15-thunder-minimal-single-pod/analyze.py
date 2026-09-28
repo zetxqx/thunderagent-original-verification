@@ -81,7 +81,8 @@ def series_stats(cell):
         if ws:
             cap = ws[-1][3] or float("nan")
             out["ws_undecayed_mean_steady"] = st.mean(w[1] for w in ws if w[0] >= WARMUP_S) / cap
-            out["ws_decayed_mean_steady"] = st.mean(w[2] for w in ws if w[0] >= WARMUP_S) / cap
+            dec = [w[2] for w in ws if w[0] >= WARMUP_S and w[2] is not None]  # the lease build has no decayed view
+            out["ws_decayed_mean_steady"] = st.mean(dec) / cap if dec else float("nan")
             out["ws_over_capacity_share"] = sum(1 for w in ws if w[1] > cap) / len(ws)
         else:  # v3 exported the undecayed utilization (plus 100-token buffers) as a ratio
             u = [(float(r["ts"]) - t0, num(r, "pod_utilization")) for r in er if num(r, "pod_utilization") is not None]
