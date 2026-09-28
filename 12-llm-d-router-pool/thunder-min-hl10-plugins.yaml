@@ -1,0 +1,41 @@
+# Step 16 arm thunder-min-hl10: the thunder-min arm with one change, the idle
+# decay half-life raised from 1 s (upstream) to 10 s, the replay's idle-gap cap
+# and about the prefix lifetime on a pod (step 13 wait-cost curve). Otherwise
+# the minimal thunder-agent (llm-d-router
+# thunder-agent-minimal, image thunder-agent-min-*) with the same semantics
+# as the step 13 thunder-origin arm (origin-only is the only placement in the
+# minimal plugin), in the six keys it accepts.
+# actingHalfLifeSeconds was renamed idleDecayHalfLifeSeconds; the removed
+# keys (bufferTokensPerProgram, kvUsageCorrection, evictionSweepSeconds,
+# sessionFinalHeader) are rejected by the strict decoder.
+apiVersion: llm-d.ai/v1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- type: agent-identity
+  parameters:
+    additionalSessionHeaders:
+    - x-session-id
+- type: thunder-agent
+  name: thunder
+  parameters:
+    capacityTokens: 2237040
+    utilThreshold: 1.0
+    idleDecayHalfLifeSeconds: 10
+    pauseSweepSeconds: 5
+    headWaitStarvationMs: 1800000
+    evictionTtlSeconds: 3600
+- type: max-score-picker
+- type: single-profile-handler
+flowControl:
+  defaultRequestTTL: "0s"
+  saturationDetector:
+    pluginRef: thunder
+  defaultPriorityBand:
+    fairnessPolicyRef: thunder
+schedulingProfiles:
+- name: default
+  plugins:
+  - pluginRef: thunder
+  - pluginRef: max-score-picker

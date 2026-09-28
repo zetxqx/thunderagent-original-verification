@@ -118,6 +118,10 @@ Open item, resolved in step 10: the extra errors were 600 s client timeouts on t
 
 `15-thunder-minimal-single-pod/` runs the minimal rewrite of the plugin (llm-d-router `thunder-agent-minimal` at `33dde5d2`) through step 10's single-pod protocol, one cell, against step 10's v3 cells. **The gate works and the ledger closes (smoke test 20 of 20; vLLM waiting 0.5, no EPP errors). The cell reached 397 tok/s and a 0.57 steady-state hit rate against v3's 351 (327-367) and 0.49, with a heavier long-wait tail (TTFT p99 712 s vs 410 s).** Both follow from the intended removal of `markedForPause`: 345 pauses instead of 971, and the working set over capacity 65 percent of the time instead of 24. One cell, no same-day control. Details: `15-thunder-minimal-single-pod/README.md`.
 
+### 16. Minimal thunder-agent rewrite on the 4-pod pool (done)
+
+`16-thunder-minimal-pool/` runs the same build through step 13's pool protocol at c=128, one cell with upstream's 1 s idle decay half-life and one with 10 s, against step 13's origin-only arm. **At 1 s the minimal build reproduces origin-only (1752 tok/s vs 1693 (1571-1807), steady-state hit rate 0.69 vs 0.68, goodput within SLO 1.50 vs 1.53, no forced admissions, pods balanced), with a third of the pauses and slightly lower strict session attainment (0.64 vs 0.70). At 10 s efficiency improves (1817 tok/s, hit rate 0.73, goodput 1.63) and the tail worsens (strict attainment 0.58).** One cell per arm; the half-life effect is inside origin-only's cell-to-cell spread. Details: `16-thunder-minimal-pool/README.md`.
+
 ## Proposals (not part of the numbered steps)
 
 `proposal/PROPOSAL.md` - eight ThunderAgent proposals; Part 3 and its Option B were run in step 13, the rest are unrun. Kept outside the numbered sequence.

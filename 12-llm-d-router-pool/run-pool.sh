@@ -86,7 +86,7 @@ print('reset_prefix_cache $VP:', urllib.request.urlopen(urllib.request.Request('
   kubectl rollout status "deploy/$DEPLOY" -n "$NS" --timeout=300s >/dev/null; sleep 5
   local EPP_POD; EPP_POD=$(kubectl get pod -n "$NS" -l "app.kubernetes.io/name=$DEPLOY" --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
   [ -n "$EPP_POD" ] || EPP_POD=$(kubectl get pod -n "$NS" -o name | grep "$DEPLOY" | head -1 | sed 's|pod/||')
-  local PARSED; PARSED=$(kubectl logs "$EPP_POD" -n "$NS" -c epp 2>/dev/null | grep -m1 '"msg":"parsed config"' | grep -oE 'Scorers: \[[^]]*\]' || true)
+  local PARSED; PARSED=$(kubectl logs "$EPP_POD" -n "$NS" -c epp 2>/dev/null | grep -m1 -E '"(msg|body)":"parsed config"' | grep -oE 'Scorers: \[[^]]*\]' || true)
   local GATE; GATE=$(kubectl logs "$EPP_POD" -n "$NS" -c epp 2>/dev/null | grep -c "Initializing Flow Control layer" || true)
   local IMAGE; IMAGE=$(kubectl get pod "$EPP_POD" -n "$NS" -o jsonpath='{.spec.containers[?(@.name=="epp")].image}')
   echo "[$CELL] epp pod $EPP_POD  image ${IMAGE##*/}  $PARSED  flow-control=$GATE"
@@ -101,6 +101,10 @@ print('reset_prefix_cache $VP:', urllib.request.urlopen(urllib.request.Request('
         LINE=$(grep -oE "$KEY: [^ #]+" "$HERE/$ARM-plugins.yaml" || true)
         [ -z "$LINE" ] || echo "$CM" | grep -q "$LINE" || { echo "FATAL [$CELL]: '$LINE' not in the EPP config" >&2; return 1; }
       done ;;
+    thunder-min*)  # minimal thunder-agent: must run with its own (six-key) config, half-life as in the arm's file
+      [ "$GATE" -ge 1 ] && echo "$PARSED" | grep -q thunder-agent || { echo "FATAL [$CELL]: $ARM arm not active" >&2; return 1; }
+      LINE=$(grep -oE "idleDecayHalfLifeSeconds: [^ #]+" "$HERE/$ARM-plugins.yaml")
+      kubectl get cm "$DEPLOY" -n "$NS" -o yaml | grep -q "$LINE" || { echo "FATAL [$CELL]: '$LINE' not in the EPP config" >&2; return 1; } ;;
     affinity) echo "$PARSED" | grep -q session-affinity || { echo "FATAL [$CELL]: affinity arm not active" >&2; return 1; } ;;
     baseline) echo "$PARSED" | grep -q prefix-cache-scorer || { echo "FATAL [$CELL]: baseline arm not active" >&2; return 1; } ;;
   esac
@@ -132,6 +136,10 @@ print('reset_prefix_cache $VP:', urllib.request.urlopen(urllib.request.Request('
   kill $CPU_PID 2>/dev/null || true
   kubectl logs "$EPP_POD" -n "$NS" -c epp --tail=200000 > "$CELL_DIR/epp.log" 2>/dev/null || true
   kubectl logs "$POD" -n "$NS" -c prober --tail=2000 > "$CELL_DIR/prober.log" 2>/dev/null || true
+  for VP in "${PODS[@]}"; do
+    kubectl logs "$VP" -n "$NS" -c modelserver --since="$(( $(date +%s) - T0 + 120 ))s" 2>/dev/null | gzip > "$CELL_DIR/vllm-$VP.log.gz" || true
+  done
+  kubectl get cm "$DEPLOY" -n "$NS" -o yaml > "$CELL_DIR/epp-configmap.yaml" 2>/dev/null || true
   retry kubectl cp "$NS/$POD:/results" "$CELL_DIR/results" -c bench >/dev/null
   # The bench pod downloads a 700 MB slice of the trace corpus at start; a truncated
   # download leaves too few traces to fill the concurrency (the step 13 origin c=192
