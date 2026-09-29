@@ -9,12 +9,18 @@ Two tables, one cell per arm:
   minimal arm (half-life 10 s, sweep 1 s, three cells).
 
 Writes analysis.md, raw-metrics-<cell>.md per step 18 cell, and
-timeseries-single.png / timeseries-pool.png next to this script's results.
+timeseries-single.png / timeseries-pool.png next to this script's results,
+and summary.png / summary.pdf in the single-pod run.
 
 Usage: analyze.py   (finds the newest single-pod and pool runs in results/)
 """
 import importlib.util
 from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
 
 HERE = Path(__file__).resolve().parent
 
@@ -53,6 +59,37 @@ def table(title, note, arms, data):
     return L + [""]
 
 
+def summary(arms, data, out):
+    """Bar chart of the headline metrics, one bar per arm (one cell each)."""
+    panels = [("throughput", "Output throughput", "tokens / s", "{:.0f}"),
+              ("hit_steady", "Prefix-cache hit rate", "steady state (after 10 min)", "{:.2f}"),
+              ("ttft_p50", "TTFT p50", "seconds", "{:.1f}"),
+              ("ttft_p90", "TTFT p90", "seconds", "{:.1f}"),
+              ("ttft_p99", "TTFT p99", "seconds", "{:.0f}")]
+    present = [a for a in arms if data[a[0]]]
+    plt.rcParams.update({"font.size": 11, "axes.spines.top": False, "axes.spines.right": False})
+    fig, axes = plt.subplots(1, len(panels), figsize=(3.2 * len(panels), 3.6))
+    for ax, (key, title, ylabel, spec) in zip(axes, panels):
+        vals = [data[k][0][key] for k, *_ in present]
+        x = np.arange(len(present))
+        ax.bar(x, vals, width=0.6, color=[col for *_, col in present])
+        for xi, v in zip(x, vals):
+            ax.annotate(spec.format(v), (xi, v), xytext=(0, 3), textcoords="offset points",
+                        ha="center", va="bottom", color="#333333")
+        ax.set_xticks(x, [label.replace("single pod, ", "") for _, label, *_ in present])
+        ax.set_ylim(0, max(vals) * 1.15)
+        ax.set_title(title, loc="left", fontweight="bold")
+        ax.set_ylabel(ylabel)
+        ax.grid(axis="y", color="#e5e5e5", linewidth=0.8)
+        ax.set_axisbelow(True)
+    fig.text(0.01, 0.01, "Single vLLM pod, c = 32, one cell per lease, through the llm-d-router EPP "
+             "(lease thunder-agent on the minimal ledger, 1a98a6c5).", fontsize=9, color="#666666")
+    fig.tight_layout(rect=(0, 0.05, 1, 1))
+    for ext in ("png", "pdf"):
+        fig.savefig(out.with_suffix("." + ext), dpi=150)
+    plt.close(fig)
+
+
 def main():
     single = newest("rep-*-c32-t1900")
     pool = newest("rep-*-c128-t1900")
@@ -87,6 +124,8 @@ def main():
         s15.PALETTE = {k: col for k, _, _, col in present}
         s15.LABELS = {k: label for k, label, _, _ in present}
         s15.timeseries({k: cs for k, _, cs, _ in present}, HERE / "results" / f"timeseries-{name}.png")
+    if single and any(cs for _, _, cs, _ in single_arms):
+        summary([(k, label, col) for k, label, _, col in single_arms], data, single / "summary")
     print(f"wrote {out}")
 
 

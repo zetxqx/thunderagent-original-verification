@@ -58,7 +58,7 @@ Both cells completed, not preempted, prober saw DONE, no ERROR line in either EP
 | per-session worst TTFT, p90 (s) | 233 | 235 |
 | sessions whose worst turn exceeded 60 s | 0.21 | 0.30 |
 
-Time series: `../timeseries-single.png`. Raw EPP metrics: `../raw-metrics-epp-thunder-lease-main-r1.md`, `../raw-metrics-epp-thunder-lease-main10-r1.md`.
+Headline metrics as bars: `summary.png` (also `summary.pdf`). Time series: `../timeseries-single.png`. Raw EPP metrics: `../raw-metrics-epp-thunder-lease-main-r1.md`, `../raw-metrics-epp-thunder-lease-main10-r1.md`.
 
 ## Readings
 
