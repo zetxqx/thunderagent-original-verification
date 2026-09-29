@@ -128,3 +128,35 @@ Readings:
 4. **Prediction check.** Lease 30 s: hit rate at or above the reference, met (0.819 against 0.795, inside the range); longer wait tail, met for TTFT p99 only. Lease 5 s closer to the decayed builds, met.
 
 Caveats: no same-day control (by choice), though step 16 ran on the same four pods the day before; lease 30 s cells spread widely (1871 to 2018 tok/s, hit rate 0.778 to 0.849), wider than the reference arm's; one load level (c=128) and one workload, whose 10 s gap cap puts every live tool call inside a 30 s lease.
+
+## Where the TTFT tail comes from (2026-09-28, analysis of the cells above, no new runs)
+
+Question: lease 30 s's clearest cost is TTFT p99 (242 s against 141 s for step 16's best arm). Which requests make up that tail, and why do they wait? `tail_analysis.py` matches every client request to its EPP log entry (100 percent matched in all nine cells; the client and EPP clocks differ by a constant offset) and splits TTFT into the hold in the gate (EPP arrival to dispatch) and everything after (scheduling, vLLM queue, prefill). A request is classed new if it is its session's first in the run, paused if it was held more than 1 s (admitted sessions' turns dispatch at once), admitted otherwise. Full table in `tail.md`; three cells per arm, lease 30 s and 5 s against step 16's half-life 10 s, sweep 1 s.
+
+| | minimal, 10 s, sweep 1 s | lease 30 s | lease 5 s |
+|---|---|---|---|
+| tail (TTFT at or above the cell's p99) that is a paused session | 1.00 | 1.00 | 1.00 |
+| hold share of a tail request's TTFT, median | 0.99 | 0.99 | 0.98 |
+| tail: engine time (TTFT minus hold), median (s) | 5.0 | 3.9 | 5.6 |
+| paused requests per cell | 353 | 220 | 341 |
+| paused requests: hold p50 / p90 (s) | 13 / 248 | 26 / 671 | 15 / 199 |
+| paused requests held over 60 s | 0.19 | 0.37 | 0.21 |
+| paused, prompt above the median: hold p90 (s) | 359 | 589 | 405 |
+| paused, prompt at or below the median: hold p90 (s) | 40 | 147 | 57 |
+| steady pauses, three cells | 1193 | 693 | 1071 |
+| releases of paused sessions in a 2 s interval that also has a pause | 0.90 | 0.81 | 0.91 |
+| admission rate, paused + new (per s) / EPP queue, mean | 0.264 / 27.0 | 0.152 / 32.4 | 0.239 / 24.8 |
+| Little's law mean wait / measured mean hold of paused requests (s) | 102 / 72 | 213 / 123 | 104 / 74 |
+| holds over 60 s released 28-32 s after some session's last response (random times) | 0.06 (0.10) | 0.08 (0.11) | 0.06 (0.10) |
+
+Findings:
+
+1. **The p99 tail is entirely paused sessions waiting in the gate.** In every arm, every tail request is a paused session's next turn, and 98 to 99 percent of its TTFT is the hold before dispatch; once dispatched it takes about 4 to 6 s (the median tail request re-prefills about 75 to 90 k tokens with no cache hit). New sessions, admitted turns and vLLM are not in the tail.
+2. **A paused session gets in by swapping with one that is paused.** 81 to 91 percent of releases of paused sessions fall in a 2 s interval that also has a pause, in all three builds: room on a pod appears when an idle session is paused (the sweep in the minimal build; on-demand reclaim in the lease build), and a waiting session takes it.
+3. **Lease 30 s swaps half as often, so each paused session waits about twice as long.** On this replay (tool-call gaps capped at 10 s) no live session is ever idle 30 s, so admission almost never reclaims one; pauses come from the growth rule and number 693 against 1071 to 1193. The admission rate falls to 0.15 per s against 0.24 to 0.26 with a longer queue (32 against 25 to 27), so Little's law gives twice the mean wait (213 against 102 to 104 s); the measured mean hold agrees in ratio (123 against 72 to 74 s; Little's law runs higher because requests still held at stage end count in the queue but not in the client report). Fewer sessions are paused (220 against about 350 per cell), which is where the hit rate gain comes from, but those that are wait longer: 37 percent over 60 s against about 20.
+4. **Large sessions wait longest in every build.** Within the paused class the gate releases the smallest first, so a paused session above the median prompt size waits a p90 of 359 to 589 s against 40 to 147 s below it. The tail's median prompt (73 to 90 k) is above the paused median (60 to 68 k).
+5. **Rejected: waiting for a finished session.** Under a 30 s lease a finished session's room becomes reclaimable 30 s after its last response, so if paused sessions were waiting for sessions to end, long holds would be released 28 to 32 s after one. They are not: 8 percent against 11 percent at random times.
+
+What this means for the design: the lease sets how fast the gate rotates held sessions through the pods, and so trades the hit rate (fewer rotations, fewer re-prefills) against the wait tail (fewer rotations, longer waits), with smallest-first ordering concentrating the wait on large sessions. Levers that follow from this, untested: a lease just above typical tool-call gaps (about 10 s here) to rotate a little more; or an age term in the paused-class order so a large session is not overtaken indefinitely (step 13's age-only and urgent tiers were tried on the v4 port and failed, so this needs care).
+
+Limits: class is inferred from the client side (the plugin's reclaim events are debug-level and not in the EPP log); the pod a request went to is not recorded per request, so the swap is shown at pool level in 2 s intervals, not per pod.
