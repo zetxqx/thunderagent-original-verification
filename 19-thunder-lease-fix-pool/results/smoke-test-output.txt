@@ -1,0 +1,63 @@
+
+=== 0. deploy the thunder-lease-main arm on the main release (image thunder-agent-lease-44544c04) ===
+Waiting for deployment "program-aware-scheduling-epp" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "program-aware-scheduling-epp" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "program-aware-scheduling-epp" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "program-aware-scheduling-epp" rollout to finish: 0 of 1 updated replicas are available...
+deployment "program-aware-scheduling-epp" successfully rolled out
+epp pod program-aware-scheduling-epp-84bcbf854f-c2vrx
+
+=== 1. running build and config ===
+llm_d_epp_info{build_ref="thunder-agent-lease-1a98a6c5",commit="44544c04aa6febd453d1009f9ed34c8cc6ea1ca4"} 1
+PASS  build info reports commit 44544c04
+PASS  live ConfigMap has idleLeaseSeconds: 30
+
+=== 2. metric set of the minimal ledger ===
+metrics: thunder_agent_endpoint_capacity_tokens thunder_agent_endpoint_working_set_tokens thunder_agent_pauses_total thunder_agent_resumes_total thunder_agent_sessions thunder_agent_starvation_promotions_total 
+PASS  sessions exists
+PASS  endpoint_working_set_tokens exists
+PASS  endpoint_capacity_tokens exists
+PASS  pauses_total exists
+PASS  resumes_total exists
+PASS  starvation_promotions_total exists
+PASS  old names programs and pod_working_set_tokens absent
+PASS  working set has no view label
+
+=== 3. every pod reports its scraped capacity ===
+thunder_agent_endpoint_capacity_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-dk9ld-rank-0"} 2.23704e+06
+thunder_agent_endpoint_capacity_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-mrh7k-rank-0"} 2.23704e+06
+thunder_agent_endpoint_capacity_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-qzfn7-rank-0"} 2.23704e+06
+thunder_agent_endpoint_capacity_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-tvkv7-rank-0"} 2.23704e+06
+PASS  4 pods at 2,237,040 tokens (got 4 series)
+
+=== 4. counters before traffic ===
+sessions=0 releases new=0 admitted=0
+
+=== 5. traffic: two turns of smoke-a-1790696702, one of smoke-b-1790696702 ===
+PASS  smoke-a-1790696702 turn 1 answered: Hello from turn one.
+PASS  smoke-a-1790696702 turn 2 answered: Hello from turn two.
+PASS  smoke-b-1790696702 answered: Hello from b
+
+=== 6. accounting after traffic (metrics are computed at scrape time) ===
+thunder_agent_endpoint_working_set_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-dk9ld-rank-0"} 0
+thunder_agent_endpoint_working_set_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-mrh7k-rank-0"} 18
+thunder_agent_endpoint_working_set_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-qzfn7-rank-0"} 44
+thunder_agent_endpoint_working_set_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-tvkv7-rank-0"} 0
+thunder_agent_sessions{state="idle"} 2
+thunder_agent_sessions{state="paused"} 0
+thunder_agent_sessions{state="running"} 0
+PASS  2 new sessions tracked (sessions 0 -> 2)
+PASS  no session running after the turns ended (in-flight closed)
+PASS  no session paused
+PASS  pool working set > 0
+
+=== 7. class accounting ===
+deltas: releases new=2 admitted=1; totals holds=0 pauses=0
+PASS  two first turns dispatched as class=new
+PASS  one follow-up turn dispatched as class=admitted
+PASS  no holds, no pauses on an idle pool
+
+=== 8. EPP log ===
+PASS  no error or panic lines in the EPP log (got 0 of 73 lines)
+
+=== 0 check(s) failed ===
