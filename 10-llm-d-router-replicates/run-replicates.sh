@@ -62,7 +62,8 @@ r=urllib.request.Request(os.environ["EPP_METRICS_URL"]); r.add_header("Authoriza
 m=urllib.request.urlopen(r,timeout=10).read().decode()
 def g(n,l=""):
     x=re.search(r"^\S*"+re.escape(n)+r"(?:\{[^}]*"+re.escape(l)+r"[^}]*\})?\s+([\d.eE+-]+)",m,re.M); return int(float(x.group(1))) if x else 0
-print("run",g("thunder_agent_programs","state=\"running\""),"idle",g("thunder_agent_programs","state=\"idle\""),"paused",g("thunder_agent_programs","state=\"paused\""),"holds",g("thunder_agent_holds_total","class=\"paused\"")+g("thunder_agent_holds_total","class=\"new\""),"pauses",g("thunder_agent_pauses_total"),"resumes",g("thunder_agent_resumes_total"),"queue",g("flow_control_queue_size"))' 2>/dev/null || echo n/a
+s=lambda l: g("thunder_agent_programs",l) or g("thunder_agent_sessions",l)
+print("run",s("state=\"running\""),"idle",s("state=\"idle\""),"paused",s("state=\"paused\""),"holds",g("thunder_agent_holds_total","class=\"paused\"")+g("thunder_agent_holds_total","class=\"new\""),"pauses",g("thunder_agent_pauses_total"),"resumes",g("thunder_agent_resumes_total"),"queue",g("flow_control_queue_size"))' 2>/dev/null || echo n/a
 }
 
 run_cell() { # run_cell <cell> <lane> <arm> <pod> <ip>
@@ -94,6 +95,12 @@ print('reset_prefix_cache:', urllib.request.urlopen(urllib.request.Request(
       [ "$GATE" -ge 1 ] || { echo "FATAL [$CELL]: thunder-min arm without flow control" >&2; return 1; }
       local IMG; IMG=$(kubectl get pod "$EPP_POD" -n "$NS" -o jsonpath='{.spec.containers[?(@.name=="epp")].image}')
       case "$IMG" in *":${EPP_IMAGE_TAG:-thunder-agent-v3}") ;; *) echo "FATAL [$CELL]: EPP image is $IMG" >&2; return 1 ;; esac ;;
+    thunder-lease*)  # lease thunder-agent: flow control, the arm's image, and the arm's idle lease in the live config
+      [ "$GATE" -ge 1 ] || { echo "FATAL [$CELL]: $ARM arm without flow control" >&2; return 1; }
+      local IMG; IMG=$(kubectl get pod "$EPP_POD" -n "$NS" -o jsonpath='{.spec.containers[?(@.name=="epp")].image}')
+      case "$IMG" in *":${EPP_IMAGE_TAG:-thunder-agent-v3}") ;; *) echo "FATAL [$CELL]: EPP image is $IMG" >&2; return 1 ;; esac
+      local LINE; LINE=$(grep -oE "idleLeaseSeconds: [^ #]+" "$HERE/$ARM-plugins.yaml")
+      kubectl get cm "$SVC" -n "$NS" -o yaml | grep -q "$LINE" || { echo "FATAL [$CELL]: '$LINE' not in the EPP config" >&2; return 1; } ;;
     turnprio*)
       [ "$GATE" -ge 1 ] || { echo "FATAL [$CELL]: turn-priority arm without flow control" >&2; return 1; }
       kubectl get cm "$SVC" -n "$NS" -o yaml | grep -q 'strategy: turn-priority' || { echo "FATAL [$CELL]: turn-priority not in the EPP config" >&2; return 1; }

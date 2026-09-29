@@ -129,16 +129,20 @@ def main():
             if raw:
                 save_raw("raw-epp-metrics.txt.gz", ts, m)
             g = lambda name, labels="": prom_value(m, name, labels)
+            # Builds from the step 18 ledger renamed these series; read the
+            # older name first, then the newer one.
+            either = lambda old, new: old if old is not None else new
+            sessions = lambda state: either(g("thunder_agent_programs", f'state="{state}"'), g("thunder_agent_sessions", f'state="{state}"'))
             epp_csv.row({
                 "ts": ts,
-                "programs_running": g("thunder_agent_programs", 'state="running"'),
-                "programs_idle": g("thunder_agent_programs", 'state="idle"'),
-                "programs_marked": g("thunder_agent_programs", 'state="marked"'),
-                "programs_paused": g("thunder_agent_programs", 'state="paused"'),
-                "holds_reasoning": g("thunder_agent_holds_total", 'class="reasoning"'),
+                "programs_running": sessions("running"),
+                "programs_idle": sessions("idle"),
+                "programs_marked": sessions("marked"),
+                "programs_paused": sessions("paused"),
+                "holds_reasoning": either(g("thunder_agent_holds_total", 'class="reasoning"'), g("thunder_agent_holds_total", 'class="admitted"')),
                 "holds_paused": g("thunder_agent_holds_total", 'class="paused"'),
                 "holds_new": g("thunder_agent_holds_total", 'class="new"'),
-                "releases_reasoning": g("thunder_agent_releases_total", 'class="reasoning"'),
+                "releases_reasoning": either(g("thunder_agent_releases_total", 'class="reasoning"'), g("thunder_agent_releases_total", 'class="admitted"')),
                 "releases_paused": g("thunder_agent_releases_total", 'class="paused"'),
                 "releases_new": g("thunder_agent_releases_total", 'class="new"'),
                 "pauses_total": g("thunder_agent_pauses_total"),
@@ -149,9 +153,9 @@ def main():
                 "fc_queue_size": prom_sum(m, "flow_control_queue_size"),
                 "fc_queue_wait_sum": prom_sum(m, "flow_control_request_queue_duration_seconds_sum"),
                 "fc_queue_wait_count": prom_sum(m, "flow_control_request_queue_duration_seconds_count"),
-                "working_set_undecayed": g("thunder_agent_pod_working_set_tokens", 'view="undecayed"'),
+                "working_set_undecayed": either(g("thunder_agent_pod_working_set_tokens", 'view="undecayed"'), g("thunder_agent_endpoint_working_set_tokens")),
                 "working_set_decayed": g("thunder_agent_pod_working_set_tokens", 'view="decayed"'),
-                "capacity_tokens": g("thunder_agent_pod_capacity_tokens"),
+                "capacity_tokens": either(g("thunder_agent_pod_capacity_tokens"), g("thunder_agent_endpoint_capacity_tokens")),
             })
         except Exception as e:
             print(f"epp probe failed: {e}", flush=True)

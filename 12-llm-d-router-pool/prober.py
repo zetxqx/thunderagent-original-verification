@@ -69,7 +69,7 @@ def prom_by_pod(text, name):
     out = {}
     for labels, v in re.findall(rf"^\S*{re.escape(name)}\{{([^}}]*)\}}\s+([\d.eE+-]+)", text, re.M):
         d = dict(re.findall(r'(\w+)="([^"]*)"', labels))
-        out[(d.get("pod", ""), d.get("view", d.get("source", "")))] = float(v)
+        out[(d.get("pod", d.get("endpoint", "")), d.get("view", d.get("source", "")))] = float(v)
     return out
 
 
@@ -159,24 +159,28 @@ def main():
             if raw:
                 save_raw("raw-epp-metrics.txt.gz", ts, m)
             g = lambda name, labels="": prom_value(m, name, labels)
-            ws = prom_by_pod(m, "thunder_agent_pod_working_set_tokens")
+            # Builds from the step 18 ledger renamed these series (endpoint_*,
+            # label endpoint); read the older name first.
+            ws = prom_by_pod(m, "thunder_agent_pod_working_set_tokens") or prom_by_pod(m, "thunder_agent_endpoint_working_set_tokens")
             # The lease build exports one full-footprint series with no view
             # label: the minimal build's undecayed view.
             ws = {(p, k or "undecayed"): v for (p, k), v in ws.items()}
-            cap = {pod: v for (pod, _), v in prom_by_pod(m, "thunder_agent_pod_capacity_tokens").items()}
+            cap = {pod: v for (pod, _), v in (prom_by_pod(m, "thunder_agent_pod_capacity_tokens") or prom_by_pod(m, "thunder_agent_endpoint_capacity_tokens")).items()}
             for pod in sorted({p for p, _ in ws} | set(cap)):
                 pods_csv.row({"ts": ts, "pod": pod, "working_set_undecayed": ws.get((pod, "undecayed")),
                               "working_set_decayed": ws.get((pod, "decayed")), "capacity_tokens": cap.get(pod)})
+            either = lambda old, new: old if old is not None else new
+            sessions = lambda state: either(g("thunder_agent_programs", f'state="{state}"'), g("thunder_agent_sessions", f'state="{state}"'))
             epp_csv.row({
                 "ts": ts,
-                "programs_running": g("thunder_agent_programs", 'state="running"'),
-                "programs_idle": g("thunder_agent_programs", 'state="idle"'),
-                "programs_marked": g("thunder_agent_programs", 'state="marked"'),
-                "programs_paused": g("thunder_agent_programs", 'state="paused"'),
-                "holds_reasoning": g("thunder_agent_holds_total", 'class="reasoning"'),
+                "programs_running": sessions("running"),
+                "programs_idle": sessions("idle"),
+                "programs_marked": sessions("marked"),
+                "programs_paused": sessions("paused"),
+                "holds_reasoning": either(g("thunder_agent_holds_total", 'class="reasoning"'), g("thunder_agent_holds_total", 'class="admitted"')),
                 "holds_paused": g("thunder_agent_holds_total", 'class="paused"'),
                 "holds_new": g("thunder_agent_holds_total", 'class="new"'),
-                "releases_reasoning": g("thunder_agent_releases_total", 'class="reasoning"'),
+                "releases_reasoning": either(g("thunder_agent_releases_total", 'class="reasoning"'), g("thunder_agent_releases_total", 'class="admitted"')),
                 "releases_paused": g("thunder_agent_releases_total", 'class="paused"'),
                 "releases_new": g("thunder_agent_releases_total", 'class="new"'),
                 "pauses_total": g("thunder_agent_pauses_total"),

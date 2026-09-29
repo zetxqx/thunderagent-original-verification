@@ -65,7 +65,8 @@ m=urllib.request.urlopen(r,timeout=10).read().decode()
 def g(n,l=""):
     x=re.search(r"^\S*"+re.escape(n)+r"(?:\{[^}]*"+re.escape(l)+r"[^}]*\})?\s+([\d.eE+-]+)",m,re.M); return int(float(x.group(1))) if x else 0
 q=sum(float(v) for v in re.findall(r"^\S*flow_control_queue_size(?:\{[^}]*\})?\s+([\d.eE+-]+)",m,re.M))
-print("paused",g("thunder_agent_programs","state=\"paused\""),"holds",g("thunder_agent_holds_total","class=\"paused\"")+g("thunder_agent_holds_total","class=\"new\""),"pauses",g("thunder_agent_pauses_total"),"queued",int(q))' 2>/dev/null || echo n/a
+s=lambda l: g("thunder_agent_programs",l) or g("thunder_agent_sessions",l)
+print("paused",s("state=\"paused\""),"holds",g("thunder_agent_holds_total","class=\"paused\"")+g("thunder_agent_holds_total","class=\"new\""),"pauses",g("thunder_agent_pauses_total"),"queued",int(q))' 2>/dev/null || echo n/a
 }
 
 run_cell() { # <cell> <arm>

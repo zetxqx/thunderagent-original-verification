@@ -11,7 +11,7 @@ No same-day control: by the user's choice, the reference is step 16's three arms
 
 ## What runs
 
-- Build: image `llm-d-router-endpoint-picker:thunder-agent-lease-20e3b1ee` (`sha256:c71cdd393ab9...`, `results/epp-image.txt`), built with Cloud Build from the commit above; the commit is pinned by the annotated tag `thunder-agent-lease-20e3b1ee` on `zetxqx/llm-d-router`.
+- Build: image `llm-d-router-endpoint-picker:thunder-agent-lease-20e3b1ee` (`sha256:c71cdd393ab9...`, `results/epp-image.txt`), built with Cloud Build from the commit above; the commit is pinned by the annotated tag `thunder-agent-lease-20e3b1ee` on `zetxqx/llm-d-router`. The branch `thunder-agent-lease-main` was later rebuilt on the minimal ledger of #2968 and #3052 (step 18); this step's build is the tag, not the branch.
 - Protocol: step 16's exactly, through step 12's `run-pool.sh`: one EPP (the main release `program-aware-scheduling`) over the four vLLM pods, prefix-cache reset on every pod and a fresh EPP per cell, c=128 (32 sessions per pod), 30 min window (10 min warm-up), client timeout 1900 s, bench image `inference-perf:session-id-v1`, bench pod on the non-spot default pool.
 - Arms (`../12-llm-d-router-pool/thunder-lease*-plugins.yaml`, identical to step 16's config except the plugin keys):
 
@@ -95,7 +95,7 @@ Caveats: one cell per arm against three cells from the day before, no same-day c
 
 ## Results, three cells per arm (2026-09-28)
 
-Replicates in the same run directory, ABBA order: `epp-thunder-lease-c128-r2` (13:32), `epp-thunder-lease5-c128-r2` (14:18), `epp-thunder-lease5-c128-r3` (15:04), `epp-thunder-lease-c128-r3` (15:50), driver log `results/driver-replicates.log`. All six cells complete, not preempted, 338 corpus traces, every artifact intact, no error or warning line in any EPP log (13,035 to 13,628 lines). The main release was restored to revision 84's manifest at 16:36 (revision 89 again, found by manifest). Values are mean (min-max) over three cells; full table in `analysis.md`.
+Replicates in the same run directory, ABBA order: `epp-thunder-lease-c128-r2` (13:32), `epp-thunder-lease5-c128-r2` (14:18), `epp-thunder-lease5-c128-r3` (15:04), `epp-thunder-lease-c128-r3` (15:50), driver log `results/driver-replicates.log`. All six cells complete, not preempted, 338 corpus traces, every artifact intact, and no error from the gate in any EPP log (see the correction below on the ERROR lines at stage end). The main release was restored to revision 84's manifest at 16:36 (revision 89 again, found by manifest). Values are mean (min-max) over three cells; full table in `analysis.md`.
 
 | metric | step 16, half-life 10 s, sweep 1 s | step 17, lease 30 s | step 17, lease 5 s |
 |---|---|---|---|
@@ -118,7 +118,9 @@ Replicates in the same run directory, ABBA order: `epp-thunder-lease-c128-r2` (1
 
 Per cell (throughput, hit rate, TTFT p99, worst-turn p90, forced admissions): lease 30 s 1871 / 0.778 / 227 / 435 / 0, 1903 / 0.830 / 279 / 335 / 1, 2018 / 0.849 / 220 / 291 / 0; lease 5 s 1863 / 0.766 / 164 / 386 / 0, 1874 / 0.724 / 130 / 394 / 0, 1839 / 0.757 / 122 / 298 / 2.
 
-Against the correctness criteria: criteria 1 to 4 and 6 hold in all six cells. Criterion 5 holds in five: `epp-thunder-lease5-c128-r3` had 2 forced admissions, above step 16's 0 to 1. The three request errors (one each in `lease5-r2`, `lease5-r3`; none in the lease 30 s cells) are envoy 503s ("upstream connect error ... connection termination"), the same type step 16 saw in three of its nine cells, but on requests open for 633 s and 1301 s rather than failing at once, so they were held in the gate when the connection was reset.
+Against the correctness criteria: criteria 1 to 4 and 6 hold in all six cells; for criterion 4, the only ERROR lines are requests cancelled at stage end (see the correction below). Criterion 5 holds in five: `epp-thunder-lease5-c128-r3` had 2 forced admissions, above step 16's 0 to 1. The three request errors (one each in `lease5-r2`, `lease5-r3`; none in the lease 30 s cells) are envoy 503s ("upstream connect error ... connection termination"), the same type step 16 saw in three of its nine cells, but on requests open for 633 s and 1301 s rather than failing at once, so they were held in the gate when the connection was reset.
+
+Correction (2026-09-29): the first version of this README said no EPP log had an error or warning line. That check looked for a `"level"` field, but the EPP logs severity in `"severity_text"`, so it could not find anything (the smoke test's log check had the same flaw). Checked by `"severity_text"`: four of the six cells have no ERROR line. `epp-thunder-lease-c128-r2` has 9 (3 requests) and `epp-thunder-lease5-c128-r3` has 28 (9 requests, plus one startup notice "gRPC health check not serving (leader election disabled)"). Every one of those requests logs "client disconnected: request evicted from queue: request context cancelled" about 2010 s after the bench pod started, which is when the 30-minute stage ended: they were still held in the gate when the load generator stopped and cancelled its outstanding requests. None comes from the gate itself, and none is among the client-side request errors in the table above. Step 16's cells show the same stage-end lines (0 to 6 per cell).
 
 Readings:
 

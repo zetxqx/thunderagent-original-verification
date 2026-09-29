@@ -1,0 +1,39 @@
+# Step 18 arm thunder-lease-main: the lease thunder-agent as rebuilt on
+# the minimal ledger (llm-d-router thunder-agent-lease-main at 1a98a6c5,
+# image thunder-agent-lease-1a98a6c5). Same gate as step 17's lease build;
+# the ledger underneath has a capacity fallback, an idle TTL key, maintenance
+# in the request hooks and one in-flight request per session.
+# idleLeaseSeconds 30: a paused or new session may take the room of sessions
+# idle for at least 30 s (the replay caps tool-call gaps at 10 s); an
+# admitted turn that pushes its pod over the ceiling may take any idle
+# session's room. These five keys are the whole config.
+apiVersion: llm-d.ai/v1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- type: agent-identity
+  parameters:
+    additionalSessionHeaders:
+    - x-session-id
+- type: thunder-agent
+  name: thunder
+  parameters:
+    capacityTokens: 2237040
+    evictionTtlSeconds: 3600
+    utilThreshold: 1.0
+    idleLeaseSeconds: 30
+    headWaitStarvationMs: 1800000
+- type: max-score-picker
+- type: single-profile-handler
+flowControl:
+  defaultRequestTTL: "0s"
+  saturationDetector:
+    pluginRef: thunder
+  defaultPriorityBand:
+    fairnessPolicyRef: thunder
+schedulingProfiles:
+- name: default
+  plugins:
+  - pluginRef: thunder
+  - pluginRef: max-score-picker

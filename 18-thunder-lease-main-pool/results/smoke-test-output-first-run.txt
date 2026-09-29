@@ -1,0 +1,52 @@
+epp pod thunder-lane-a-epp-bcfb4947-45dhs
+
+=== 1. running build and config ===
+llm_d_epp_info{build_ref="v0.10.0-rc.1",commit="1a98a6c5e631e67e19e693ce02b75afdaed30198"} 1
+PASS  build info reports commit 1a98a6c5
+PASS  live ConfigMap has idleLeaseSeconds: 30
+
+=== 2. metric set of the minimal ledger ===
+metrics: thunder_agent_endpoint_capacity_tokens thunder_agent_endpoint_working_set_tokens thunder_agent_pauses_total thunder_agent_resumes_total thunder_agent_sessions thunder_agent_starvation_promotions_total 
+PASS  sessions exists
+PASS  endpoint_working_set_tokens exists
+PASS  endpoint_capacity_tokens exists
+FAIL  holds_total exists
+FAIL  releases_total exists
+PASS  pauses_total exists
+PASS  resumes_total exists
+PASS  starvation_promotions_total exists
+PASS  old names programs and pod_working_set_tokens absent
+PASS  working set has no view label
+
+=== 3. the lane pod reports its scraped capacity ===
+thunder_agent_endpoint_capacity_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-dk9ld-rank-0"} 2.23704e+06
+PASS  1 pod at 2,237,040 tokens (got 1 series)
+
+=== 4. counters before traffic ===
+sessions=0 releases new=0 admitted=0
+
+=== 5. traffic: two turns of smoke-a-1790675170, one of smoke-b-1790675170 ===
+PASS  smoke-a-1790675170 turn 1 answered: Hello from turn one.
+PASS  smoke-a-1790675170 turn 2 answered: Hello from turn two.
+PASS  smoke-b-1790675170 answered: Hello from b
+
+=== 6. accounting after traffic (metrics are computed at scrape time) ===
+thunder_agent_endpoint_working_set_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-9c9b54cb6-dk9ld-rank-0"} 62
+thunder_agent_sessions{state="idle"} 2
+thunder_agent_sessions{state="paused"} 0
+thunder_agent_sessions{state="running"} 0
+PASS  2 new sessions tracked (sessions 0 -> 2)
+PASS  no session running after the turns ended (in-flight closed)
+PASS  no session paused
+PASS  working set > 0
+
+=== 7. class accounting ===
+deltas: releases new=2 admitted=1; totals holds=0 pauses=0
+PASS  two first turns dispatched as class=new
+PASS  one follow-up turn dispatched as class=admitted
+PASS  no holds, no pauses on an idle pod
+
+=== 8. EPP log ===
+PASS  no error or panic lines in the EPP log (got 0 of 61 lines)
+
+=== 2 check(s) failed ===
