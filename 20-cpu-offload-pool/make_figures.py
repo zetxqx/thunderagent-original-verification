@@ -8,6 +8,7 @@ results/figure-data.json, delete it to recompute) and writes to figures/:
   fig2-reuse-source    steady-state prefix reuse split into GPU hits and CPU tier hits
   fig3-latency         median TTFT, p99 TTFT and goodput within the 30 s TTFT SLO
   fig4-offload-effect  throughput with offloading off and on, at the points that have both
+  fig5-kv-budget       the setup, the KV cache one replica has, and the KV cache the workload needs
 
 Each as PNG (300 dpi) and PDF.
 Usage: uv run --with matplotlib --with numpy python make_figures.py
@@ -215,6 +216,60 @@ def fig4_offload_effect(data):
     finalize_figure(fig, "fig4-offload-effect")
 
 
+def fig5_kv_budget(data):
+    GIB_PER_TOKEN = 49152 / 2**30  # 48 layers x K,V x 4 KV heads x 128 dims x 1 byte (FP8)
+    gpu_tok, tier_tok = 2237040, 8738133
+    need = data["B"]["baseline"]
+    cs = [c for c in C_ALL if c in need]
+    tok = np.array([np.mean([r["ws_over_tier"] for r in need[c]]) * tier_tok for c in cs])
+
+    fig = plt.figure(figsize=(14, 5.4))
+    box = fig.add_axes([0.0, 0.0, 0.34, 1.0])
+    box.set_axis_off()
+    lines = [("Setup", None),
+             ("model", "Qwen3-Coder-30B-A3B-Instruct-FP8"),
+             ("engine", "vLLM v0.28.0"),
+             ("replica", "2 x H100 80GB, tensor parallel 2"),
+             ("KV cache", "FP8, 48 KiB per token"),
+             ("GPU KV", f"{gpu_tok / 1e6:.2f}M tokens = {gpu_tok * GIB_PER_TOKEN:.0f} GiB"),
+             ("CPU tier", f"400 GiB = {tier_tok / 1e6:.2f}M tokens"),
+             ("", "(copies GPU blocks, so it can hold about"),
+             ("", f" {tier_tok / 1e6:.2f}M tokens in total, not GPU + CPU)"),
+             ("workload", "weka agentic coding traces;"),
+             ("", "each turn resends the whole history;"),
+             ("", "tool-call gaps capped at 10 s"),
+             ("router", "one EPP per replica, 3 replicas in parallel")]
+    y = 0.93
+    for k, v in lines:
+        if v is None:
+            box.text(0.06, y, k, fontsize=15, fontweight="bold", transform=box.transAxes)
+        else:
+            box.text(0.06, y, k, fontsize=11.5, color="#555555", transform=box.transAxes)
+            box.text(0.30, y, v, fontsize=11.5, transform=box.transAxes)
+        y -= 0.072
+
+    ax = fig.add_axes([0.46, 0.14, 0.52, 0.78])
+    x = np.arange(len(cs))
+    ax.bar(x, tok / 1e6, 0.55, color=PALETTE["neutral"], edgecolor="black", lw=1.2, zorder=3)
+    for xi, t in zip(x, tok):
+        ax.text(xi, t / 1e6 + 0.2, f"{t / 1e6:.1f}M\n({t * GIB_PER_TOKEN:.0f} GiB)", ha="center", va="bottom", fontsize=10.5)
+    for level, color, label in ((gpu_tok, PALETTE["red_strong"], "GPU KV cache"),
+                                (tier_tok, PALETTE["blue_main"], "CPU tier (offloading)")):
+        ax.axhline(level / 1e6, color=color, lw=2.4, ls="--", zorder=4,
+                   label=f"{label}: {level / 1e6:.2f}M tokens ({level * GIB_PER_TOKEN:.0f} GiB)")
+    ax.set_xticks(x, [str(c) for c in cs])
+    ax.set_xlabel("concurrent sessions per vLLM replica")
+    ax.set_ylabel("KV cache the workload needs\n(M tokens, working set)")
+    ax.set_ylim(0, 13.5)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles[::-1], labels[::-1], loc="upper left", fontsize=11.5)
+    ax.grid(axis="y", color="#E5E5E5", lw=1)
+    ax.set_axisbelow(True)
+    ax.set_title("Working set: live sessions' latest prompt sizes, summed (mean over steady state,\n"
+                 "llm-d default with offloading on, so no gate holds sessions back)", loc="left", fontsize=10.5, color="#555555")
+    finalize_figure(fig, "fig5-kv-budget")
+
+
 def main():
     apply_publication_style()
     data = load_data()
@@ -222,6 +277,7 @@ def main():
     fig2_reuse_source(data)
     fig3_latency(data)
     fig4_offload_effect(data)
+    fig5_kv_budget(data)
 
 
 if __name__ == "__main__":
