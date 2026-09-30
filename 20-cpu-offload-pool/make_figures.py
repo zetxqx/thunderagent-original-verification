@@ -34,11 +34,11 @@ PALETTE = {
     "neutral": "#CFCECE", "highlight": "#FFD700",
     "teal": "#42949E", "violet": "#9A4D8E",
 }
-# Blue: the lease gate as built (the key method); teal: its CPU-tier-sized
-# variant; red: the llm-d default baseline.
+# Blue: llm-d-thunder-simplified sized to GPU KV (the key method); teal: sized to
+# the CPU tier; red: the llm-d default baseline.
 ARMS = [("baseline", "llm-d default (no gate)", PALETTE["red_strong"], PALETTE["red_1"]),
-        ("thunder-lease-main", "lease gate, GPU capacity", PALETTE["blue_main"], "#C9D8EC"),
-        ("thunder-lease-main-tier", "lease gate, CPU-tier capacity", PALETTE["teal"], "#CDE6E8")]
+        ("thunder-lease-main", "llm-d-thunder-simplified (GPU tier)", PALETTE["blue_main"], "#C9D8EC"),
+        ("thunder-lease-main-tier", "llm-d-thunder-simplified (CPU tier)", PALETTE["teal"], "#CDE6E8")]
 LABEL = {a: l for a, l, _, _ in ARMS}
 COLOR = {a: c for a, _, c, _ in ARMS}
 LIGHT = {a: c for a, _, _, c in ARMS}
@@ -209,8 +209,8 @@ def fig4_offload_effect(data):
     ax.set_axisbelow(True)
     handles = [Patch(facecolor=LIGHT["baseline"], edgecolor="black", hatch="..", label="llm-d default, offloading off"),
                Patch(facecolor=COLOR["baseline"], edgecolor="black", label="llm-d default, offloading 400 GiB"),
-               Patch(facecolor=LIGHT["thunder-lease-main"], edgecolor="black", hatch="..", label="lease gate, offloading off"),
-               Patch(facecolor=COLOR["thunder-lease-main"], edgecolor="black", label="lease gate, offloading 400 GiB")]
+               Patch(facecolor=LIGHT["thunder-lease-main"], edgecolor="black", hatch="..", label="llm-d-thunder-simplified (GPU tier), offloading off"),
+               Patch(facecolor=COLOR["thunder-lease-main"], edgecolor="black", label="llm-d-thunder-simplified (GPU tier), offloading 400 GiB")]
     ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=2, fontsize=11.5)
     finalize_figure(fig, "fig4-offload-effect")
 
