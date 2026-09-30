@@ -6,7 +6,6 @@ results/figure-data.json, delete it to recompute) and writes to figures/:
 
   fig1-throughput      output throughput against concurrency, every arm, offload off and on
   fig2-reuse-source    steady-state prefix reuse split into GPU hits and CPU tier hits
-  fig3-latency         median TTFT, p99 TTFT and goodput within the 30 s TTFT SLO
   fig4-offload-effect  throughput with offloading off and on, at the points that have both
   fig5-kv-budget       the setup, the KV cache one replica has, and the KV cache the workload needs
 
@@ -153,36 +152,6 @@ def fig2_reuse_source(data):
     finalize_figure(fig, "fig2-reuse-source")
 
 
-def fig3_latency(data):
-    b = data["B"]
-    fig, axes = plt.subplots(1, 3, figsize=(15.5, 4.9))
-    panels = [("ttft_p50", "median TTFT (s)", True), ("ttft_p99", "p99 TTFT (s)", True),
-              ("goodput_slo", "turns/s within TTFT <= 30 s", False)]
-    for ax, (key, ylabel, log) in zip(axes, panels):
-        for arm in LABEL:
-            if arm in b:
-                c, m, _, _ = series(b[arm], key)
-                ax.plot(c, m, color=COLOR[arm], lw=2.6, marker="o", ms=7)
-        if key == "ttft_p99":
-            ax.axhline(1800, color="#555555", lw=1.5, ls=":")
-            ax.text(29, 1800 * 1.12, "forced admission at 1800 s", fontsize=10.5, color="#555555")
-        if log:
-            ax.set_yscale("log")
-            ax.set_ylim(0.3, 4000)
-        else:
-            ax.set_ylim(0, 0.75)
-        ax.set_ylabel(ylabel)
-        c_axis(ax)
-        ax.grid(axis="y", color="#E5E5E5", lw=1)
-        ax.set_axisbelow(True)
-    for ax, t in zip(axes, ("a", "b", "c")):
-        ax.set_title(f"({t})", loc="left", fontweight="bold")
-    handles = [Line2D([], [], color=COLOR[a], lw=2.6, marker="o", ms=7, label=LABEL[a]) for a in LABEL if a in b]
-    fig.legend(handles=handles, loc="lower center", bbox_to_anchor=(0.5, -0.1), ncol=3, fontsize=12.5)
-    fig.tight_layout()
-    finalize_figure(fig, "fig3-latency")
-
-
 def fig4_offload_effect(data):
     both = sorted(set(data["A"]["baseline"]) & set(data["B"]["baseline"]))
     groups = [("baseline", "A"), ("baseline", "B"), ("thunder-lease-main", "A"), ("thunder-lease-main", "B")]
@@ -275,7 +244,6 @@ def main():
     data = load_data()
     fig1_throughput(data)
     fig2_reuse_source(data)
-    fig3_latency(data)
     fig4_offload_effect(data)
     fig5_kv_budget(data)
 
