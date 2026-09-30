@@ -1,0 +1,142 @@
+# Step 20 phase B: the vLLM model server as single replicas, CPU KV offloading 400 GiB.
+# Generated from ../model-server/deployment.yaml (revision 3). Changes:
+#   replicas 4 -> 3, and a required pod anti-affinity (one replica per node);
+#   --kv-offloading-size=400: vLLM's native OffloadingConnector with a 400 GiB
+#     CPU tier (GiB summed over the two TP ranks);
+#   memory request and limit 450Gi: the tier is a tmpfs file in /dev/shm
+#     (/dev/shm/vllm_offload_<engine_id>.mmap), and tmpfs pages count against
+#     the pod's memory limit; about 11 GiB of process and shm memory and about
+#     30 GiB of headroom on top;
+#   /dev/shm sizeLimit 20Gi -> 410Gi: the connector checks /dev/shm free space
+#     before creating the tier file.
+# Everything else is unchanged. Applied with kubectl replace by offload.sh on.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    llm-d.ai/engine-type: vllm
+    llm-d.ai/guide: program-aware-scheduling
+    llm-d.ai/model: Qwen3-Coder-30B-A3B-FP8
+    llm-d.ai/role: decode
+  name: program-aware-vllm-decode
+  namespace: llm-d-program-aware-scheduling
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 3
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      llm-d.ai/engine-type: vllm
+      llm-d.ai/guide: program-aware-scheduling
+      llm-d.ai/model: Qwen3-Coder-30B-A3B-FP8
+      llm-d.ai/role: decode
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        llm-d.ai/engine-type: vllm
+        llm-d.ai/guide: program-aware-scheduling
+        llm-d.ai/model: Qwen3-Coder-30B-A3B-FP8
+        llm-d.ai/role: decode
+    spec:
+      containers:
+      - args:
+        - Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8
+        - --host=0.0.0.0
+        - --port=8000
+        - --tensor-parallel-size=2
+        - --max-model-len=262144
+        - --kv-cache-dtype=fp8_e4m3
+        - --gpu-memory-utilization=0.88
+        - --compilation-config={"pass_config":{"fuse_allreduce_rms":false}}
+        - --enable-prompt-tokens-details
+        - --kv-offloading-size=400
+        command:
+        - vllm
+        - serve
+        env:
+        - name: VLLM_USE_DEEP_GEMM
+          value: '0'
+        - name: VLLM_ALLREDUCE_USE_SYMM_MEM
+          value: '0'
+        - name: VLLM_SERVER_DEV_MODE
+          value: '1'
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: HF_TOKEN
+              name: llm-d-hf-token
+        image: vllm/vllm-openai:v0.28.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: modelserver
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: modelserver
+        ports:
+        - containerPort: 8000
+          name: modelserver
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /v1/models
+            port: modelserver
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 2
+        resources:
+          limits:
+            cpu: '16'
+            memory: 450Gi
+            nvidia.com/gpu: '2'
+          requests:
+            cpu: '8'
+            memory: 450Gi
+            nvidia.com/gpu: '2'
+        startupProbe:
+          failureThreshold: 120
+          httpGet:
+            path: /health
+            port: modelserver
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 5
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /dev/shm
+          name: shm
+        - mountPath: /root/.cache
+          name: hf-cache
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-h100-80gb
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - emptyDir:
+          medium: Memory
+          sizeLimit: 410Gi
+        name: shm
+      - emptyDir: {}
+        name: hf-cache
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                llm-d.ai/role: decode
+                llm-d.ai/guide: program-aware-scheduling
+            topologyKey: kubernetes.io/hostname

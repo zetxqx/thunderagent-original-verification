@@ -11,6 +11,15 @@
 #   defaults: 128 3 2700 sticky,thunder 1900
 #   calibration: ./run-replicates.sh 128 1 600 thunder
 #   step 08 client: ./run-replicates.sh 128 3 2700 sticky,thunder 600
+#
+# Optional env (step 20; both off by default, so earlier steps run unchanged):
+#   LANE_ARMS="a:<arm> b:<arm> c:<arm>"  one cell per listed lane, each with its
+#       own arm, all lanes at the same time; reps and arms are then ignored.
+#   RESET_EXTERNAL=1  the per-cell reset also clears the vLLM CPU offload tier
+#       (/reset_prefix_cache?reset_external=true) and retries until the response
+#       says success: true, for up to 5 minutes; every response goes to the
+#       cell's reset.jsonl.
+#   SKIP_ANALYSIS=1  do not run step 10's analyze.py at the end.
 set -euo pipefail
 
 NS=llm-d-program-aware-scheduling
@@ -44,6 +53,7 @@ cat > "$OUT_ROOT/manifest-global.json" <<EOJ
  "thunder_plugins_sha256":"$(shasum -a 256 "$HERE/thunder-plugins.yaml" | cut -d' ' -f1)",
  "sticky_plugins_sha256":"$(shasum -a 256 "$HERE/sticky-plugins.yaml" | cut -d' ' -f1)",
  "prober_sha256":"$(shasum -a 256 "$HERE/prober.py" | cut -d' ' -f1)",
+ "lane_arms":"${LANE_ARMS:-}","reset_external":"${RESET_EXTERNAL:-0}",
  "lanes":"$(tr '\n' ' ' < "$RESULTS_DIR/lanes.env")"}
 EOJ
 
@@ -53,6 +63,24 @@ kubectl create configmap weka-bench-scripts \
   -n "$NS" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 retry() { local n=0; until "$@"; do n=$((n+1)); [ "$n" -ge 5 ] && return 1; sleep 20; done; }
+
+copy_results() { # copy_results <bench-pod> <dest-dir>
+  # kubectl cp of the whole directory failed 5 times in a row with "unexpected
+  # EOF" on a 45 MB per-request report (step 20). Copy file by file,
+  # gzip-compressed in the pod, and check every file's md5 against the pod.
+  local POD=$1 DEST=$2 SUM F i
+  mkdir -p "$DEST"
+  while read -r SUM F; do
+    [ -n "$F" ] || continue
+    mkdir -p "$DEST/$(dirname "$F")"
+    for i in 1 2 3 4 5; do
+      kubectl exec "$POD" -n "$NS" -c bench -- gzip -c "/results/$F" 2>/dev/null | gunzip -c > "$DEST/$F" 2>/dev/null || true
+      [ "$(md5 -q "$DEST/$F" 2>/dev/null || md5sum "$DEST/$F" | cut -d' ' -f1)" = "$SUM" ] && continue 2
+      sleep 5
+    done
+    echo "copy failed after 5 tries: $F" >&2; return 1
+  done <<< "$(kubectl exec "$POD" -n "$NS" -c bench -- sh -c 'cd /results && find . -type f | sort | xargs md5sum')"
+}
 
 epp_summary() { # epp_summary <bench-pod>  (prober container has the token and python)
   kubectl exec "$1" -n "$NS" -c prober -- python -c '
@@ -66,31 +94,70 @@ s=lambda l: g("thunder_agent_programs",l) or g("thunder_agent_sessions",l)
 print("run",s("state=\"running\""),"idle",s("state=\"idle\""),"paused",s("state=\"paused\""),"holds",g("thunder_agent_holds_total","class=\"paused\"")+g("thunder_agent_holds_total","class=\"new\""),"pauses",g("thunder_agent_pauses_total"),"resumes",g("thunder_agent_resumes_total"),"queue",g("flow_control_queue_size"))' 2>/dev/null || echo n/a
 }
 
+reset_cache() { # reset_cache <vllm-pod> <cell-dir>
+  if [ "${RESET_EXTERNAL:-0}" != 1 ]; then
+    kubectl exec "$1" -n "$NS" -c modelserver -- python3 -c "
+import urllib.request
+print('reset_prefix_cache:', urllib.request.urlopen(urllib.request.Request(
+    'http://localhost:8000/reset_prefix_cache', method='POST')).status)"
+    return
+  fi
+  # vLLM v0.28.0 returns {"success": false} while blocks are held (running
+  # requests, offload transfers in flight); success means both the GPU prefix
+  # cache and the connector's CPU tier were cleared.
+  local DEADLINE=$(( $(date +%s) + 300 )) R
+  while :; do
+    R=$(kubectl exec "$1" -n "$NS" -c modelserver -- python3 -c "
+import json, urllib.request
+r = urllib.request.urlopen(urllib.request.Request(
+    'http://localhost:8000/reset_prefix_cache?reset_external=true', method='POST'), timeout=60)
+print(json.dumps({'status': r.status, 'body': json.loads(r.read().decode() or 'null')}))" 2>&1 | tail -1)
+    printf '{"ts":%s,"pod":"%s","response":%s}\n' "$(date +%s)" "$1" \
+      "$(printf '%s' "$R" | python3 -c 'import json,sys; t=sys.stdin.read(); print(t if t.startswith("{") else json.dumps(t))')" >> "$2/reset.jsonl"
+    echo "reset_prefix_cache?reset_external=true: $R"
+    printf '%s' "$R" | python3 -c 'import json,sys; r=json.loads(sys.stdin.read()); sys.exit(0 if r["status"]==200 and (r["body"] or {}).get("success") is True else 1)' 2>/dev/null && return 0
+    [ "$(date +%s)" -lt "$DEADLINE" ] || { echo "FATAL: reset with reset_external=true did not succeed within 300 s" >&2; return 1; }
+    sleep 10
+  done
+}
+
 run_cell() { # run_cell <cell> <lane> <arm> <pod> <ip>
   local CELL=$1 L=$2 ARM=$3 VP=$4 BIP=$5 REL="thunder-lane-$2" SVC="thunder-lane-$2-epp"
   local CELL_DIR="$OUT_ROOT/$CELL"; mkdir -p "$CELL_DIR"
   echo "===== $CELL (arm=$ARM lane=$L pod=$VP) ====="
   local VUID; VUID=$(kubectl get pod "$VP" -n "$NS" -o jsonpath='{.metadata.uid}' 2>/dev/null)
   [ -n "$VUID" ] || { echo "FATAL [$CELL]: pod $VP gone before start" >&2; return 1; }
+  # A container restart (e.g. an OOM kill) keeps the pod uid but empties every cache.
+  local VRS; VRS=$(kubectl get pod "$VP" -n "$NS" -o jsonpath='{.status.containerStatuses[?(@.name=="modelserver")].restartCount}' 2>/dev/null)
 
-  kubectl exec "$VP" -n "$NS" -c modelserver -- python3 -c "
-import urllib.request
-print('reset_prefix_cache:', urllib.request.urlopen(urllib.request.Request(
-    'http://localhost:8000/reset_prefix_cache', method='POST')).status)"
+  reset_cache "$VP" "$CELL_DIR" || { echo "FATAL [$CELL]: cache reset failed" >&2; return 1; }
 
   # Fresh EPP on this arm's config: re-render the lane with the arm's plugin
   # config, apply, and restart so the program table starts empty.
   "$HERE/render-lane.sh" "$L" "$ARM" > "$RESULTS_DIR/lane-$L-manifest.yaml"
+  # Keep this cell's own copy of what was applied: the lane files are rewritten per cell.
+  cp "$RESULTS_DIR/lane-$L-manifest.yaml" "$CELL_DIR/lane-manifest.yaml"
+  cp "$RESULTS_DIR/lane-values-$L.yaml" "$CELL_DIR/lane-values.yaml"
+  cp "$HERE/$ARM-plugins.yaml" "$CELL_DIR/plugins.yaml"
   kubectl apply -f "$RESULTS_DIR/lane-$L-manifest.yaml" >/dev/null
   kubectl rollout restart "deploy/$SVC" -n "$NS" >/dev/null
   kubectl rollout status "deploy/$SVC" -n "$NS" --timeout=300s >/dev/null
   sleep 5
-  local EPP_POD; EPP_POD=$(kubectl get pod -n "$NS" -l "app.kubernetes.io/name=$SVC" --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  # The standalone chart labels EPP pods llm-d-router-standalone=<deployment>; take the
+  # newest running one that is not being deleted (right after the restart the old pod lingers).
+  local EPP_POD; EPP_POD=$(kubectl get pods -n "$NS" -l "llm-d-router-standalone=$SVC" -o json 2>/dev/null | python3 -c '
+import json, sys
+pods = [p for p in json.load(sys.stdin)["items"] if p["status"].get("phase") == "Running" and not p["metadata"].get("deletionTimestamp")]
+print(max(pods, key=lambda p: p["metadata"]["creationTimestamp"])["metadata"]["name"] if pods else "")' || true)
   [ -n "$EPP_POD" ] || EPP_POD=$(kubectl get pod -n "$NS" -o name | grep "$SVC" | head -1 | sed 's|pod/||')
   local GATE; GATE=$(kubectl logs "$EPP_POD" -n "$NS" -c epp 2>/dev/null | grep -c "Initializing Flow Control layer" || true)
   case "$ARM" in
     thunder) [ "$GATE" -ge 1 ] || { echo "FATAL [$CELL]: thunder arm without flow control" >&2; return 1; } ;;
     sticky)  [ "$GATE" -eq 0 ] || { echo "FATAL [$CELL]: sticky arm started flow control" >&2; return 1; } ;;
+    baseline)  # llm-d default: no flow control, the run's image
+      [ "$GATE" -eq 0 ] || { echo "FATAL [$CELL]: baseline arm started flow control" >&2; return 1; }
+      local IMG; IMG=$(kubectl get pod "$EPP_POD" -n "$NS" -o jsonpath='{.spec.containers[?(@.name=="epp")].image}')
+      case "$IMG" in *":${EPP_IMAGE_TAG:-thunder-agent-v3}") ;; *) echo "FATAL [$CELL]: EPP image is $IMG" >&2; return 1 ;; esac ;;
     thunder-min)
       [ "$GATE" -ge 1 ] || { echo "FATAL [$CELL]: thunder-min arm without flow control" >&2; return 1; }
       local IMG; IMG=$(kubectl get pod "$EPP_POD" -n "$NS" -o jsonpath='{.spec.containers[?(@.name=="epp")].image}')
@@ -100,7 +167,13 @@ print('reset_prefix_cache:', urllib.request.urlopen(urllib.request.Request(
       local IMG; IMG=$(kubectl get pod "$EPP_POD" -n "$NS" -o jsonpath='{.spec.containers[?(@.name=="epp")].image}')
       case "$IMG" in *":${EPP_IMAGE_TAG:-thunder-agent-v3}") ;; *) echo "FATAL [$CELL]: EPP image is $IMG" >&2; return 1 ;; esac
       local LINE; LINE=$(grep -oE "idleLeaseSeconds: [^ #]+" "$HERE/$ARM-plugins.yaml")
-      kubectl get cm "$SVC" -n "$NS" -o yaml | grep -q "$LINE" || { echo "FATAL [$CELL]: '$LINE' not in the EPP config" >&2; return 1; } ;;
+      local CMY; CMY=$(kubectl get cm "$SVC" -n "$NS" -o yaml)  # searched with here-strings: `cmd | grep -q` can SIGPIPE under pipefail
+      grep -q "$LINE" <<< "$CMY" || { echo "FATAL [$CELL]: '$LINE' not in the EPP config" >&2; return 1; }
+      case "$ARM" in *-tier)  # capacity from capacityTokens: cache info must be off and the arm's capacity live
+        local CAP; CAP=$(grep -oE "capacityTokens: [0-9]+" "$HERE/$ARM-plugins.yaml")
+        grep -q "$CAP" <<< "$CMY" || { echo "FATAL [$CELL]: '$CAP' not in the EPP config" >&2; return 1; }
+        grep -q 'cacheInfoSpec: ""' <<< "$CMY" || { echo "FATAL [$CELL]: cacheInfoSpec \"\" not in the EPP config" >&2; return 1; } ;;
+      esac ;;
     turnprio*)
       [ "$GATE" -ge 1 ] || { echo "FATAL [$CELL]: turn-priority arm without flow control" >&2; return 1; }
       kubectl get cm "$SVC" -n "$NS" -o yaml | grep -q 'strategy: turn-priority' || { echo "FATAL [$CELL]: turn-priority not in the EPP config" >&2; return 1; }
@@ -137,6 +210,8 @@ print('reset_prefix_cache:', urllib.request.urlopen(urllib.request.Request(
   while ! kubectl exec "$POD" -n "$NS" -c bench -- test -f /results/DONE 2>/dev/null; do
     local NOWUID; NOWUID=$(kubectl get pod "$VP" -n "$NS" -o jsonpath='{.metadata.uid}' 2>/dev/null)
     if [ "$NOWUID" != "$VUID" ]; then echo "PREEMPTED [$CELL]: pod $VP replaced; aborting cell" >&2; PREEMPTED=true; break; fi
+    local NOWRS; NOWRS=$(kubectl get pod "$VP" -n "$NS" -o jsonpath='{.status.containerStatuses[?(@.name=="modelserver")].restartCount}' 2>/dev/null)
+    if [ -n "$NOWRS" ] && [ -n "$VRS" ] && [ "$NOWRS" != "$VRS" ]; then echo "PREEMPTED [$CELL]: vLLM container in $VP restarted ($VRS -> $NOWRS); aborting cell" >&2; PREEMPTED=true; break; fi
     echo "$(date +%H:%M:%S) [$CELL] $(epp_summary "$POD")"
     sleep 60
   done
@@ -146,10 +221,12 @@ print('reset_prefix_cache:', urllib.request.urlopen(urllib.request.Request(
   kubectl logs "$POD" -n "$NS" -c prober --tail=1000 > "$CELL_DIR/prober.log" 2>/dev/null || true
   kubectl logs "$VP" -n "$NS" -c modelserver --since="$(( $(date +%s) - T0 + 120 ))s" 2>/dev/null | gzip > "$CELL_DIR/vllm.log.gz" || true
   kubectl get cm "$SVC" -n "$NS" -o yaml > "$CELL_DIR/epp-configmap.yaml" 2>/dev/null || true
-  retry kubectl cp "$NS/$POD:/results" "$CELL_DIR/results" -c bench >/dev/null
+  retry copy_results "$POD" "$CELL_DIR/results"
   cat > "$CELL_DIR/manifest.json" <<EOJ
 {"cell":"$CELL","arm":"$ARM","lane":"$L","concurrency":$CONC,"window_s":$WINDOW,"client_timeout_s":$CLIENT_TIMEOUT,
  "vllm_pod":"$VP","vllm_pod_uid":"$VUID","epp_pod":"$EPP_POD","bench_pod":"$POD",
+ "vllm_restarts_start":"$VRS","vllm_restarts_end":"$(kubectl get pod "$VP" -n "$NS" -o jsonpath='{.status.containerStatuses[?(@.name=="modelserver")].restartCount}' 2>/dev/null)",
+ "epp_restarts_end":"$(kubectl get pod "$EPP_POD" -n "$NS" -o jsonpath='{.status.containerStatuses[?(@.name=="epp")].restartCount}' 2>/dev/null)",
  "preempted":$PREEMPTED,"started_epoch":$T0,"finished_epoch":$(date +%s),
  "config_sha256":"$(shasum -a 256 "$CELL_DIR/config.yml" | cut -d' ' -f1)",
  "plugins_sha256":"$(shasum -a 256 "$HERE/$ARM-plugins.yaml" | cut -d' ' -f1)"}
@@ -171,15 +248,26 @@ run_lane() { # run_lane <replicate index 1..3>
 }
 
 PIDS=()
-for i in $(seq 1 "$REPS"); do
-  run_lane "$i" > >(sed "s/^/[r$i] /") 2>&1 &
-  PIDS+=($!)
-done
+if [ -n "${LANE_ARMS:-}" ]; then
+  for LA in $LANE_ARMS; do
+    L=${LA%%:*} ARM=${LA#*:} PODV="LANE_${LA%%:*}_POD" IPV="LANE_${LA%%:*}_IP"
+    [ -n "${!PODV:-}" ] || { echo "FATAL: lane $L not in $RESULTS_DIR/lanes.env" >&2; exit 1; }
+    run_cell "epp-$ARM-$L" "$L" "$ARM" "${!PODV}" "${!IPV}" > >(sed "s/^/[$L] /") 2>&1 &
+    PIDS+=($!)
+  done
+else
+  for i in $(seq 1 "$REPS"); do
+    run_lane "$i" > >(sed "s/^/[r$i] /") 2>&1 &
+    PIDS+=($!)
+  done
+fi
 FAIL=0
 for p in "${PIDS[@]}"; do wait "$p" || FAIL=1; done
 
 echo; echo "===== analysis ====="
-if command -v uv >/dev/null 2>&1; then
+if [ "${SKIP_ANALYSIS:-0}" = 1 ]; then
+  echo "skipped (SKIP_ANALYSIS=1)"
+elif command -v uv >/dev/null 2>&1; then
   uv run --quiet --with matplotlib --with numpy python "$HERE/analyze.py" "$OUT_ROOT" || true
 else
   "${VIZ_PYTHON:-python3}" "$HERE/analyze.py" "$OUT_ROOT" || true

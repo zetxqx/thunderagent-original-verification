@@ -1,0 +1,1488 @@
+step 20 start Wed Sep 30 01:00:32 PDT 2026  EPP thunder-agent-lease-44544c04  bench us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/inference-perf@sha256:f7381b014f378026bed7b1295480670858e2ce7be57d3c9e55492817b0df660b  context gke_bobzetian-gke-dev_us-central1_bobbm
+
+##### 1. save (Wed Sep 30 01:00:33 PDT 2026)
+original already saved (Sep 30 00:34); keeping it
+
+##### 2. offloading on, smoke test (Wed Sep 30 01:00:33 PDT 2026)
+applying /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/vllm-deploy-3rep-offload400.yaml (Wed Sep 30 01:00:34 PDT 2026)
+deployment.apps/program-aware-vllm-decode replaced
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 of 3 updated replicas are available...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 1 of 3 updated replicas are available...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 2 of 3 updated replicas are available...
+deployment "program-aware-vllm-decode" successfully rolled out
+POD                                          UID                                    NODE                                     IP             PHASE     RESTARTS
+program-aware-vllm-decode-559bd4f57c-5q7zz   38b7b4c4-af2f-4430-8fd0-2d3398961f5a   gke-bobbm-bobbm-spoth100-ef0c964e-91qy   10.100.2.12    Running   0
+program-aware-vllm-decode-559bd4f57c-p85wq   4d31d52c-bfe4-4d57-bbcf-7345c52d6903   gke-bobbm-bobbm-spoth100-ef0c964e-zhnf   10.100.15.14   Running   0
+program-aware-vllm-decode-559bd4f57c-x5569   1d2e6942-b2db-4f44-885b-a1e13973ee84   gke-bobbm-bobbm-spoth100-ef0c964e-trwg   10.100.12.15   Running   0
+program-aware-vllm-decode-559bd4f57c-5q7zz kv_offloading_size=400.0 num_gpu_blocks=139815
+program-aware-vllm-decode-559bd4f57c-p85wq kv_offloading_size=400.0 num_gpu_blocks=139815
+program-aware-vllm-decode-559bd4f57c-x5569 kv_offloading_size=400.0 num_gpu_blocks=139815
+smoke test Wed Sep 30 01:05:49 PDT 2026  image thunder-agent-lease-44544c04  tier capacityTokens 8738133
+
+=== lane a replica program-aware-vllm-decode-559bd4f57c-x5569 on gke-bobbm-bobbm-spoth100-ef0c964e-trwg: offloading (checks 1 to 3) ===
+vllm:cache_config_info{_block_size_resolved="True",block_size="16",cache_dtype="fp8_e4m3",enable_prefix_caching="True",engine="0",gpu_memory_utilization="0.88",is_attention_free="False",kv_cache_dtype_skip_layers="[]",kv_cache_max_concurrency="8.53363037109375",kv_cache_memory_bytes="None",kv_cache_size_tokens="2237040",kv_offloading_backend="native",kv_offloading_size="400.0",kv_sharing_fast_pref
+PASS  cache_config_info reports kv_offloading_size 400
+PASS  GPU KV unchanged: 16 x 139815 = 2237040 tokens
+PASS  log names OffloadingConnector
+Created mmap file /dev/shm/vllm_offload_b83a8f34-3559-4829-a129-a70b7f92d9b4.mmap (429.50 GB)
+PASS  CPU tier from the log is 429.50 GB = 8738199 tokens, within 1% of the tier arm's capacityTokens 8738133
+PASS  /dev/shm holds the tier: 400 GiB used (>= 380)
+PASS  no restart or OOM kill (restarts, last reason: 0 )
+PASS  kv_offload_allocation_failure = 0
+
+=== lane a replica program-aware-vllm-decode-559bd4f57c-x5569: the CPU tier works (checks 4 and 5) ===
+{"reset_both_before": true, "cold": {"seconds": 1.9845170920016244, "prompt_tokens": 50023, "cached_tokens": 0}, "reset_gpu_only": true, "from_cpu": {"seconds": 0.1967677540378645, "prompt_tokens": 50023, "cached_tokens": 50016}, "reset_both": true, "after_reset": {"seconds": 1.4445114779518917, "prompt_tokens": 50023, "cached_tokens": 0}, "counters_cold": {"vllm:kv_offload_store_bytes": 2458386432.0, "vllm:external_prefix_cache_hits": 0.0, "vllm:prefix_cache_queries": 50023.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_queries": 50023.0}, "counters_from_cpu": {"vllm:kv_offload_store_bytes": 0.0, "vllm:kv_offload_load_bytes": 2458386432.0, "vllm:external_prefix_cache_hits": 50016.0, "vllm:prefix_cache_queries": 50023.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_queries": 50023.0}, "counters_after_reset": {"vllm:kv_offload_load_bytes": 0.0, "vllm:kv_offload_store_bytes": 2458386432.0, "vllm:external_prefix_cache_hits": 0.0, "vllm:prefix_cache_queries": 50023.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_queries": 50023.0}}
+PASS  resets returned success (both, GPU only, both)
+PASS  cold request computed its prompt (50023 tokens, cached 0)
+PASS  after a GPU-only reset, cached_tokens 50016 >= 90% of the prompt
+PASS  ... and they came from the CPU tier: external hits 50016
+PASS  ... load time 0.2 s vs recompute 1.98 s (at most half)
+PASS  offload counters are exported and move: stored 2.46 GB on the cold request, loaded 2.46 GB on the reload
+PASS  after reset_external=true: cached_tokens 0, external hits 0
+
+=== lane b replica program-aware-vllm-decode-559bd4f57c-5q7zz on gke-bobbm-bobbm-spoth100-ef0c964e-91qy: offloading (checks 1 to 3) ===
+vllm:cache_config_info{_block_size_resolved="True",block_size="16",cache_dtype="fp8_e4m3",enable_prefix_caching="True",engine="0",gpu_memory_utilization="0.88",is_attention_free="False",kv_cache_dtype_skip_layers="[]",kv_cache_max_concurrency="8.53363037109375",kv_cache_memory_bytes="None",kv_cache_size_tokens="2237040",kv_offloading_backend="native",kv_offloading_size="400.0",kv_sharing_fast_pref
+PASS  cache_config_info reports kv_offloading_size 400
+PASS  GPU KV unchanged: 16 x 139815 = 2237040 tokens
+PASS  log names OffloadingConnector
+Created mmap file /dev/shm/vllm_offload_42fb7622-d30b-4ced-81fd-bfda3513a949.mmap (429.50 GB)
+PASS  CPU tier from the log is 429.50 GB = 8738199 tokens, within 1% of the tier arm's capacityTokens 8738133
+PASS  /dev/shm holds the tier: 400 GiB used (>= 380)
+PASS  no restart or OOM kill (restarts, last reason: 0 )
+PASS  kv_offload_allocation_failure = 0
+
+=== lane b replica program-aware-vllm-decode-559bd4f57c-5q7zz: the CPU tier works (checks 4 and 5) ===
+{"reset_both_before": true, "cold": {"seconds": 2.0379248600220308, "prompt_tokens": 50021, "cached_tokens": 0}, "reset_gpu_only": true, "from_cpu": {"seconds": 0.26238136598840356, "prompt_tokens": 50021, "cached_tokens": 50016}, "reset_both": true, "after_reset": {"seconds": 1.4531785539584234, "prompt_tokens": 50021, "cached_tokens": 0}, "counters_cold": {"vllm:external_prefix_cache_hits": 0.0, "vllm:kv_offload_store_bytes": 2458386432.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_queries": 50021.0, "vllm:prefix_cache_queries": 50021.0}, "counters_from_cpu": {"vllm:external_prefix_cache_hits": 50016.0, "vllm:kv_offload_store_bytes": 0.0, "vllm:kv_offload_load_bytes": 2458386432.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_queries": 50021.0, "vllm:prefix_cache_queries": 50021.0}, "counters_after_reset": {"vllm:external_prefix_cache_hits": 0.0, "vllm:kv_offload_store_bytes": 2458386432.0, "vllm:kv_offload_load_bytes": 0.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_queries": 50021.0, "vllm:prefix_cache_queries": 50021.0}}
+PASS  resets returned success (both, GPU only, both)
+PASS  cold request computed its prompt (50021 tokens, cached 0)
+PASS  after a GPU-only reset, cached_tokens 50016 >= 90% of the prompt
+PASS  ... and they came from the CPU tier: external hits 50016
+PASS  ... load time 0.26 s vs recompute 2.04 s (at most half)
+PASS  offload counters are exported and move: stored 2.46 GB on the cold request, loaded 2.46 GB on the reload
+PASS  after reset_external=true: cached_tokens 0, external hits 0
+
+=== lane c replica program-aware-vllm-decode-559bd4f57c-p85wq on gke-bobbm-bobbm-spoth100-ef0c964e-zhnf: offloading (checks 1 to 3) ===
+vllm:cache_config_info{_block_size_resolved="True",block_size="16",cache_dtype="fp8_e4m3",enable_prefix_caching="True",engine="0",gpu_memory_utilization="0.88",is_attention_free="False",kv_cache_dtype_skip_layers="[]",kv_cache_max_concurrency="8.53363037109375",kv_cache_memory_bytes="None",kv_cache_size_tokens="2237040",kv_offloading_backend="native",kv_offloading_size="400.0",kv_sharing_fast_pref
+PASS  cache_config_info reports kv_offloading_size 400
+PASS  GPU KV unchanged: 16 x 139815 = 2237040 tokens
+PASS  log names OffloadingConnector
+Created mmap file /dev/shm/vllm_offload_1969d2a8-5c0c-4e47-a13b-59b1c2cc5ec8.mmap (429.50 GB)
+PASS  CPU tier from the log is 429.50 GB = 8738199 tokens, within 1% of the tier arm's capacityTokens 8738133
+PASS  /dev/shm holds the tier: 400 GiB used (>= 380)
+PASS  no restart or OOM kill (restarts, last reason: 0 )
+PASS  kv_offload_allocation_failure = 0
+
+=== lane c replica program-aware-vllm-decode-559bd4f57c-p85wq: the CPU tier works (checks 4 and 5) ===
+{"reset_both_before": true, "cold": {"seconds": 1.497789337998256, "prompt_tokens": 50022, "cached_tokens": 0}, "reset_gpu_only": true, "from_cpu": {"seconds": 0.20253733696881682, "prompt_tokens": 50022, "cached_tokens": 50016}, "reset_both": true, "after_reset": {"seconds": 1.4418370840139687, "prompt_tokens": 50022, "cached_tokens": 0}, "counters_cold": {"vllm:external_prefix_cache_queries": 50022.0, "vllm:external_prefix_cache_hits": 0.0, "vllm:prefix_cache_queries": 50022.0, "vllm:kv_offload_store_bytes": 2458386432.0, "vllm:prefix_cache_hits": 0.0}, "counters_from_cpu": {"vllm:external_prefix_cache_queries": 50022.0, "vllm:external_prefix_cache_hits": 50016.0, "vllm:prefix_cache_queries": 50022.0, "vllm:kv_offload_load_bytes": 2458386432.0, "vllm:kv_offload_store_bytes": 0.0, "vllm:prefix_cache_hits": 0.0}, "counters_after_reset": {"vllm:external_prefix_cache_queries": 50022.0, "vllm:external_prefix_cache_hits": 0.0, "vllm:kv_offload_load_bytes": 0.0, "vllm:prefix_cache_queries": 50022.0, "vllm:kv_offload_store_bytes": 2458386432.0, "vllm:prefix_cache_hits": 0.0}}
+PASS  resets returned success (both, GPU only, both)
+PASS  cold request computed its prompt (50022 tokens, cached 0)
+PASS  after a GPU-only reset, cached_tokens 50016 >= 90% of the prompt
+PASS  ... and they came from the CPU tier: external hits 50016
+PASS  ... load time 0.2 s vs recompute 1.5 s (at most half)
+PASS  offload counters are exported and move: stored 2.46 GB on the cold request, loaded 2.46 GB on the reload
+PASS  after reset_external=true: cached_tokens 0, external hits 0
+
+=== lanes as at phase B's first point: a baseline, b lease, c tier ===
+LANE_a_POD=program-aware-vllm-decode-559bd4f57c-x5569
+LANE_a_IP=10.100.12.15
+LANE_a_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-trwg
+LANE_b_POD=program-aware-vllm-decode-559bd4f57c-5q7zz
+LANE_b_IP=10.100.2.12
+LANE_b_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-91qy
+LANE_c_POD=program-aware-vllm-decode-559bd4f57c-p85wq
+LANE_c_IP=10.100.15.14
+LANE_c_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-zhnf
+lane a: thunder-lane-a-epp, arm baseline, image thunder-agent-lease-44544c04
+lane b: thunder-lane-b-epp, arm thunder-lease-main, image thunder-agent-lease-44544c04
+lane c: thunder-lane-c-epp, arm thunder-lease-main-tier, image thunder-agent-lease-44544c04
+
+=== lane a (baseline): no gate, answers ===
+PASS  lane a's EPP log is readable (53 lines)
+PASS  no flow control in lane a's EPP log
+PASS  lane a answered: Hello from lane a.
+
+=== lane b: build, config and gate capacity (check 6) ===
+llm_d_epp_info{build_ref="thunder-agent-lease-1a98a6c5",commit="44544c04aa6febd453d1009f9ed34c8cc6ea1ca4"} 1
+PASS  build info reports commit 44544c04
+PASS  flow control on
+PASS  live ConfigMap has idleLeaseSeconds: 30
+thunder_agent_endpoint_capacity_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-559bd4f57c-5q7zz-rank-0"} 2.23704e+06
+PASS  one endpoint at capacity 2237040 tokens (got: 2.23704e+06)
+
+=== lane b: session and class accounting (check 7) ===
+PASS  smoke-b-a-1790755549 turn 1 answered: Hello from turn one.
+PASS  smoke-b-a-1790755549 turn 2 answered: Hello from turn two.
+PASS  smoke-b-b-1790755549 answered: Hello from b
+PASS  2 new sessions tracked (sessions 0 -> 2)
+PASS  no session running or paused after the turns
+PASS  releases: new +2 (want 2), admitted +1 (want 1)
+PASS  no holds or pauses on an idle replica (holds 0, pauses 0)
+
+=== lane c: build, config and gate capacity (check 6) ===
+llm_d_epp_info{build_ref="thunder-agent-lease-1a98a6c5",commit="44544c04aa6febd453d1009f9ed34c8cc6ea1ca4"} 1
+PASS  build info reports commit 44544c04
+PASS  flow control on
+PASS  live ConfigMap has idleLeaseSeconds: 30
+thunder_agent_endpoint_capacity_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-559bd4f57c-p85wq-rank-0"} 8.738133e+06
+PASS  one endpoint at capacity 8738133 tokens (got: 8.738133e+06)
+PASS  live ConfigMap has cacheInfoSpec "" and capacityTokens: 8738133
+PASS  EPP registered its own vllm engine mapping
+
+=== lane c: session and class accounting (check 7) ===
+PASS  smoke-c-a-1790755549 turn 1 answered: Hello from turn one.
+PASS  smoke-c-a-1790755549 turn 2 answered: Hello from turn two.
+PASS  smoke-c-b-1790755549 answered: Hello from b
+PASS  2 new sessions tracked (sessions 0 -> 2)
+PASS  no session running or paused after the turns
+PASS  releases: new +2 (want 2), admitted +1 (want 1)
+PASS  no holds or pauses on an idle replica (holds 0, pauses 0)
+
+=== EPP logs ===
+PASS  lane a: no error or panic lines (got 0 of 56 lines)
+PASS  lane b: no error or panic lines (got 0 of 61 lines)
+PASS  lane c: no error or panic lines (got 0 of 61 lines)
+
+=== 0 check(s) failed ===
+
+##### 3. phase B: offloading 400 GiB (Wed Sep 30 01:08:30 PDT 2026)
+
+##### phase B c=32 window 1800s warm-up 600s: a:baseline b:thunder-lease-main c:thunder-lease-main-tier  (Wed Sep 30 01:08:31 PDT 2026)
+LANE_a_POD=program-aware-vllm-decode-559bd4f57c-x5569
+LANE_a_IP=10.100.12.15
+LANE_a_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-trwg
+LANE_b_POD=program-aware-vllm-decode-559bd4f57c-5q7zz
+LANE_b_IP=10.100.2.12
+LANE_b_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-91qy
+LANE_c_POD=program-aware-vllm-decode-559bd4f57c-p85wq
+LANE_c_IP=10.100.15.14
+LANE_c_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-zhnf
+run id: rep-20260930-010845-c32-t1900  concurrency=32 replicates=1 window=1800s arms=baseline client_timeout=1900s
+[a] ===== epp-baseline-a (arm=baseline lane=a pod=program-aware-vllm-decode-559bd4f57c-x5569) =====
+[a] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[a] [epp-baseline-a] epp pod thunder-lane-a-epp-58bbff77cf-pwnlk, flow control lines: 0
+[a] 01:10:06 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:11:09 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:12:13 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:13:17 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:14:21 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:15:25 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:16:29 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:17:33 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:18:36 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:19:39 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:20:43 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:21:46 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:22:50 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:23:53 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:24:57 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:26:00 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:27:03 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:28:07 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:29:10 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:30:13 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:31:17 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:32:20 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:33:23 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:34:26 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:35:30 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:36:33 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:37:37 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:38:40 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:39:43 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:40:47 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:41:50 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:42:53 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:43:57 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/../10-llm-d-router-replicates/run-replicates.sh: line 106: 29476 Terminated: 15          ( while ! kubectl exec "$POD" -n "$NS" -c bench -- test -f /results/DONE 2> /dev/null; do
+[a]     kubectl top pod -n "$NS" --no-headers 2> /dev/null | awk -v t="$(date +%s)" -v r="$SVC" -v v="$VP" -v b="$POD" '$1 ~ r || $1 == v || $1 == b {print t","$1","$2","$3}' >> "$CELL_DIR/cpu-usage.csv"; sleep 30;
+[a] done )
+[a] └───────┴───────────┘
+[a] EXIT=0
+[a] REPORTS_COMPLETE=yes
+[b] ===== epp-thunder-lease-main-b (arm=thunder-lease-main lane=b pod=program-aware-vllm-decode-559bd4f57c-5q7zz) =====
+[b] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[b] [epp-thunder-lease-main-b] epp pod thunder-lane-b-epp-69fc487bb5-zt8kr, flow control lines: 1
+[b] 01:10:16 [epp-thunder-lease-main-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:11:20 [epp-thunder-lease-main-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:12:24 [epp-thunder-lease-main-b] run 32 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:13:28 [epp-thunder-lease-main-b] run 32 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:14:32 [epp-thunder-lease-main-b] run 29 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:15:36 [epp-thunder-lease-main-b] run 30 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:16:40 [epp-thunder-lease-main-b] run 29 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:17:44 [epp-thunder-lease-main-b] run 32 idle 0 paused 0 holds 1 pauses 2 resumes 2 queue 0
+[b] 01:18:48 [epp-thunder-lease-main-b] run 29 idle 1 paused 2 holds 2 pauses 5 resumes 3 queue 0
+[b] 01:19:51 [epp-thunder-lease-main-b] run 28 idle 1 paused 3 holds 6 pauses 10 resumes 7 queue 0
+[b] 01:20:55 [epp-thunder-lease-main-b] run 25 idle 1 paused 7 holds 8 pauses 16 resumes 9 queue 0
+[b] 01:21:58 [epp-thunder-lease-main-b] run 30 idle 0 paused 4 holds 17 pauses 23 resumes 19 queue 0
+[b] 01:23:02 [epp-thunder-lease-main-b] run 28 idle 1 paused 5 holds 19 pauses 27 resumes 22 queue 0
+[b] 01:24:06 [epp-thunder-lease-main-b] run 29 idle 0 paused 6 holds 25 pauses 33 resumes 27 queue 0
+[b] 01:25:09 [epp-thunder-lease-main-b] run 26 idle 1 paused 9 holds 26 pauses 38 resumes 29 queue 0
+[b] 01:26:13 [epp-thunder-lease-main-b] run 27 idle 0 paused 9 holds 27 pauses 39 resumes 30 queue 0
+[b] 01:27:17 [epp-thunder-lease-main-b] run 27 idle 0 paused 11 holds 34 pauses 48 resumes 37 queue 0
+[b] 01:28:20 [epp-thunder-lease-main-b] run 26 idle 1 paused 11 holds 39 pauses 55 resumes 44 queue 0
+[b] 01:29:24 [epp-thunder-lease-main-b] run 26 idle 0 paused 13 holds 41 pauses 59 resumes 46 queue 0
+[b] 01:30:28 [epp-thunder-lease-main-b] run 23 idle 1 paused 16 holds 45 pauses 65 resumes 49 queue 0
+[b] 01:31:32 [epp-thunder-lease-main-b] run 23 idle 2 paused 15 holds 52 pauses 71 resumes 56 queue 0
+[b] 01:32:35 [epp-thunder-lease-main-b] run 23 idle 1 paused 16 holds 53 pauses 73 resumes 57 queue 0
+[b] 01:33:39 [epp-thunder-lease-main-b] run 24 idle 0 paused 17 holds 57 pauses 77 resumes 60 queue 0
+[b] 01:34:43 [epp-thunder-lease-main-b] run 21 idle 1 paused 19 holds 59 pauses 81 resumes 62 queue 1
+[b] 01:35:47 [epp-thunder-lease-main-b] run 23 idle 0 paused 18 holds 63 pauses 84 resumes 66 queue 0
+[b] 01:36:51 [epp-thunder-lease-main-b] run 22 idle 1 paused 18 holds 66 pauses 87 resumes 69 queue 0
+[b] 01:37:54 [epp-thunder-lease-main-b] run 22 idle 1 paused 18 holds 66 pauses 87 resumes 69 queue 0
+[b] 01:38:58 [epp-thunder-lease-main-b] run 22 idle 0 paused 19 holds 68 pauses 90 resumes 71 queue 1
+[b] 01:40:02 [epp-thunder-lease-main-b] run 20 idle 0 paused 21 holds 69 pauses 93 resumes 72 queue 1
+[b] 01:41:06 [epp-thunder-lease-main-b] run 20 idle 0 paused 21 holds 70 pauses 94 resumes 73 queue 1
+[b] 01:42:09 [epp-thunder-lease-main-b] run 15 idle 8 paused 18 holds 76 pauses 97 resumes 79 queue 0
+[b] 01:43:13 [epp-thunder-lease-main-b] run 5 idle 14 paused 22 holds 85 pauses 110 resumes 88 queue 0
+[b] 01:44:17 [epp-thunder-lease-main-b] run 0 idle 19 paused 22 holds 85 pauses 110 resumes 88 queue 0
+[b] 01:45:21 [epp-thunder-lease-main-b] run 0 idle 19 paused 22 holds 85 pauses 110 resumes 88 queue 0
+[b] 01:46:25 [epp-thunder-lease-main-b] run 0 idle 19 paused 22 holds 85 pauses 110 resumes 88 queue 0
+[b] /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/../10-llm-d-router-replicates/run-replicates.sh: line 106: 29521 Terminated: 15          ( while ! kubectl exec "$POD" -n "$NS" -c bench -- test -f /results/DONE 2> /dev/null; do
+[b]     kubectl top pod -n "$NS" --no-headers 2> /dev/null | awk -v t="$(date +%s)" -v r="$SVC" -v v="$VP" -v b="$POD" '$1 ~ r || $1 == v || $1 == b {print t","$1","$2","$3}' >> "$CELL_DIR/cpu-usage.csv"; sleep 30;
+[b] done )
+[b] └───────┴───────────┘
+[b] EXIT=0
+[b] REPORTS_COMPLETE=yes
+[c] ===== epp-thunder-lease-main-tier-c (arm=thunder-lease-main-tier lane=c pod=program-aware-vllm-decode-559bd4f57c-p85wq) =====
+[c] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[c] [epp-thunder-lease-main-tier-c] epp pod thunder-lane-c-epp-7d77747996-d4wtt, flow control lines: 1
+[c] 01:10:26 [epp-thunder-lease-main-tier-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:11:30 [epp-thunder-lease-main-tier-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:12:34 [epp-thunder-lease-main-tier-c] run 32 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:13:38 [epp-thunder-lease-main-tier-c] run 27 idle 5 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:14:42 [epp-thunder-lease-main-tier-c] run 30 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:15:47 [epp-thunder-lease-main-tier-c] run 30 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:16:51 [epp-thunder-lease-main-tier-c] run 31 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:17:54 [epp-thunder-lease-main-tier-c] run 31 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:18:58 [epp-thunder-lease-main-tier-c] run 31 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:20:01 [epp-thunder-lease-main-tier-c] run 31 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:21:05 [epp-thunder-lease-main-tier-c] run 29 idle 4 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:22:09 [epp-thunder-lease-main-tier-c] run 32 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:23:13 [epp-thunder-lease-main-tier-c] run 31 idle 4 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:24:16 [epp-thunder-lease-main-tier-c] run 31 idle 6 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:25:20 [epp-thunder-lease-main-tier-c] run 31 idle 6 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:26:24 [epp-thunder-lease-main-tier-c] run 32 idle 5 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:27:27 [epp-thunder-lease-main-tier-c] run 32 idle 6 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:28:31 [epp-thunder-lease-main-tier-c] run 32 idle 7 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:29:35 [epp-thunder-lease-main-tier-c] run 32 idle 8 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:30:39 [epp-thunder-lease-main-tier-c] run 31 idle 9 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:31:42 [epp-thunder-lease-main-tier-c] run 31 idle 11 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:32:46 [epp-thunder-lease-main-tier-c] run 32 idle 10 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:33:50 [epp-thunder-lease-main-tier-c] run 31 idle 11 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:34:54 [epp-thunder-lease-main-tier-c] run 31 idle 11 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:35:57 [epp-thunder-lease-main-tier-c] run 32 idle 10 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:37:01 [epp-thunder-lease-main-tier-c] run 32 idle 10 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:38:05 [epp-thunder-lease-main-tier-c] run 32 idle 11 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:39:09 [epp-thunder-lease-main-tier-c] run 31 idle 12 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:40:13 [epp-thunder-lease-main-tier-c] run 32 idle 11 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:41:16 [epp-thunder-lease-main-tier-c] run 31 idle 12 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:42:20 [epp-thunder-lease-main-tier-c] run 20 idle 23 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:43:24 [epp-thunder-lease-main-tier-c] run 2 idle 41 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:44:27 [epp-thunder-lease-main-tier-c] run 0 idle 43 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:45:31 [epp-thunder-lease-main-tier-c] run 0 idle 43 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:46:35 [epp-thunder-lease-main-tier-c] run 0 idle 43 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/../10-llm-d-router-replicates/run-replicates.sh: line 106: 29557 Terminated: 15          ( while ! kubectl exec "$POD" -n "$NS" -c bench -- test -f /results/DONE 2> /dev/null; do
+[c]     kubectl top pod -n "$NS" --no-headers 2> /dev/null | awk -v t="$(date +%s)" -v r="$SVC" -v v="$VP" -v b="$POD" '$1 ~ r || $1 == v || $1 == b {print t","$1","$2","$3}' >> "$CELL_DIR/cpu-usage.csv"; sleep 30;
+[c] done )
+[c] reports complete; stopping benchmark process
+[c] EXIT=0
+[c] REPORTS_COMPLETE=yes
+
+===== analysis =====
+skipped (SKIP_ANALYSIS=1)
+artifacts: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-010845-c32-t1900
+phase B c=32 done: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-010845-c32-t1900 (exit 0)
+
+##### phase B c=64 window 1800s warm-up 600s: a:thunder-lease-main-tier b:baseline c:thunder-lease-main  (Wed Sep 30 01:48:08 PDT 2026)
+LANE_a_POD=program-aware-vllm-decode-559bd4f57c-x5569
+LANE_a_IP=10.100.12.15
+LANE_a_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-trwg
+LANE_b_POD=program-aware-vllm-decode-559bd4f57c-5q7zz
+LANE_b_IP=10.100.2.12
+LANE_b_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-91qy
+LANE_c_POD=program-aware-vllm-decode-559bd4f57c-p85wq
+LANE_c_IP=10.100.15.14
+LANE_c_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-zhnf
+run id: rep-20260930-014820-c64-t1900  concurrency=64 replicates=1 window=1800s arms=baseline client_timeout=1900s
+[b] ===== epp-baseline-b (arm=baseline lane=b pod=program-aware-vllm-decode-559bd4f57c-5q7zz) =====
+[b] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[b] [epp-baseline-b] epp pod thunder-lane-b-epp-86647d86cf-856j8, flow control lines: 0
+[b] 01:49:36 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:50:39 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:51:43 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:52:46 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:53:49 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:54:53 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:55:56 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:57:00 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:58:03 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 01:59:07 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:00:10 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:01:14 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:02:17 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:03:21 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:04:24 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:05:28 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:06:31 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:07:34 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:08:38 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:09:41 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:10:45 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:11:48 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:12:52 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:13:55 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:14:59 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:16:02 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:17:06 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:18:09 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:19:12 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:20:16 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:21:19 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:22:23 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:23:26 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:24:29 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] error: unexpected EOF
+[b] error: unexpected EOF
+[b] error: unexpected EOF
+[b] reports complete; stopping benchmark process
+[b] EXIT=0
+[b] REPORTS_COMPLETE=yes
+[a] ===== epp-thunder-lease-main-tier-a (arm=thunder-lease-main-tier lane=a pod=program-aware-vllm-decode-559bd4f57c-x5569) =====
+[a] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[a] [epp-thunder-lease-main-tier-a] epp pod thunder-lane-a-epp-6f494d7c5-ljcfp, flow control lines: 1
+[a] 01:49:46 [epp-thunder-lease-main-tier-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:50:49 [epp-thunder-lease-main-tier-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:51:53 [epp-thunder-lease-main-tier-a] run 64 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:52:57 [epp-thunder-lease-main-tier-a] run 60 idle 4 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:54:01 [epp-thunder-lease-main-tier-a] run 61 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:55:05 [epp-thunder-lease-main-tier-a] run 61 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:56:08 [epp-thunder-lease-main-tier-a] run 61 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:57:12 [epp-thunder-lease-main-tier-a] run 62 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:58:16 [epp-thunder-lease-main-tier-a] run 62 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 01:59:20 [epp-thunder-lease-main-tier-a] run 63 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:00:24 [epp-thunder-lease-main-tier-a] run 63 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:01:28 [epp-thunder-lease-main-tier-a] run 61 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:02:32 [epp-thunder-lease-main-tier-a] run 63 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:03:36 [epp-thunder-lease-main-tier-a] run 62 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:04:40 [epp-thunder-lease-main-tier-a] run 63 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:05:44 [epp-thunder-lease-main-tier-a] run 64 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:06:48 [epp-thunder-lease-main-tier-a] run 63 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:07:52 [epp-thunder-lease-main-tier-a] run 64 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:08:56 [epp-thunder-lease-main-tier-a] run 63 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:10:00 [epp-thunder-lease-main-tier-a] run 64 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:11:04 [epp-thunder-lease-main-tier-a] run 64 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:12:08 [epp-thunder-lease-main-tier-a] run 62 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:13:12 [epp-thunder-lease-main-tier-a] run 64 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:14:16 [epp-thunder-lease-main-tier-a] run 63 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:15:20 [epp-thunder-lease-main-tier-a] run 64 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:16:23 [epp-thunder-lease-main-tier-a] run 63 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:17:27 [epp-thunder-lease-main-tier-a] run 64 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:18:32 [epp-thunder-lease-main-tier-a] run 62 idle 5 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:19:35 [epp-thunder-lease-main-tier-a] run 61 idle 8 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:20:39 [epp-thunder-lease-main-tier-a] run 64 idle 5 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:21:43 [epp-thunder-lease-main-tier-a] run 55 idle 14 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:22:47 [epp-thunder-lease-main-tier-a] run 20 idle 49 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:23:52 [epp-thunder-lease-main-tier-a] run 0 idle 69 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:24:55 [epp-thunder-lease-main-tier-a] run 0 idle 69 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:25:59 [epp-thunder-lease-main-tier-a] run 0 idle 69 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:27:03 [epp-thunder-lease-main-tier-a] run 0 idle 69 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] reports complete; stopping benchmark process
+[a] EXIT=0
+[a] REPORTS_COMPLETE=yes
+[c] ===== epp-thunder-lease-main-c (arm=thunder-lease-main lane=c pod=program-aware-vllm-decode-559bd4f57c-p85wq) =====
+[c] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[c] [epp-thunder-lease-main-c] epp pod thunder-lane-c-epp-b4b477fc4-dkldd, flow control lines: 1
+[c] 01:49:47 [epp-thunder-lease-main-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:50:50 [epp-thunder-lease-main-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 01:51:53 [epp-thunder-lease-main-c] run 62 idle 0 paused 2 holds 0 pauses 2 resumes 0 queue 0
+[c] 01:52:57 [epp-thunder-lease-main-c] run 46 idle 1 paused 17 holds 0 pauses 17 resumes 0 queue 0
+[c] 01:54:01 [epp-thunder-lease-main-c] run 42 idle 1 paused 21 holds 12 pauses 33 resumes 12 queue 0
+[c] 01:55:05 [epp-thunder-lease-main-c] run 38 idle 1 paused 25 holds 21 pauses 46 resumes 21 queue 0
+[c] 01:56:09 [epp-thunder-lease-main-c] run 38 idle 0 paused 26 holds 32 pauses 58 resumes 32 queue 0
+[c] 01:57:13 [epp-thunder-lease-main-c] run 39 idle 1 paused 24 holds 43 pauses 70 resumes 46 queue 0
+[c] 01:58:17 [epp-thunder-lease-main-c] run 37 idle 1 paused 26 holds 57 pauses 87 resumes 61 queue 0
+[c] 01:59:21 [epp-thunder-lease-main-c] run 32 idle 3 paused 29 holds 63 pauses 97 resumes 68 queue 0
+[c] 02:00:25 [epp-thunder-lease-main-c] run 30 idle 1 paused 34 holds 68 pauses 106 resumes 72 queue 0
+[c] 02:01:29 [epp-thunder-lease-main-c] run 30 idle 1 paused 34 holds 77 pauses 116 resumes 82 queue 0
+[c] 02:02:33 [epp-thunder-lease-main-c] run 36 idle 0 paused 30 holds 90 pauses 125 resumes 95 queue 0
+[c] 02:03:37 [epp-thunder-lease-main-c] run 33 idle 3 paused 30 holds 99 pauses 136 resumes 106 queue 0
+[c] 02:04:41 [epp-thunder-lease-main-c] run 36 idle 0 paused 30 holds 101 pauses 138 resumes 108 queue 0
+[c] 02:05:44 [epp-thunder-lease-main-c] run 32 idle 0 paused 35 holds 102 pauses 144 resumes 109 queue 0
+[c] 02:06:49 [epp-thunder-lease-main-c] run 32 idle 0 paused 35 holds 108 pauses 150 resumes 115 queue 0
+[c] 02:07:52 [epp-thunder-lease-main-c] run 30 idle 0 paused 38 holds 112 pauses 157 resumes 119 queue 0
+[c] 02:08:56 [epp-thunder-lease-main-c] run 30 idle 0 paused 38 holds 119 pauses 164 resumes 126 queue 0
+[c] 02:10:00 [epp-thunder-lease-main-c] run 30 idle 0 paused 38 holds 127 pauses 174 resumes 136 queue 0
+[c] 02:11:04 [epp-thunder-lease-main-c] run 30 idle 0 paused 38 holds 132 pauses 179 resumes 141 queue 0
+[c] 02:12:08 [epp-thunder-lease-main-c] run 30 idle 0 paused 38 holds 137 pauses 184 resumes 146 queue 0
+[c] 02:13:12 [epp-thunder-lease-main-c] run 28 idle 0 paused 40 holds 139 pauses 188 resumes 148 queue 0
+[c] 02:14:16 [epp-thunder-lease-main-c] run 26 idle 0 paused 42 holds 142 pauses 193 resumes 151 queue 0
+[c] 02:15:20 [epp-thunder-lease-main-c] run 25 idle 0 paused 44 holds 145 pauses 198 resumes 154 queue 0
+[c] 02:16:24 [epp-thunder-lease-main-c] run 24 idle 0 paused 45 holds 147 pauses 201 resumes 156 queue 0
+[c] 02:17:28 [epp-thunder-lease-main-c] run 23 idle 0 paused 46 holds 150 pauses 205 resumes 159 queue 0
+[c] 02:18:32 [epp-thunder-lease-main-c] run 23 idle 0 paused 46 holds 151 pauses 206 resumes 160 queue 0
+[c] 02:19:36 [epp-thunder-lease-main-c] run 26 idle 0 paused 44 holds 156 pauses 209 resumes 165 queue 0
+[c] 02:20:40 [epp-thunder-lease-main-c] run 25 idle 0 paused 46 holds 161 pauses 216 resumes 170 queue 0
+[c] 02:21:44 [epp-thunder-lease-main-c] run 15 idle 11 paused 45 holds 166 pauses 220 resumes 175 queue 0
+[c] 02:22:48 [epp-thunder-lease-main-c] run 18 idle 9 paused 44 holds 191 pauses 244 resumes 200 queue 0
+[c] 02:23:52 [epp-thunder-lease-main-c] run 0 idle 25 paused 46 holds 198 pauses 253 resumes 207 queue 0
+[c] 02:24:56 [epp-thunder-lease-main-c] run 0 idle 25 paused 46 holds 198 pauses 253 resumes 207 queue 0
+[c] 02:26:00 [epp-thunder-lease-main-c] run 0 idle 25 paused 46 holds 198 pauses 253 resumes 207 queue 0
+[c] 02:27:04 [epp-thunder-lease-main-c] run 0 idle 25 paused 46 holds 198 pauses 253 resumes 207 queue 0
+[c] error: unexpected EOF
+[c] └───────┴───────────┘
+[c] EXIT=0
+[c] REPORTS_COMPLETE=yes
+
+===== analysis =====
+skipped (SKIP_ANALYSIS=1)
+artifacts: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-014820-c64-t1900
+phase B c=64 done: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-014820-c64-t1900 (exit 0)
+
+##### phase B c=128 window 1800s warm-up 600s: a:thunder-lease-main b:thunder-lease-main-tier c:baseline  (Wed Sep 30 02:29:25 PDT 2026)
+LANE_a_POD=program-aware-vllm-decode-559bd4f57c-x5569
+LANE_a_IP=10.100.12.15
+LANE_a_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-trwg
+LANE_b_POD=program-aware-vllm-decode-559bd4f57c-5q7zz
+LANE_b_IP=10.100.2.12
+LANE_b_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-91qy
+LANE_c_POD=program-aware-vllm-decode-559bd4f57c-p85wq
+LANE_c_IP=10.100.15.14
+LANE_c_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-zhnf
+run id: rep-20260930-022937-c128-t1900  concurrency=128 replicates=1 window=1800s arms=baseline client_timeout=1900s
+[c] ===== epp-baseline-c (arm=baseline lane=c pod=program-aware-vllm-decode-559bd4f57c-p85wq) =====
+[c] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[c] [epp-baseline-c] epp pod thunder-lane-c-epp-7b47cdc5d8-lb22s, flow control lines: 0
+[c] 02:30:52 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:31:56 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:32:59 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:34:03 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:35:07 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:36:10 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:37:13 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:38:17 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:39:20 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:40:24 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:41:27 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:42:30 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:43:34 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:44:37 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:45:40 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:46:44 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:47:47 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:48:51 [epp-baseline-c] n/a
+[c] 02:51:08 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:52:12 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:53:15 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:54:18 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:55:22 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:56:25 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:57:28 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:58:32 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 02:59:35 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 03:00:39 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 03:01:42 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 03:02:45 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 03:03:49 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 03:04:52 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/../10-llm-d-router-replicates/run-replicates.sh: line 106: 49514 Terminated: 15          ( while ! kubectl exec "$POD" -n "$NS" -c bench -- test -f /results/DONE 2> /dev/null; do
+[c]     kubectl top pod -n "$NS" --no-headers 2> /dev/null | awk -v t="$(date +%s)" -v r="$SVC" -v v="$VP" -v b="$POD" '$1 ~ r || $1 == v || $1 == b {print t","$1","$2","$3}' >> "$CELL_DIR/cpu-usage.csv"; sleep 30;
+[c] done )
+[c] error: unexpected EOF
+[c] error: unexpected EOF
+[c] └───────┴───────────┘
+[c] EXIT=0
+[c] REPORTS_COMPLETE=yes
+[a] ===== epp-thunder-lease-main-a (arm=thunder-lease-main lane=a pod=program-aware-vllm-decode-559bd4f57c-x5569) =====
+[a] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[a] [epp-thunder-lease-main-a] epp pod thunder-lane-a-epp-5f6bcb7c94-qbmtz, flow control lines: 1
+[a] 02:31:08 [epp-thunder-lease-main-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:32:12 [epp-thunder-lease-main-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 02:33:15 [epp-thunder-lease-main-a] run 106 idle 0 paused 9 holds 0 pauses 9 resumes 0 queue 0
+[a] 02:34:19 [epp-thunder-lease-main-a] run 86 idle 1 paused 28 holds 0 pauses 28 resumes 0 queue 0
+[a] 02:35:23 [epp-thunder-lease-main-a] run 67 idle 1 paused 47 holds 0 pauses 47 resumes 0 queue 0
+[a] 02:36:28 [epp-thunder-lease-main-a] run 45 idle 2 paused 77 holds 14 pauses 82 resumes 5 queue 1
+[a] 02:37:32 [epp-thunder-lease-main-a] run 48 idle 0 paused 77 holds 28 pauses 95 resumes 18 queue 0
+[a] 02:38:37 [epp-thunder-lease-main-a] run 39 idle 1 paused 85 holds 32 pauses 107 resumes 22 queue 0
+[a] 02:39:41 [epp-thunder-lease-main-a] run 40 idle 0 paused 87 holds 42 pauses 118 resumes 31 queue 0
+[a] 02:40:46 [epp-thunder-lease-main-a] run 39 idle 1 paused 87 holds 60 pauses 136 resumes 49 queue 0
+[a] 02:41:50 [epp-thunder-lease-main-a] run 36 idle 0 paused 91 holds 67 pauses 147 resumes 56 queue 0
+[a] 02:42:55 [epp-thunder-lease-main-a] run 36 idle 0 paused 91 holds 73 pauses 153 resumes 62 queue 0
+[a] 02:43:59 [epp-thunder-lease-main-a] run 35 idle 1 paused 91 holds 78 pauses 158 resumes 67 queue 0
+[a] 02:45:04 [epp-thunder-lease-main-a] run 38 idle 0 paused 90 holds 88 pauses 166 resumes 76 queue 0
+[a] 02:46:08 [epp-thunder-lease-main-a] run 34 idle 0 paused 94 holds 94 pauses 176 resumes 82 queue 0
+[a] 02:47:12 [epp-thunder-lease-main-a] run 34 idle 0 paused 94 holds 100 pauses 182 resumes 88 queue 0
+[a] 02:48:17 [epp-thunder-lease-main-a] run 31 idle 2 paused 95 holds 103 pauses 186 resumes 91 queue 0
+[a] 02:49:22 [epp-thunder-lease-main-a] run 35 idle 0 paused 93 holds 114 pauses 195 resumes 102 queue 0
+[a] 02:50:26 [epp-thunder-lease-main-a] run 30 idle 2 paused 96 holds 116 pauses 200 resumes 104 queue 0
+[a] 02:51:31 [epp-thunder-lease-main-a] run 32 idle 0 paused 97 holds 122 pauses 206 resumes 109 queue 0
+[a] 02:52:35 [epp-thunder-lease-main-a] run 33 idle 0 paused 96 holds 129 pauses 212 resumes 116 queue 0
+[a] 02:53:40 [epp-thunder-lease-main-a] run 29 idle 4 paused 96 holds 135 pauses 218 resumes 122 queue 0
+[a] 02:54:44 [epp-thunder-lease-main-a] run 27 idle 2 paused 100 holds 140 pauses 227 resumes 127 queue 0
+[a] 02:55:49 [epp-thunder-lease-main-a] run 29 idle 0 paused 100 holds 146 pauses 233 resumes 133 queue 0
+[a] 02:56:54 [epp-thunder-lease-main-a] run 30 idle 0 paused 99 holds 151 pauses 237 resumes 138 queue 0
+[a] 02:57:58 [epp-thunder-lease-main-a] run 28 idle 0 paused 101 holds 154 pauses 242 resumes 141 queue 0
+[a] 02:59:03 [epp-thunder-lease-main-a] run 27 idle 0 paused 102 holds 158 pauses 247 resumes 145 queue 0
+[a] 03:00:07 [epp-thunder-lease-main-a] run 28 idle 0 paused 101 holds 166 pauses 254 resumes 153 queue 0
+[a] 03:01:12 [epp-thunder-lease-main-a] run 25 idle 0 paused 106 holds 172 pauses 264 resumes 158 queue 0
+[a] 03:02:16 [epp-thunder-lease-main-a] run 28 idle 1 paused 102 holds 180 pauses 269 resumes 167 queue 0
+[a] 03:03:21 [epp-thunder-lease-main-a] run 21 idle 6 paused 104 holds 191 pauses 282 resumes 178 queue 0
+[a] 03:04:26 [epp-thunder-lease-main-a] run 14 idle 19 paused 98 holds 207 pauses 292 resumes 194 queue 0
+[a] 03:05:30 [epp-thunder-lease-main-a] run 0 idle 31 paused 100 holds 215 pauses 301 resumes 201 queue 0
+[a] 03:06:35 [epp-thunder-lease-main-a] run 0 idle 31 paused 100 holds 215 pauses 301 resumes 201 queue 0
+[a] 03:07:39 [epp-thunder-lease-main-a] run 0 idle 31 paused 100 holds 215 pauses 301 resumes 201 queue 0
+[a] └───────┴───────────┘
+[a] EXIT=0
+[a] REPORTS_COMPLETE=yes
+[b] ===== epp-thunder-lease-main-tier-b (arm=thunder-lease-main-tier lane=b pod=program-aware-vllm-decode-559bd4f57c-5q7zz) =====
+[b] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[b] [epp-thunder-lease-main-tier-b] epp pod thunder-lane-b-epp-56645d7fd8-xl2k2, flow control lines: 1
+[b] 02:31:04 [epp-thunder-lease-main-tier-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:32:08 [epp-thunder-lease-main-tier-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:33:11 [epp-thunder-lease-main-tier-b] run 127 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:34:15 [epp-thunder-lease-main-tier-b] run 128 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:35:20 [epp-thunder-lease-main-tier-b] run 125 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:36:24 [epp-thunder-lease-main-tier-b] run 126 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:37:29 [epp-thunder-lease-main-tier-b] run 125 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:38:33 [epp-thunder-lease-main-tier-b] run 126 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:39:37 [epp-thunder-lease-main-tier-b] run 127 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:40:42 [epp-thunder-lease-main-tier-b] run 126 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:41:47 [epp-thunder-lease-main-tier-b] run 126 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:42:51 [epp-thunder-lease-main-tier-b] run 126 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:43:56 [epp-thunder-lease-main-tier-b] run 127 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:45:00 [epp-thunder-lease-main-tier-b] run 126 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:46:05 [epp-thunder-lease-main-tier-b] run 127 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:47:09 [epp-thunder-lease-main-tier-b] run 128 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:48:14 [epp-thunder-lease-main-tier-b] run 125 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:49:18 [epp-thunder-lease-main-tier-b] run 124 idle 4 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:50:23 [epp-thunder-lease-main-tier-b] run 127 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:51:27 [epp-thunder-lease-main-tier-b] run 126 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:52:32 [epp-thunder-lease-main-tier-b] run 128 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:53:36 [epp-thunder-lease-main-tier-b] run 127 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 02:54:41 [epp-thunder-lease-main-tier-b] run 125 idle 0 paused 3 holds 4 pauses 7 resumes 4 queue 0
+[b] 02:55:45 [epp-thunder-lease-main-tier-b] run 120 idle 2 paused 6 holds 5 pauses 11 resumes 5 queue 0
+[b] 02:56:49 [epp-thunder-lease-main-tier-b] run 119 idle 0 paused 9 holds 7 pauses 16 resumes 7 queue 0
+[b] 02:57:54 [epp-thunder-lease-main-tier-b] run 118 idle 0 paused 10 holds 9 pauses 19 resumes 9 queue 0
+[b] 02:58:58 [epp-thunder-lease-main-tier-b] run 116 idle 1 paused 11 holds 12 pauses 23 resumes 12 queue 0
+[b] 03:00:03 [epp-thunder-lease-main-tier-b] run 116 idle 0 paused 12 holds 14 pauses 26 resumes 14 queue 0
+[b] 03:01:08 [epp-thunder-lease-main-tier-b] run 119 idle 0 paused 9 holds 18 pauses 27 resumes 18 queue 0
+[b] 03:02:12 [epp-thunder-lease-main-tier-b] run 119 idle 1 paused 8 holds 19 pauses 27 resumes 19 queue 0
+[b] 03:03:17 [epp-thunder-lease-main-tier-b] run 106 idle 12 paused 10 holds 23 pauses 33 resumes 23 queue 0
+[b] 03:04:21 [epp-thunder-lease-main-tier-b] run 76 idle 38 paused 14 holds 29 pauses 43 resumes 29 queue 0
+[b] 03:05:26 [epp-thunder-lease-main-tier-b] run 0 idle 114 paused 14 holds 29 pauses 43 resumes 29 queue 0
+[b] 03:06:30 [epp-thunder-lease-main-tier-b] run 0 idle 114 paused 14 holds 29 pauses 43 resumes 29 queue 0
+[b] 03:07:35 [epp-thunder-lease-main-tier-b] run 0 idle 114 paused 14 holds 29 pauses 43 resumes 29 queue 0
+[b] error: unexpected EOF
+[b] reports complete; stopping benchmark process
+[b] EXIT=0
+[b] REPORTS_COMPLETE=yes
+
+===== analysis =====
+skipped (SKIP_ANALYSIS=1)
+artifacts: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-022937-c128-t1900
+phase B c=128 done: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-022937-c128-t1900 (exit 0)
+
+##### phase B c=192 window 2700s warm-up 900s: a:baseline b:thunder-lease-main c:thunder-lease-main-tier  (Wed Sep 30 03:10:01 PDT 2026)
+LANE_a_POD=program-aware-vllm-decode-559bd4f57c-x5569
+LANE_a_IP=10.100.12.15
+LANE_a_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-trwg
+LANE_b_POD=program-aware-vllm-decode-559bd4f57c-5q7zz
+LANE_b_IP=10.100.2.12
+LANE_b_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-91qy
+LANE_c_POD=program-aware-vllm-decode-559bd4f57c-p85wq
+LANE_c_IP=10.100.15.14
+LANE_c_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-zhnf
+run id: rep-20260930-031014-c192-t1900  concurrency=192 replicates=1 window=2700s arms=baseline client_timeout=1900s
+[a] ===== epp-baseline-a (arm=baseline lane=a pod=program-aware-vllm-decode-559bd4f57c-x5569) =====
+[a] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[a] [epp-baseline-a] epp pod thunder-lane-a-epp-59558bcb7f-wg6sk, flow control lines: 0
+[a] 03:11:41 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:12:44 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:13:48 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:14:51 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:15:55 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:16:58 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:18:02 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:19:05 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:20:08 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:21:12 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:22:15 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:23:18 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:24:22 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:25:25 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:26:29 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:27:32 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:28:35 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:29:39 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:30:42 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:31:45 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:32:49 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:33:53 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:34:56 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:36:00 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:37:04 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:38:07 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:39:11 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:40:14 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:41:18 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:42:21 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:43:25 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:44:28 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:45:32 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:46:35 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:47:39 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:48:42 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:49:45 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:50:49 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:51:52 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:52:55 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:53:59 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:55:02 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:56:06 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:57:09 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:58:13 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 03:59:16 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 04:00:20 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 04:01:23 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 04:02:27 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/../10-llm-d-router-replicates/run-replicates.sh: line 106: 59310 Terminated: 15          ( while ! kubectl exec "$POD" -n "$NS" -c bench -- test -f /results/DONE 2> /dev/null; do
+[a]     kubectl top pod -n "$NS" --no-headers 2> /dev/null | awk -v t="$(date +%s)" -v r="$SVC" -v v="$VP" -v b="$POD" '$1 ~ r || $1 == v || $1 == b {print t","$1","$2","$3}' >> "$CELL_DIR/cpu-usage.csv"; sleep 30;
+[a] done )
+[a] └───────┴───────────┘
+[a] EXIT=0
+[a] REPORTS_COMPLETE=yes
+[c] ===== epp-thunder-lease-main-tier-c (arm=thunder-lease-main-tier lane=c pod=program-aware-vllm-decode-559bd4f57c-p85wq) =====
+[c] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[c] [epp-thunder-lease-main-tier-c] epp pod thunder-lane-c-epp-7bc4f9578d-lbjtc, flow control lines: 1
+[c] 03:11:30 [epp-thunder-lease-main-tier-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 03:12:34 [epp-thunder-lease-main-tier-c] run 17 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 03:13:37 [epp-thunder-lease-main-tier-c] run 192 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 03:14:42 [epp-thunder-lease-main-tier-c] run 187 idle 0 paused 5 holds 0 pauses 5 resumes 0 queue 0
+[c] 03:15:46 [epp-thunder-lease-main-tier-c] run 181 idle 0 paused 11 holds 3 pauses 14 resumes 3 queue 0
+[c] 03:16:51 [epp-thunder-lease-main-tier-c] run 179 idle 1 paused 12 holds 4 pauses 16 resumes 4 queue 0
+[c] 03:17:56 [epp-thunder-lease-main-tier-c] run 177 idle 1 paused 14 holds 7 pauses 21 resumes 7 queue 0
+[c] 03:19:00 [epp-thunder-lease-main-tier-c] run 174 idle 2 paused 16 holds 12 pauses 28 resumes 12 queue 0
+[c] 03:20:05 [epp-thunder-lease-main-tier-c] run 175 idle 1 paused 16 holds 25 pauses 42 resumes 26 queue 0
+[c] 03:21:09 [epp-thunder-lease-main-tier-c] run 176 idle 1 paused 15 holds 35 pauses 53 resumes 38 queue 0
+[c] 03:22:14 [epp-thunder-lease-main-tier-c] run 175 idle 1 paused 16 holds 41 pauses 60 resumes 44 queue 0
+[c] 03:23:19 [epp-thunder-lease-main-tier-c] run 175 idle 0 paused 17 holds 45 pauses 65 resumes 48 queue 0
+[c] 03:24:24 [epp-thunder-lease-main-tier-c] run 168 idle 2 paused 22 holds 46 pauses 71 resumes 49 queue 0
+[c] 03:25:28 [epp-thunder-lease-main-tier-c] run 165 idle 1 paused 26 holds 53 pauses 83 resumes 57 queue 0
+[c] 03:26:33 [epp-thunder-lease-main-tier-c] run 160 idle 2 paused 30 holds 55 pauses 90 resumes 60 queue 0
+[c] 03:27:38 [epp-thunder-lease-main-tier-c] run 160 idle 3 paused 29 holds 61 pauses 95 resumes 66 queue 0
+[c] 03:28:42 [epp-thunder-lease-main-tier-c] run 163 idle 0 paused 29 holds 64 pauses 98 resumes 69 queue 0
+[c] 03:29:47 [epp-thunder-lease-main-tier-c] run 160 idle 0 paused 32 holds 64 pauses 101 resumes 69 queue 0
+[c] 03:30:51 [epp-thunder-lease-main-tier-c] run 154 idle 2 paused 36 holds 66 pauses 107 resumes 71 queue 0
+[c] 03:31:56 [epp-thunder-lease-main-tier-c] run 155 idle 1 paused 36 holds 74 pauses 116 resumes 80 queue 0
+[c] 03:33:01 [epp-thunder-lease-main-tier-c] run 152 idle 0 paused 40 holds 79 pauses 126 resumes 86 queue 0
+[c] 03:34:05 [epp-thunder-lease-main-tier-c] run 152 idle 0 paused 40 holds 85 pauses 133 resumes 93 queue 0
+[c] 03:35:10 [epp-thunder-lease-main-tier-c] run 149 idle 0 paused 43 holds 87 pauses 138 resumes 95 queue 0
+[c] 03:36:15 [epp-thunder-lease-main-tier-c] run 150 idle 0 paused 42 holds 91 pauses 141 resumes 99 queue 0
+[c] 03:37:19 [epp-thunder-lease-main-tier-c] run 150 idle 0 paused 42 holds 96 pauses 146 resumes 104 queue 0
+[c] 03:38:24 [epp-thunder-lease-main-tier-c] run 144 idle 1 paused 47 holds 103 pauses 159 resumes 112 queue 0
+[c] 03:39:29 [epp-thunder-lease-main-tier-c] run 144 idle 0 paused 48 holds 105 pauses 162 resumes 114 queue 0
+[c] 03:40:34 [epp-thunder-lease-main-tier-c] run 142 idle 1 paused 49 holds 108 pauses 166 resumes 117 queue 0
+[c] 03:41:38 [epp-thunder-lease-main-tier-c] run 138 idle 1 paused 53 holds 110 pauses 172 resumes 119 queue 0
+[c] 03:42:43 [epp-thunder-lease-main-tier-c] run 136 idle 0 paused 56 holds 112 pauses 177 resumes 121 queue 0
+[c] 03:43:48 [epp-thunder-lease-main-tier-c] run 137 idle 0 paused 55 holds 118 pauses 182 resumes 127 queue 0
+[c] 03:44:52 [epp-thunder-lease-main-tier-c] run 138 idle 0 paused 54 holds 120 pauses 183 resumes 129 queue 0
+[c] 03:45:57 [epp-thunder-lease-main-tier-c] run 135 idle 1 paused 56 holds 121 pauses 186 resumes 130 queue 0
+[c] 03:47:02 [epp-thunder-lease-main-tier-c] run 131 idle 2 paused 59 holds 126 pauses 194 resumes 135 queue 0
+[c] 03:48:07 [epp-thunder-lease-main-tier-c] run 137 idle 0 paused 56 holds 133 pauses 198 resumes 142 queue 0
+[c] 03:49:11 [epp-thunder-lease-main-tier-c] run 134 idle 0 paused 60 holds 134 pauses 202 resumes 142 queue 0
+[c] 03:50:16 [epp-thunder-lease-main-tier-c] run 136 idle 1 paused 58 holds 142 pauses 207 resumes 149 queue 0
+[c] 03:51:21 [epp-thunder-lease-main-tier-c] run 132 idle 2 paused 61 holds 146 pauses 214 resumes 153 queue 0
+[c] 03:52:26 [epp-thunder-lease-main-tier-c] run 137 idle 0 paused 64 holds 154 pauses 224 resumes 160 queue 0
+[c] 03:53:31 [epp-thunder-lease-main-tier-c] run 133 idle 0 paused 69 holds 156 pauses 231 resumes 162 queue 0
+[c] 03:54:36 [epp-thunder-lease-main-tier-c] run 135 idle 0 paused 70 holds 163 pauses 239 resumes 169 queue 0
+[c] 03:55:41 [epp-thunder-lease-main-tier-c] run 133 idle 0 paused 74 holds 170 pauses 249 resumes 175 queue 0
+[c] 03:56:45 [epp-thunder-lease-main-tier-c] run 135 idle 2 paused 74 holds 176 pauses 253 resumes 179 queue 0
+[c] 03:57:50 [epp-thunder-lease-main-tier-c] run 124 idle 12 paused 78 holds 179 pauses 260 resumes 182 queue 0
+[c] 03:58:55 [epp-thunder-lease-main-tier-c] run 113 idle 19 paused 82 holds 207 pauses 292 resumes 210 queue 0
+[c] 03:59:59 [epp-thunder-lease-main-tier-c] run 0 idle 127 paused 87 holds 225 pauses 315 resumes 228 queue 0
+[c] 04:01:04 [epp-thunder-lease-main-tier-c] run 0 idle 127 paused 87 holds 225 pauses 315 resumes 228 queue 0
+[c] 04:02:09 [epp-thunder-lease-main-tier-c] run 0 idle 127 paused 87 holds 225 pauses 315 resumes 228 queue 0
+[c] error: unexpected EOF
+[c] └───────┴────────────────────┴────────────────┘
+[c] EXIT=0
+[c] REPORTS_COMPLETE=yes
+[b] ===== epp-thunder-lease-main-b (arm=thunder-lease-main lane=b pod=program-aware-vllm-decode-559bd4f57c-5q7zz) =====
+[b] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[b] [epp-thunder-lease-main-b] epp pod thunder-lane-b-epp-7dbbcdc85c-rzjqh, flow control lines: 1
+[b] 03:11:42 [epp-thunder-lease-main-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 03:12:46 [epp-thunder-lease-main-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 03:13:50 [epp-thunder-lease-main-b] run 117 idle 0 paused 24 holds 0 pauses 24 resumes 0 queue 0
+[b] 03:14:54 [epp-thunder-lease-main-b] run 101 idle 0 paused 40 holds 0 pauses 40 resumes 0 queue 0
+[b] 03:15:58 [epp-thunder-lease-main-b] run 87 idle 0 paused 54 holds 0 pauses 54 resumes 0 queue 0
+[b] 03:17:03 [epp-thunder-lease-main-b] run 69 idle 0 paused 72 holds 0 pauses 72 resumes 0 queue 0
+[b] 03:18:08 [epp-thunder-lease-main-b] run 53 idle 0 paused 99 holds 11 pauses 99 resumes 0 queue 1
+[b] 03:19:12 [epp-thunder-lease-main-b] run 45 idle 1 paused 116 holds 22 pauses 117 resumes 1 queue 1
+[b] 03:20:17 [epp-thunder-lease-main-b] run 42 idle 0 paused 142 holds 51 pauses 150 resumes 8 queue 1
+[b] 03:21:22 [epp-thunder-lease-main-b] run 40 idle 1 paused 144 holds 68 pauses 168 resumes 24 queue 1
+[b] 03:22:27 [epp-thunder-lease-main-b] run 41 idle 1 paused 146 holds 80 pauses 179 resumes 33 queue 1
+[b] 03:23:32 [epp-thunder-lease-main-b] run 41 idle 1 paused 147 holds 88 pauses 187 resumes 40 queue 1
+[b] 03:24:37 [epp-thunder-lease-main-b] run 38 idle 0 paused 151 holds 95 pauses 198 resumes 47 queue 0
+[b] 03:25:42 [epp-thunder-lease-main-b] run 34 idle 1 paused 154 holds 100 pauses 206 resumes 52 queue 0
+[b] 03:26:47 [epp-thunder-lease-main-b] run 38 idle 1 paused 150 holds 109 pauses 211 resumes 61 queue 0
+[b] 03:27:52 [epp-thunder-lease-main-b] run 42 idle 0 paused 148 holds 122 pauses 221 resumes 73 queue 0
+[b] 03:28:58 [epp-thunder-lease-main-b] run 37 idle 4 paused 149 holds 128 pauses 228 resumes 79 queue 0
+[b] 03:30:03 [epp-thunder-lease-main-b] run 39 idle 0 paused 151 holds 132 pauses 234 resumes 83 queue 0
+[b] 03:31:08 [epp-thunder-lease-main-b] run 35 idle 1 paused 154 holds 136 pauses 241 resumes 87 queue 0
+[b] 03:32:13 [epp-thunder-lease-main-b] run 35 idle 0 paused 155 holds 142 pauses 248 resumes 93 queue 0
+[b] 03:33:18 [epp-thunder-lease-main-b] run 36 idle 0 paused 154 holds 147 pauses 252 resumes 98 queue 1
+[b] 03:34:23 [epp-thunder-lease-main-b] run 33 idle 0 paused 157 holds 152 pauses 260 resumes 103 queue 1
+[b] 03:35:28 [epp-thunder-lease-main-b] run 34 idle 0 paused 158 holds 162 pauses 270 resumes 112 queue 1
+[b] 03:36:34 [epp-thunder-lease-main-b] run 36 idle 1 paused 157 holds 177 pauses 284 resumes 127 queue 1
+[b] 03:37:39 [epp-thunder-lease-main-b] run 34 idle 1 paused 160 holds 184 pauses 293 resumes 133 queue 1
+[b] 03:38:44 [epp-thunder-lease-main-b] run 31 idle 1 paused 163 holds 190 pauses 302 resumes 139 queue 1
+[b] 03:39:49 [epp-thunder-lease-main-b] run 33 idle 1 paused 162 holds 197 pauses 308 resumes 146 queue 1
+[b] 03:40:55 [epp-thunder-lease-main-b] run 33 idle 0 paused 163 holds 200 pauses 312 resumes 149 queue 1
+[b] 03:42:00 [epp-thunder-lease-main-b] run 31 idle 0 paused 165 holds 200 pauses 314 resumes 149 queue 1
+[b] 03:43:05 [epp-thunder-lease-main-b] run 31 idle 0 paused 165 holds 203 pauses 317 resumes 152 queue 1
+[b] 03:44:10 [epp-thunder-lease-main-b] run 44 idle 0 paused 153 holds 219 pauses 320 resumes 167 queue 1
+[b] 03:45:15 [epp-thunder-lease-main-b] run 41 idle 1 paused 155 holds 226 pauses 329 resumes 174 queue 1
+[b] 03:46:20 [epp-thunder-lease-main-b] run 35 idle 0 paused 162 holds 230 pauses 340 resumes 178 queue 1
+[b] 03:47:25 [epp-thunder-lease-main-b] run 40 idle 0 paused 157 holds 247 pauses 352 resumes 195 queue 1
+[b] 03:48:30 [epp-thunder-lease-main-b] run 44 idle 0 paused 153 holds 257 pauses 358 resumes 205 queue 1
+[b] 03:49:35 [epp-thunder-lease-main-b] run 46 idle 0 paused 151 holds 273 pauses 372 resumes 221 queue 1
+[b] 03:50:41 [epp-thunder-lease-main-b] run 43 idle 0 paused 154 holds 283 pauses 385 resumes 231 queue 1
+[b] 03:51:46 [epp-thunder-lease-main-b] run 30 idle 0 paused 167 holds 287 pauses 402 resumes 235 queue 1
+[b] 03:52:51 [epp-thunder-lease-main-b] run 36 idle 1 paused 170 holds 302 pauses 410 resumes 240 queue 1
+[b] 03:53:56 [epp-thunder-lease-main-b] run 36 idle 0 paused 176 holds 312 pauses 421 resumes 245 queue 1
+[b] 03:55:01 [epp-thunder-lease-main-b] run 32 idle 0 paused 181 holds 314 pauses 427 resumes 246 queue 1
+[b] 03:56:06 [epp-thunder-lease-main-b] run 31 idle 0 paused 182 holds 322 pauses 437 resumes 255 queue 1
+[b] 03:57:12 [epp-thunder-lease-main-b] run 31 idle 0 paused 184 holds 330 pauses 446 resumes 262 queue 1
+[b] 03:58:17 [epp-thunder-lease-main-b] run 32 idle 0 paused 183 holds 335 pauses 450 resumes 267 queue 1
+[b] 03:59:22 [epp-thunder-lease-main-b] run 20 idle 15 paused 181 holds 351 pauses 463 resumes 282 queue 1
+[b] 04:00:27 [epp-thunder-lease-main-b] run 0 idle 44 paused 172 holds 380 pauses 483 resumes 311 queue 0
+[b] 04:01:33 [epp-thunder-lease-main-b] run 0 idle 44 paused 172 holds 380 pauses 483 resumes 311 queue 0
+[b] 04:02:38 [epp-thunder-lease-main-b] run 0 idle 44 paused 172 holds 380 pauses 483 resumes 311 queue 0
+[b] 04:03:43 [epp-thunder-lease-main-b] run 0 idle 44 paused 172 holds 380 pauses 483 resumes 311 queue 0
+[b] 04:04:49 [epp-thunder-lease-main-b] run 0 idle 44 paused 172 holds 380 pauses 483 resumes 311 queue 0
+[b] └───────┴────────────────────┴────────────────┘
+[b] EXIT=0
+[b] REPORTS_COMPLETE=yes
+
+===== analysis =====
+skipped (SKIP_ANALYSIS=1)
+artifacts: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-031014-c192-t1900
+phase B c=192 done: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-031014-c192-t1900 (exit 0)
+
+##### phase B c=256 window 2700s warm-up 900s: a:thunder-lease-main-tier b:baseline c:thunder-lease-main  (Wed Sep 30 04:06:28 PDT 2026)
+LANE_a_POD=program-aware-vllm-decode-559bd4f57c-x5569
+LANE_a_IP=10.100.12.15
+LANE_a_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-trwg
+LANE_b_POD=program-aware-vllm-decode-559bd4f57c-5q7zz
+LANE_b_IP=10.100.2.12
+LANE_b_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-91qy
+LANE_c_POD=program-aware-vllm-decode-559bd4f57c-p85wq
+LANE_c_IP=10.100.15.14
+LANE_c_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-zhnf
+run id: rep-20260930-040640-c256-t1900  concurrency=256 replicates=1 window=2700s arms=baseline client_timeout=1900s
+[b] ===== epp-baseline-b (arm=baseline lane=b pod=program-aware-vllm-decode-559bd4f57c-5q7zz) =====
+[b] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[b] [epp-baseline-b] epp pod thunder-lane-b-epp-768ff7d475-j89ct, flow control lines: 0
+[b] 04:08:02 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:09:06 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:10:09 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:11:13 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:12:16 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:13:19 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:14:23 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:15:27 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:16:30 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:17:34 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:18:37 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:19:41 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:20:44 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:21:47 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:22:51 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:23:54 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:24:58 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:26:01 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:27:05 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:28:08 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:29:12 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:30:15 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:31:19 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:32:22 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:33:25 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:34:29 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:35:32 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:36:35 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:37:39 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:38:42 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:39:46 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:40:50 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:41:53 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:42:56 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:44:00 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:45:04 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:46:07 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:47:11 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:48:14 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:49:17 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:50:21 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:51:24 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:52:27 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:53:31 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:54:34 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:55:37 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 04:56:41 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] └───────┴───────────┘
+[b] EXIT=0
+[b] REPORTS_COMPLETE=yes
+[c] ===== epp-thunder-lease-main-c (arm=thunder-lease-main lane=c pod=program-aware-vllm-decode-559bd4f57c-p85wq) =====
+[c] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[c] [epp-thunder-lease-main-c] epp pod thunder-lane-c-epp-bb6fc6b5d-rngrp, flow control lines: 1
+[c] 04:08:08 [epp-thunder-lease-main-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 04:09:12 [epp-thunder-lease-main-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 04:10:15 [epp-thunder-lease-main-c] run 170 idle 0 paused 24 holds 0 pauses 24 resumes 0 queue 1
+[c] 04:11:19 [epp-thunder-lease-main-c] run 132 idle 0 paused 62 holds 0 pauses 62 resumes 0 queue 1
+[c] 04:12:25 [epp-thunder-lease-main-c] run 119 idle 0 paused 75 holds 0 pauses 75 resumes 0 queue 1
+[c] 04:13:30 [epp-thunder-lease-main-c] run 104 idle 1 paused 89 holds 0 pauses 89 resumes 0 queue 1
+[c] 04:14:35 [epp-thunder-lease-main-c] run 68 idle 0 paused 126 holds 0 pauses 126 resumes 0 queue 1
+[c] 04:15:40 [epp-thunder-lease-main-c] run 48 idle 0 paused 146 holds 0 pauses 146 resumes 0 queue 1
+[c] 04:16:45 [epp-thunder-lease-main-c] run 45 idle 0 paused 181 holds 36 pauses 185 resumes 4 queue 1
+[c] 04:17:50 [epp-thunder-lease-main-c] run 40 idle 0 paused 203 holds 56 pauses 210 resumes 7 queue 1
+[c] 04:18:56 [epp-thunder-lease-main-c] run 41 idle 1 paused 201 holds 72 pauses 224 resumes 23 queue 1
+[c] 04:20:01 [epp-thunder-lease-main-c] run 39 idle 0 paused 204 holds 80 pauses 236 resumes 32 queue 1
+[c] 04:21:07 [epp-thunder-lease-main-c] run 37 idle 0 paused 207 holds 87 pauses 245 resumes 38 queue 1
+[c] 04:22:13 [epp-thunder-lease-main-c] run 38 idle 0 paused 207 holds 93 pauses 251 resumes 44 queue 1
+[c] 04:23:18 [epp-thunder-lease-main-c] run 37 idle 0 paused 208 holds 100 pauses 259 resumes 51 queue 1
+[c] 04:24:24 [epp-thunder-lease-main-c] run 35 idle 0 paused 211 holds 108 pauses 269 resumes 58 queue 1
+[c] 04:25:32 [epp-thunder-lease-main-c] run 37 idle 0 paused 211 holds 120 pauses 279 resumes 68 queue 1
+[c] 04:26:39 [epp-thunder-lease-main-c] run 37 idle 1 paused 211 holds 125 pauses 283 resumes 72 queue 1
+[c] 04:27:44 [epp-thunder-lease-main-c] run 37 idle 0 paused 212 holds 130 pauses 289 resumes 77 queue 1
+[c] 04:28:50 [epp-thunder-lease-main-c] run 33 idle 0 paused 216 holds 130 pauses 293 resumes 77 queue 1
+[c] 04:29:55 [epp-thunder-lease-main-c] run 30 idle 1 paused 218 holds 136 pauses 301 resumes 83 queue 1
+[c] 04:31:01 [epp-thunder-lease-main-c] run 35 idle 0 paused 215 holds 149 pauses 311 resumes 96 queue 1
+[c] 04:32:07 [epp-thunder-lease-main-c] run 36 idle 0 paused 214 holds 154 pauses 316 resumes 102 queue 1
+[c] 04:33:12 [epp-thunder-lease-main-c] run 33 idle 1 paused 216 holds 157 pauses 322 resumes 106 queue 1
+[c] 04:34:18 [epp-thunder-lease-main-c] run 30 idle 0 paused 220 holds 159 pauses 328 resumes 108 queue 1
+[c] 04:35:24 [epp-thunder-lease-main-c] run 29 idle 0 paused 221 holds 161 pauses 331 resumes 110 queue 1
+[c] 04:36:29 [epp-thunder-lease-main-c] run 31 idle 0 paused 219 holds 168 pauses 336 resumes 117 queue 1
+[c] 04:37:35 [epp-thunder-lease-main-c] run 31 idle 0 paused 219 holds 174 pauses 342 resumes 123 queue 1
+[c] 04:38:41 [epp-thunder-lease-main-c] run 34 idle 0 paused 216 holds 180 pauses 345 resumes 129 queue 1
+[c] 04:39:46 [epp-thunder-lease-main-c] run 31 idle 1 paused 218 holds 185 pauses 352 resumes 134 queue 1
+[c] 04:40:52 [epp-thunder-lease-main-c] run 66 idle 0 paused 192 holds 223 pauses 356 resumes 164 queue 1
+[c] 04:41:57 [epp-thunder-lease-main-c] run 62 idle 0 paused 196 holds 229 pauses 366 resumes 170 queue 1
+[c] 04:43:03 [epp-thunder-lease-main-c] run 44 idle 0 paused 214 holds 235 pauses 390 resumes 176 queue 1
+[c] 04:44:09 [epp-thunder-lease-main-c] run 48 idle 3 paused 207 holds 256 pauses 404 resumes 197 queue 1
+[c] 04:45:14 [epp-thunder-lease-main-c] run 50 idle 1 paused 207 holds 271 pauses 419 resumes 212 queue 1
+[c] 04:46:20 [epp-thunder-lease-main-c] run 66 idle 0 paused 192 holds 302 pauses 435 resumes 243 queue 0
+[c] 04:47:25 [epp-thunder-lease-main-c] run 77 idle 0 paused 181 holds 318 pauses 440 resumes 259 queue 0
+[c] 04:48:31 [epp-thunder-lease-main-c] run 62 idle 2 paused 194 holds 329 pauses 464 resumes 270 queue 0
+[c] 04:49:37 [epp-thunder-lease-main-c] run 48 idle 0 paused 210 holds 334 pauses 485 resumes 275 queue 0
+[c] 04:50:42 [epp-thunder-lease-main-c] run 43 idle 0 paused 215 holds 337 pauses 493 resumes 278 queue 0
+[c] 04:51:48 [epp-thunder-lease-main-c] run 35 idle 0 paused 223 holds 339 pauses 503 resumes 280 queue 0
+[c] 04:52:54 [epp-thunder-lease-main-c] run 41 idle 0 paused 265 holds 390 pauses 548 resumes 283 queue 0
+[c] 04:54:00 [epp-thunder-lease-main-c] run 40 idle 0 paused 269 holds 403 pauses 562 resumes 293 queue 0
+[c] 04:55:06 [epp-thunder-lease-main-c] run 23 idle 16 paused 270 holds 408 pauses 568 resumes 298 queue 0
+[c] 04:56:12 [epp-thunder-lease-main-c] run 24 idle 21 paused 269 holds 449 pauses 603 resumes 334 queue 0
+[c] 04:57:18 [epp-thunder-lease-main-c] run 0 idle 43 paused 271 holds 468 pauses 624 resumes 353 queue 0
+[c] 04:58:24 [epp-thunder-lease-main-c] run 0 idle 43 paused 271 holds 468 pauses 624 resumes 353 queue 0
+[c] 04:59:31 [epp-thunder-lease-main-c] run 0 idle 43 paused 271 holds 468 pauses 624 resumes 353 queue 0
+[c] 05:00:36 [epp-thunder-lease-main-c] run 0 idle 43 paused 271 holds 468 pauses 624 resumes 353 queue 0
+[c] /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/../10-llm-d-router-replicates/run-replicates.sh: line 106: 72476 Terminated: 15          ( while ! kubectl exec "$POD" -n "$NS" -c bench -- test -f /results/DONE 2> /dev/null; do
+[c]     kubectl top pod -n "$NS" --no-headers 2> /dev/null | awk -v t="$(date +%s)" -v r="$SVC" -v v="$VP" -v b="$POD" '$1 ~ r || $1 == v || $1 == b {print t","$1","$2","$3}' >> "$CELL_DIR/cpu-usage.csv"; sleep 30;
+[c] done )
+[c] error: unexpected EOF
+[c] └───────┴────────────────────┴────────────────┘
+[c] EXIT=0
+[c] REPORTS_COMPLETE=yes
+[a] ===== epp-thunder-lease-main-tier-a (arm=thunder-lease-main-tier lane=a pod=program-aware-vllm-decode-559bd4f57c-x5569) =====
+[a] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[a] [epp-thunder-lease-main-tier-a] epp pod thunder-lane-a-epp-677b85b479-9kswx, flow control lines: 1
+[a] 04:08:07 [epp-thunder-lease-main-tier-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 04:09:11 [epp-thunder-lease-main-tier-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 04:10:14 [epp-thunder-lease-main-tier-a] run 256 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 04:11:18 [epp-thunder-lease-main-tier-a] run 238 idle 0 paused 18 holds 0 pauses 18 resumes 0 queue 0
+[a] 04:12:23 [epp-thunder-lease-main-tier-a] run 215 idle 0 paused 41 holds 0 pauses 41 resumes 0 queue 0
+[a] 04:13:29 [epp-thunder-lease-main-tier-a] run 208 idle 1 paused 47 holds 0 pauses 47 resumes 0 queue 0
+[a] 04:14:34 [epp-thunder-lease-main-tier-a] run 193 idle 1 paused 62 holds 0 pauses 62 resumes 0 queue 0
+[a] 04:15:40 [epp-thunder-lease-main-tier-a] run 186 idle 0 paused 70 holds 0 pauses 70 resumes 0 queue 0
+[a] 04:16:45 [epp-thunder-lease-main-tier-a] run 174 idle 0 paused 82 holds 0 pauses 82 resumes 0 queue 0
+[a] 04:17:51 [epp-thunder-lease-main-tier-a] run 171 idle 0 paused 85 holds 4 pauses 89 resumes 4 queue 0
+[a] 04:18:57 [epp-thunder-lease-main-tier-a] run 173 idle 0 paused 83 holds 13 pauses 96 resumes 13 queue 0
+[a] 04:20:02 [epp-thunder-lease-main-tier-a] run 177 idle 2 paused 77 holds 23 pauses 100 resumes 23 queue 0
+[a] 04:21:08 [epp-thunder-lease-main-tier-a] run 180 idle 1 paused 75 holds 32 pauses 107 resumes 32 queue 0
+[a] 04:22:13 [epp-thunder-lease-main-tier-a] run 182 idle 1 paused 73 holds 45 pauses 119 resumes 46 queue 0
+[a] 04:23:19 [epp-thunder-lease-main-tier-a] run 183 idle 0 paused 73 holds 52 pauses 127 resumes 54 queue 0
+[a] 04:24:25 [epp-thunder-lease-main-tier-a] run 177 idle 0 paused 79 holds 56 pauses 137 resumes 58 queue 0
+[a] 04:25:33 [epp-thunder-lease-main-tier-a] run 170 idle 0 paused 86 holds 60 pauses 148 resumes 62 queue 0
+[a] 04:26:40 [epp-thunder-lease-main-tier-a] run 168 idle 1 paused 87 holds 68 pauses 157 resumes 70 queue 0
+[a] 04:27:45 [epp-thunder-lease-main-tier-a] run 169 idle 0 paused 87 holds 73 pauses 162 resumes 75 queue 0
+[a] 04:28:51 [epp-thunder-lease-main-tier-a] run 168 idle 0 paused 88 holds 78 pauses 168 resumes 80 queue 0
+[a] 04:29:56 [epp-thunder-lease-main-tier-a] run 163 idle 0 paused 93 holds 78 pauses 173 resumes 80 queue 0
+[a] 04:31:02 [epp-thunder-lease-main-tier-a] run 158 idle 0 paused 98 holds 80 pauses 180 resumes 82 queue 0
+[a] 04:32:07 [epp-thunder-lease-main-tier-a] run 154 idle 1 paused 101 holds 86 pauses 189 resumes 88 queue 0
+[a] 04:33:13 [epp-thunder-lease-main-tier-a] run 155 idle 0 paused 101 holds 97 pauses 200 resumes 99 queue 0
+[a] 04:34:19 [epp-thunder-lease-main-tier-a] run 160 idle 0 paused 96 holds 105 pauses 203 resumes 107 queue 0
+[a] 04:35:24 [epp-thunder-lease-main-tier-a] run 160 idle 0 paused 96 holds 112 pauses 210 resumes 114 queue 0
+[a] 04:36:30 [epp-thunder-lease-main-tier-a] run 159 idle 3 paused 94 holds 118 pauses 214 resumes 120 queue 0
+[a] 04:37:35 [epp-thunder-lease-main-tier-a] run 157 idle 0 paused 99 holds 119 pauses 220 resumes 121 queue 0
+[a] 04:38:41 [epp-thunder-lease-main-tier-a] run 148 idle 1 paused 107 holds 120 pauses 229 resumes 122 queue 0
+[a] 04:39:47 [epp-thunder-lease-main-tier-a] run 146 idle 0 paused 110 holds 123 pauses 235 resumes 125 queue 0
+[a] 04:40:52 [epp-thunder-lease-main-tier-a] run 143 idle 1 paused 112 holds 125 pauses 239 resumes 127 queue 0
+[a] 04:41:58 [epp-thunder-lease-main-tier-a] run 146 idle 0 paused 110 holds 136 pauses 248 resumes 138 queue 0
+[a] 04:43:03 [epp-thunder-lease-main-tier-a] run 143 idle 0 paused 119 holds 151 pauses 266 resumes 147 queue 0
+[a] 04:44:09 [epp-thunder-lease-main-tier-a] run 150 idle 1 paused 117 holds 168 pauses 278 resumes 161 queue 0
+[a] 04:45:15 [epp-thunder-lease-main-tier-a] run 156 idle 0 paused 119 holds 179 pauses 286 resumes 167 queue 0
+[a] 04:46:20 [epp-thunder-lease-main-tier-a] run 155 idle 0 paused 125 holds 188 pauses 301 resumes 176 queue 0
+[a] 04:47:26 [epp-thunder-lease-main-tier-a] run 149 idle 0 paused 131 holds 193 pauses 312 resumes 181 queue 0
+[a] 04:48:32 [epp-thunder-lease-main-tier-a] run 145 idle 5 paused 140 holds 204 pauses 326 resumes 186 queue 0
+[a] 04:49:37 [epp-thunder-lease-main-tier-a] run 156 idle 0 paused 137 holds 213 pauses 332 resumes 195 queue 0
+[a] 04:50:43 [epp-thunder-lease-main-tier-a] run 156 idle 1 paused 139 holds 219 pauses 337 resumes 198 queue 0
+[a] 04:51:49 [epp-thunder-lease-main-tier-a] run 163 idle 0 paused 138 holds 234 pauses 348 resumes 210 queue 1
+[a] 04:52:55 [epp-thunder-lease-main-tier-a] run 157 idle 0 paused 144 holds 241 pauses 361 resumes 217 queue 1
+[a] 04:54:01 [epp-thunder-lease-main-tier-a] run 157 idle 1 paused 151 holds 255 pauses 374 resumes 223 queue 1
+[a] 04:55:07 [epp-thunder-lease-main-tier-a] run 143 idle 19 paused 150 holds 266 pauses 381 resumes 231 queue 1
+[a] 04:56:13 [epp-thunder-lease-main-tier-a] run 134 idle 26 paused 154 holds 312 pauses 429 resumes 275 queue 1
+[a] 04:57:19 [epp-thunder-lease-main-tier-a] run 0 idle 155 paused 161 holds 331 pauses 452 resumes 291 queue 0
+[a] 04:58:25 [epp-thunder-lease-main-tier-a] run 0 idle 155 paused 161 holds 331 pauses 452 resumes 291 queue 0
+[a] 04:59:31 [epp-thunder-lease-main-tier-a] run 0 idle 155 paused 161 holds 331 pauses 452 resumes 291 queue 0
+[a] 05:00:36 [epp-thunder-lease-main-tier-a] run 0 idle 155 paused 161 holds 331 pauses 452 resumes 291 queue 0
+[a] error: unexpected EOF
+[a] E0930 05:03:40.957089   86043 v2.go:167] "Unhandled Error" err="read message: read tcp 192.168.86.185:55680->34.31.130.141:443: read: connection reset by peer"
+[a] E0930 05:03:40.957109   86043 v2.go:150] "Unhandled Error" err="read message: read tcp 192.168.86.185:55680->34.31.130.141:443: read: connection reset by peer"
+[a] error: error reading from error stream: read message: read tcp 192.168.86.185:55680->34.31.130.141:443: read: connection reset by peer
+[a] └───────┴────────────────────┴────────────────┘
+[a] EXIT=0
+[a] REPORTS_COMPLETE=yes
+
+===== analysis =====
+skipped (SKIP_ANALYSIS=1)
+artifacts: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-040640-c256-t1900
+phase B c=256 done: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-040640-c256-t1900 (exit 0)
+
+##### 4. phase A: offloading off (Wed Sep 30 05:04:32 PDT 2026)
+applying /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/vllm-deploy-3rep-off.yaml (Wed Sep 30 05:04:33 PDT 2026)
+deployment.apps/program-aware-vllm-decode replaced
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 of 3 updated replicas are available...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 1 of 3 updated replicas are available...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 2 of 3 updated replicas are available...
+deployment "program-aware-vllm-decode" successfully rolled out
+POD                                          UID                                    NODE                                     IP             PHASE     RESTARTS
+program-aware-vllm-decode-679589c46c-hb2fm   d1a8eb94-b3d2-4297-bcdb-1cd6f18577e7   gke-bobbm-bobbm-spoth100-ef0c964e-91qy   10.100.2.13    Running   0
+program-aware-vllm-decode-679589c46c-r4q5d   14a3bd20-ff10-48b9-8212-8a7c45148d5d   gke-bobbm-bobbm-spoth100-ef0c964e-zhnf   10.100.15.15   Running   0
+program-aware-vllm-decode-679589c46c-w66mj   9057afba-2ba3-49fe-a5be-8e684dc9b286   gke-bobbm-bobbm-spoth100-ef0c964e-trwg   10.100.12.21   Running   0
+program-aware-vllm-decode-679589c46c-hb2fm kv_offloading_size=None num_gpu_blocks=139815
+program-aware-vllm-decode-679589c46c-r4q5d kv_offloading_size=None num_gpu_blocks=139815
+program-aware-vllm-decode-679589c46c-w66mj kv_offloading_size=None num_gpu_blocks=139815
+LANE_a_POD=program-aware-vllm-decode-679589c46c-w66mj
+LANE_a_IP=10.100.12.21
+LANE_a_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-trwg
+LANE_b_POD=program-aware-vllm-decode-679589c46c-hb2fm
+LANE_b_IP=10.100.2.13
+LANE_b_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-91qy
+LANE_c_POD=program-aware-vllm-decode-679589c46c-r4q5d
+LANE_c_IP=10.100.15.15
+LANE_c_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-zhnf
+lane a: thunder-lane-a-epp, arm thunder-lease-main, image thunder-agent-lease-44544c04
+lane b: thunder-lane-b-epp, arm thunder-lease-main, image thunder-agent-lease-44544c04
+lane c: thunder-lane-c-epp, arm thunder-lease-main, image thunder-agent-lease-44544c04
+
+##### phase A c=32 window 1800s warm-up 600s: a:baseline b:thunder-lease-main c:thunder-lease-main  (Wed Sep 30 05:08:55 PDT 2026)
+LANE_a_POD=program-aware-vllm-decode-679589c46c-w66mj
+LANE_a_IP=10.100.12.21
+LANE_a_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-trwg
+LANE_b_POD=program-aware-vllm-decode-679589c46c-hb2fm
+LANE_b_IP=10.100.2.13
+LANE_b_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-91qy
+LANE_c_POD=program-aware-vllm-decode-679589c46c-r4q5d
+LANE_c_IP=10.100.15.15
+LANE_c_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-zhnf
+run id: rep-20260930-050907-c32-t1900  concurrency=32 replicates=1 window=1800s arms=baseline client_timeout=1900s
+[b] ===== epp-thunder-lease-main-b (arm=thunder-lease-main lane=b pod=program-aware-vllm-decode-679589c46c-hb2fm) =====
+[b] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[b] [epp-thunder-lease-main-b] epp pod thunder-lane-b-epp-596fc69f9-kw88d, flow control lines: 1
+[b] 05:10:25 [epp-thunder-lease-main-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:11:29 [epp-thunder-lease-main-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:12:32 [epp-thunder-lease-main-b] run 27 idle 5 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:13:36 [epp-thunder-lease-main-b] run 29 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:14:39 [epp-thunder-lease-main-b] run 31 idle 1 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:15:43 [epp-thunder-lease-main-b] run 32 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:16:46 [epp-thunder-lease-main-b] run 30 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:17:50 [epp-thunder-lease-main-b] run 30 idle 2 paused 0 holds 1 pauses 2 resumes 2 queue 0
+[b] 05:18:53 [epp-thunder-lease-main-b] run 29 idle 1 paused 2 holds 3 pauses 6 resumes 4 queue 0
+[b] 05:19:57 [epp-thunder-lease-main-b] run 28 idle 0 paused 4 holds 4 pauses 9 resumes 5 queue 0
+[b] 05:21:00 [epp-thunder-lease-main-b] run 25 idle 2 paused 6 holds 5 pauses 12 resumes 6 queue 0
+[b] 05:22:04 [epp-thunder-lease-main-b] run 30 idle 0 paused 4 holds 11 pauses 16 resumes 12 queue 0
+[b] 05:23:07 [epp-thunder-lease-main-b] run 29 idle 0 paused 5 holds 14 pauses 20 resumes 15 queue 0
+[b] 05:24:11 [epp-thunder-lease-main-b] run 28 idle 1 paused 6 holds 17 pauses 24 resumes 18 queue 1
+[b] 05:25:14 [epp-thunder-lease-main-b] run 28 idle 0 paused 7 holds 23 pauses 31 resumes 24 queue 1
+[b] 05:26:18 [epp-thunder-lease-main-b] run 27 idle 1 paused 8 holds 27 pauses 36 resumes 28 queue 0
+[b] 05:27:22 [epp-thunder-lease-main-b] run 27 idle 0 paused 11 holds 30 pauses 41 resumes 30 queue 0
+[b] 05:28:25 [epp-thunder-lease-main-b] run 27 idle 1 paused 11 holds 34 pauses 45 resumes 34 queue 0
+[b] 05:29:29 [epp-thunder-lease-main-b] run 28 idle 0 paused 11 holds 40 pauses 51 resumes 40 queue 0
+[b] 05:30:32 [epp-thunder-lease-main-b] run 27 idle 0 paused 12 holds 43 pauses 55 resumes 43 queue 0
+[b] 05:31:36 [epp-thunder-lease-main-b] run 26 idle 0 paused 15 holds 45 pauses 59 resumes 44 queue 0
+[b] 05:32:39 [epp-thunder-lease-main-b] run 25 idle 1 paused 15 holds 49 pauses 63 resumes 48 queue 0
+[b] 05:33:43 [epp-thunder-lease-main-b] run 26 idle 0 paused 16 holds 52 pauses 66 resumes 50 queue 0
+[b] 05:34:46 [epp-thunder-lease-main-b] run 25 idle 0 paused 17 holds 54 pauses 69 resumes 52 queue 0
+[b] 05:35:50 [epp-thunder-lease-main-b] run 24 idle 0 paused 18 holds 57 pauses 73 resumes 55 queue 0
+[b] 05:36:54 [epp-thunder-lease-main-b] run 22 idle 3 paused 17 holds 59 pauses 74 resumes 57 queue 0
+[b] 05:37:58 [epp-thunder-lease-main-b] run 24 idle 0 paused 18 holds 61 pauses 77 resumes 59 queue 0
+[b] 05:39:01 [epp-thunder-lease-main-b] run 23 idle 1 paused 18 holds 63 pauses 79 resumes 61 queue 0
+[b] 05:40:05 [epp-thunder-lease-main-b] run 24 idle 0 paused 18 holds 64 pauses 80 resumes 62 queue 0
+[b] 05:41:09 [epp-thunder-lease-main-b] run 23 idle 1 paused 18 holds 64 pauses 80 resumes 62 queue 0
+[b] 05:42:12 [epp-thunder-lease-main-b] run 7 idle 16 paused 19 holds 64 pauses 81 resumes 62 queue 0
+[b] 05:43:16 [epp-thunder-lease-main-b] run 9 idle 10 paused 23 holds 73 pauses 94 resumes 71 queue 0
+[b] 05:44:19 [epp-thunder-lease-main-b] run 0 idle 19 paused 23 holds 73 pauses 94 resumes 71 queue 0
+[b] /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/../10-llm-d-router-replicates/run-replicates.sh: line 106: 87740 Terminated: 15          ( while ! kubectl exec "$POD" -n "$NS" -c bench -- test -f /results/DONE 2> /dev/null; do
+[b]     kubectl top pod -n "$NS" --no-headers 2> /dev/null | awk -v t="$(date +%s)" -v r="$SVC" -v v="$VP" -v b="$POD" '$1 ~ r || $1 == v || $1 == b {print t","$1","$2","$3}' >> "$CELL_DIR/cpu-usage.csv"; sleep 30;
+[b] done )
+[b] └───────┴───────────┘
+[b] EXIT=0
+[b] REPORTS_COMPLETE=yes
+[a] ===== epp-baseline-a (arm=baseline lane=a pod=program-aware-vllm-decode-679589c46c-w66mj) =====
+[a] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[a] [epp-baseline-a] epp pod thunder-lane-a-epp-866cb8f965-cswk9, flow control lines: 0
+[a] 05:10:24 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:11:27 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:12:31 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:13:34 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:14:38 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:15:41 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:16:45 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:17:49 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:18:52 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:19:56 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:20:59 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:22:02 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:23:06 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:24:09 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:25:13 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:26:16 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:27:20 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:28:23 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:29:26 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:30:30 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:31:33 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:32:37 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:33:40 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:34:43 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:35:47 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:36:50 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:37:53 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:38:57 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:40:00 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:41:04 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:42:07 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:43:10 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:44:14 [epp-baseline-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] E0930 05:45:31.074646   95942 v2.go:167] "Unhandled Error" err="read message: read tcp 192.168.86.185:59549->34.31.130.141:443: read: connection reset by peer"
+[a] E0930 05:45:31.074651   95942 v2.go:150] "Unhandled Error" err="read message: read tcp 192.168.86.185:59549->34.31.130.141:443: read: connection reset by peer"
+[a] error: error reading from error stream: read message: read tcp 192.168.86.185:59549->34.31.130.141:443: read: connection reset by peer
+[a] └───────┴───────────┘
+[a] EXIT=0
+[a] REPORTS_COMPLETE=yes
+[c] ===== epp-thunder-lease-main-c (arm=thunder-lease-main lane=c pod=program-aware-vllm-decode-679589c46c-r4q5d) =====
+[c] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[c] [epp-thunder-lease-main-c] epp pod thunder-lane-c-epp-67f87946f7-bjvp6, flow control lines: 1
+[c] 05:10:36 [epp-thunder-lease-main-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 05:11:39 [epp-thunder-lease-main-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 05:12:43 [epp-thunder-lease-main-c] run 32 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 05:13:47 [epp-thunder-lease-main-c] run 30 idle 2 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 05:14:51 [epp-thunder-lease-main-c] run 27 idle 5 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 05:15:54 [epp-thunder-lease-main-c] run 29 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 05:16:58 [epp-thunder-lease-main-c] run 29 idle 3 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 05:18:02 [epp-thunder-lease-main-c] run 30 idle 2 paused 0 holds 1 pauses 1 resumes 1 queue 0
+[c] 05:19:06 [epp-thunder-lease-main-c] run 28 idle 3 paused 1 holds 2 pauses 3 resumes 2 queue 0
+[c] 05:20:09 [epp-thunder-lease-main-c] run 27 idle 1 paused 4 holds 4 pauses 8 resumes 4 queue 0
+[c] 05:21:13 [epp-thunder-lease-main-c] run 26 idle 0 paused 6 holds 5 pauses 11 resumes 5 queue 0
+[c] 05:22:16 [epp-thunder-lease-main-c] run 29 idle 0 paused 3 holds 11 pauses 14 resumes 11 queue 0
+[c] 05:23:20 [epp-thunder-lease-main-c] run 30 idle 0 paused 4 holds 14 pauses 20 resumes 16 queue 0
+[c] 05:24:24 [epp-thunder-lease-main-c] run 28 idle 2 paused 5 holds 16 pauses 23 resumes 18 queue 0
+[c] 05:25:27 [epp-thunder-lease-main-c] run 29 idle 0 paused 6 holds 19 pauses 28 resumes 22 queue 0
+[c] 05:26:31 [epp-thunder-lease-main-c] run 27 idle 1 paused 8 holds 21 pauses 32 resumes 24 queue 0
+[c] 05:27:35 [epp-thunder-lease-main-c] run 28 idle 0 paused 9 holds 24 pauses 35 resumes 26 queue 0
+[c] 05:28:38 [epp-thunder-lease-main-c] run 26 idle 1 paused 11 holds 29 pauses 42 resumes 31 queue 0
+[c] 05:29:42 [epp-thunder-lease-main-c] run 27 idle 0 paused 12 holds 35 pauses 50 resumes 38 queue 0
+[c] 05:30:46 [epp-thunder-lease-main-c] run 27 idle 0 paused 13 holds 41 pauses 57 resumes 44 queue 0
+[c] 05:31:49 [epp-thunder-lease-main-c] run 27 idle 0 paused 13 holds 45 pauses 61 resumes 48 queue 0
+[c] 05:32:53 [epp-thunder-lease-main-c] run 26 idle 1 paused 13 holds 49 pauses 65 resumes 52 queue 0
+[c] 05:33:57 [epp-thunder-lease-main-c] run 25 idle 1 paused 16 holds 53 pauses 71 resumes 55 queue 0
+[c] 05:35:00 [epp-thunder-lease-main-c] run 26 idle 0 paused 17 holds 60 pauses 78 resumes 61 queue 0
+[c] 05:36:04 [epp-thunder-lease-main-c] run 24 idle 0 paused 19 holds 62 pauses 82 resumes 63 queue 0
+[c] 05:37:08 [epp-thunder-lease-main-c] run 23 idle 1 paused 19 holds 65 pauses 85 resumes 66 queue 1
+[c] 05:38:12 [epp-thunder-lease-main-c] run 24 idle 1 paused 18 holds 68 pauses 87 resumes 69 queue 0
+[c] 05:39:16 [epp-thunder-lease-main-c] run 24 idle 1 paused 18 holds 70 pauses 89 resumes 71 queue 0
+[c] 05:40:20 [epp-thunder-lease-main-c] run 24 idle 0 paused 19 holds 73 pauses 93 resumes 74 queue 0
+[c] 05:41:24 [epp-thunder-lease-main-c] run 23 idle 1 paused 19 holds 76 pauses 96 resumes 77 queue 0
+[c] 05:42:27 [epp-thunder-lease-main-c] run 15 idle 9 paused 19 holds 77 pauses 97 resumes 78 queue 1
+[c] 05:43:31 [epp-thunder-lease-main-c] run 12 idle 10 paused 21 holds 84 pauses 106 resumes 85 queue 0
+[c] 05:44:35 [epp-thunder-lease-main-c] run 0 idle 21 paused 22 holds 85 pauses 108 resumes 86 queue 0
+[c] 05:45:39 [epp-thunder-lease-main-c] run 0 idle 21 paused 22 holds 85 pauses 108 resumes 86 queue 0
+[c] 05:46:43 [epp-thunder-lease-main-c] run 0 idle 21 paused 22 holds 85 pauses 108 resumes 86 queue 0
+[c] error: unexpected EOF
+[c] └───────┴───────────┘
+[c] EXIT=0
+[c] REPORTS_COMPLETE=yes
+
+===== analysis =====
+skipped (SKIP_ANALYSIS=1)
+artifacts: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-050907-c32-t1900
+phase A c=32 done: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-050907-c32-t1900 (exit 0)
+
+##### phase A c=128 window 1800s warm-up 600s: a:thunder-lease-main b:baseline c:thunder-lease-main  (Wed Sep 30 05:48:42 PDT 2026)
+LANE_a_POD=program-aware-vllm-decode-679589c46c-w66mj
+LANE_a_IP=10.100.12.21
+LANE_a_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-trwg
+LANE_b_POD=program-aware-vllm-decode-679589c46c-hb2fm
+LANE_b_IP=10.100.2.13
+LANE_b_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-91qy
+LANE_c_POD=program-aware-vllm-decode-679589c46c-r4q5d
+LANE_c_IP=10.100.15.15
+LANE_c_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-zhnf
+run id: rep-20260930-054855-c128-t1900  concurrency=128 replicates=1 window=1800s arms=baseline client_timeout=1900s
+[c] ===== epp-thunder-lease-main-c (arm=thunder-lease-main lane=c pod=program-aware-vllm-decode-679589c46c-r4q5d) =====
+[c] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[c] [epp-thunder-lease-main-c] epp pod thunder-lane-c-epp-98d8647b-pdbwv, flow control lines: 1
+[c] 05:50:12 [epp-thunder-lease-main-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 05:51:15 [epp-thunder-lease-main-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 05:52:19 [epp-thunder-lease-main-c] run 98 idle 1 paused 29 holds 0 pauses 29 resumes 0 queue 0
+[c] 05:53:23 [epp-thunder-lease-main-c] run 81 idle 1 paused 46 holds 0 pauses 46 resumes 0 queue 0
+[c] 05:54:27 [epp-thunder-lease-main-c] run 68 idle 1 paused 59 holds 0 pauses 59 resumes 0 queue 0
+[c] 05:55:31 [epp-thunder-lease-main-c] run 52 idle 0 paused 76 holds 0 pauses 76 resumes 0 queue 0
+[c] 05:56:36 [epp-thunder-lease-main-c] run 49 idle 0 paused 79 holds 17 pauses 96 resumes 17 queue 0
+[c] 05:57:40 [epp-thunder-lease-main-c] run 49 idle 0 paused 79 holds 29 pauses 110 resumes 31 queue 0
+[c] 05:58:47 [epp-thunder-lease-main-c] run 42 idle 2 paused 84 holds 38 pauses 124 resumes 40 queue 0
+[c] 05:59:51 [epp-thunder-lease-main-c] run 41 idle 0 paused 87 holds 47 pauses 137 resumes 50 queue 0
+[c] 06:00:55 [epp-thunder-lease-main-c] run 38 idle 0 paused 90 holds 48 pauses 141 resumes 51 queue 0
+[c] 06:02:00 [epp-thunder-lease-main-c] run 35 idle 0 paused 93 holds 51 pauses 147 resumes 54 queue 0
+[c] 06:03:04 [epp-thunder-lease-main-c] run 33 idle 1 paused 94 holds 53 pauses 150 resumes 56 queue 0
+[c] 06:04:08 [epp-thunder-lease-main-c] run 33 idle 1 paused 94 holds 58 pauses 155 resumes 61 queue 0
+[c] 06:05:12 [epp-thunder-lease-main-c] run 30 idle 0 paused 98 holds 61 pauses 162 resumes 64 queue 0
+[c] 06:06:17 [epp-thunder-lease-main-c] run 30 idle 0 paused 98 holds 63 pauses 164 resumes 66 queue 0
+[c] 06:07:21 [epp-thunder-lease-main-c] run 29 idle 0 paused 99 holds 63 pauses 165 resumes 66 queue 0
+[c] 06:08:25 [epp-thunder-lease-main-c] run 30 idle 0 paused 98 holds 68 pauses 169 resumes 71 queue 0
+[c] 06:09:30 [epp-thunder-lease-main-c] run 34 idle 2 paused 92 holds 83 pauses 178 resumes 86 queue 0
+[c] 06:10:34 [epp-thunder-lease-main-c] run 34 idle 0 paused 94 holds 89 pauses 186 resumes 92 queue 0
+[c] 06:11:38 [epp-thunder-lease-main-c] run 31 idle 1 paused 96 holds 95 pauses 194 resumes 98 queue 0
+[c] 06:12:43 [epp-thunder-lease-main-c] run 32 idle 0 paused 96 holds 100 pauses 199 resumes 103 queue 0
+[c] 06:13:47 [epp-thunder-lease-main-c] run 31 idle 0 paused 97 holds 100 pauses 200 resumes 103 queue 0
+[c] 06:14:51 [epp-thunder-lease-main-c] run 28 idle 0 paused 100 holds 100 pauses 203 resumes 103 queue 0
+[c] 06:15:56 [epp-thunder-lease-main-c] run 26 idle 0 paused 102 holds 100 pauses 205 resumes 103 queue 0
+[c] 06:17:00 [epp-thunder-lease-main-c] run 29 idle 0 paused 100 holds 107 pauses 209 resumes 109 queue 0
+[c] 06:18:05 [epp-thunder-lease-main-c] run 27 idle 1 paused 101 holds 110 pauses 213 resumes 112 queue 0
+[c] 06:19:10 [epp-thunder-lease-main-c] run 30 idle 1 paused 99 holds 116 pauses 218 resumes 119 queue 0
+[c] 06:20:14 [epp-thunder-lease-main-c] run 34 idle 1 paused 95 holds 124 pauses 222 resumes 127 queue 0
+[c] 06:21:18 [epp-thunder-lease-main-c] run 34 idle 0 paused 96 holds 129 pauses 228 resumes 132 queue 0
+[c] 06:22:22 [epp-thunder-lease-main-c] run 36 idle 4 paused 90 holds 147 pauses 240 resumes 150 queue 0
+[c] 06:23:27 [epp-thunder-lease-main-c] run 0 idle 45 paused 85 holds 152 pauses 240 resumes 155 queue 0
+[c] 06:24:31 [epp-thunder-lease-main-c] run 0 idle 45 paused 85 holds 152 pauses 240 resumes 155 queue 0
+[c] /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/../10-llm-d-router-replicates/run-replicates.sh: line 106: 97134 Terminated: 15          ( while ! kubectl exec "$POD" -n "$NS" -c bench -- test -f /results/DONE 2> /dev/null; do
+[c]     kubectl top pod -n "$NS" --no-headers 2> /dev/null | awk -v t="$(date +%s)" -v r="$SVC" -v v="$VP" -v b="$POD" '$1 ~ r || $1 == v || $1 == b {print t","$1","$2","$3}' >> "$CELL_DIR/cpu-usage.csv"; sleep 30;
+[c] done )
+[c] reports complete; stopping benchmark process
+[c] EXIT=0
+[c] REPORTS_COMPLETE=yes
+[a] ===== epp-thunder-lease-main-a (arm=thunder-lease-main lane=a pod=program-aware-vllm-decode-679589c46c-w66mj) =====
+[a] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[a] [epp-thunder-lease-main-a] epp pod thunder-lane-a-epp-5c859cb497-nqrxg, flow control lines: 1
+[a] 05:50:11 [epp-thunder-lease-main-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:51:14 [epp-thunder-lease-main-a] run 3 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 05:52:18 [epp-thunder-lease-main-a] run 95 idle 1 paused 32 holds 0 pauses 32 resumes 0 queue 0
+[a] 05:53:22 [epp-thunder-lease-main-a] run 73 idle 2 paused 53 holds 0 pauses 53 resumes 0 queue 0
+[a] 05:54:26 [epp-thunder-lease-main-a] run 56 idle 1 paused 71 holds 0 pauses 71 resumes 0 queue 0
+[a] 05:55:30 [epp-thunder-lease-main-a] run 50 idle 0 paused 78 holds 10 pauses 91 resumes 13 queue 0
+[a] 05:56:35 [epp-thunder-lease-main-a] run 47 idle 0 paused 81 holds 17 pauses 102 resumes 21 queue 0
+[a] 05:57:39 [epp-thunder-lease-main-a] run 43 idle 1 paused 84 holds 20 pauses 108 resumes 24 queue 0
+[a] 05:58:43 [epp-thunder-lease-main-a] run 40 idle 0 paused 88 holds 23 pauses 115 resumes 27 queue 0
+[a] 05:59:47 [epp-thunder-lease-main-a] run 41 idle 1 paused 86 holds 34 pauses 124 resumes 38 queue 0
+[a] 06:00:51 [epp-thunder-lease-main-a] run 37 idle 0 paused 91 holds 37 pauses 132 resumes 41 queue 0
+[a] 06:01:56 [epp-thunder-lease-main-a] run 35 idle 0 paused 93 holds 44 pauses 141 resumes 48 queue 0
+[a] 06:03:00 [epp-thunder-lease-main-a] run 35 idle 0 paused 93 holds 50 pauses 147 resumes 54 queue 0
+[a] 06:04:04 [epp-thunder-lease-main-a] run 34 idle 0 paused 94 holds 50 pauses 148 resumes 54 queue 0
+[a] 06:05:09 [epp-thunder-lease-main-a] run 33 idle 1 paused 94 holds 53 pauses 151 resumes 57 queue 0
+[a] 06:06:13 [epp-thunder-lease-main-a] run 33 idle 0 paused 95 holds 58 pauses 157 resumes 62 queue 0
+[a] 06:07:17 [epp-thunder-lease-main-a] run 30 idle 0 paused 98 holds 62 pauses 164 resumes 66 queue 0
+[a] 06:08:22 [epp-thunder-lease-main-a] run 30 idle 1 paused 97 holds 70 pauses 171 resumes 74 queue 0
+[a] 06:09:26 [epp-thunder-lease-main-a] run 36 idle 0 paused 92 holds 84 pauses 180 resumes 88 queue 0
+[a] 06:10:30 [epp-thunder-lease-main-a] run 37 idle 0 paused 91 holds 99 pauses 195 resumes 104 queue 0
+[a] 06:11:35 [epp-thunder-lease-main-a] run 35 idle 3 paused 90 holds 108 pauses 203 resumes 113 queue 0
+[a] 06:12:39 [epp-thunder-lease-main-a] run 34 idle 0 paused 94 holds 114 pauses 213 resumes 119 queue 0
+[a] 06:13:43 [epp-thunder-lease-main-a] run 35 idle 1 paused 93 holds 126 pauses 223 resumes 130 queue 0
+[a] 06:14:48 [epp-thunder-lease-main-a] run 36 idle 1 paused 92 holds 135 pauses 231 resumes 139 queue 0
+[a] 06:15:52 [epp-thunder-lease-main-a] run 36 idle 1 paused 92 holds 139 pauses 235 resumes 143 queue 0
+[a] 06:16:56 [epp-thunder-lease-main-a] run 34 idle 0 paused 95 holds 142 pauses 241 resumes 146 queue 0
+[a] 06:18:00 [epp-thunder-lease-main-a] run 32 idle 0 paused 97 holds 147 pauses 248 resumes 151 queue 0
+[a] 06:19:05 [epp-thunder-lease-main-a] run 30 idle 0 paused 100 holds 149 pauses 252 resumes 152 queue 0
+[a] 06:20:09 [epp-thunder-lease-main-a] run 29 idle 0 paused 101 holds 155 pauses 260 resumes 159 queue 0
+[a] 06:21:13 [epp-thunder-lease-main-a] run 29 idle 0 paused 101 holds 158 pauses 263 resumes 162 queue 0
+[a] 06:22:17 [epp-thunder-lease-main-a] run 38 idle 8 paused 84 holds 180 pauses 268 resumes 184 queue 0
+[a] 06:23:22 [epp-thunder-lease-main-a] run 0 idle 51 paused 79 holds 185 pauses 268 resumes 189 queue 0
+[a] 06:24:26 [epp-thunder-lease-main-a] run 0 idle 51 paused 79 holds 185 pauses 268 resumes 189 queue 0
+[a] error: unexpected EOF
+[a] └───────┴───────────┴──────────────┘
+[a] EXIT=0
+[a] REPORTS_COMPLETE=yes
+[b] ===== epp-baseline-b (arm=baseline lane=b pod=program-aware-vllm-decode-679589c46c-hb2fm) =====
+[b] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[b] [epp-baseline-b] epp pod thunder-lane-b-epp-7ffd6b7f57-h5lcz, flow control lines: 0
+[b] 05:50:52 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:51:55 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:52:58 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:54:02 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:55:05 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:56:09 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:57:12 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:58:15 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 05:59:19 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:00:23 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:01:27 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:02:30 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:03:34 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:04:37 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:05:41 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:06:44 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:07:47 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:08:51 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:09:54 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:10:58 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:12:02 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:13:05 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:14:09 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:15:13 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:16:16 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:17:20 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:18:23 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:19:27 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:20:31 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:21:35 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:22:38 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:23:42 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:24:45 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:25:49 [epp-baseline-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] error: unexpected EOF
+[b] error: unexpected EOF
+[b] error: unexpected EOF
+[b] error: unexpected EOF
+[b] error: unexpected EOF
+
+===== analysis =====
+skipped (SKIP_ANALYSIS=1)
+WARNING: at least one lane failed (check for *-PREEMPTED dirs)
+artifacts: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-054855-c128-t1900
+phase A c=128 done: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-054855-c128-t1900 (exit 0)
+WARNING: phase A c=128: at least one lane failed (see the log)
+
+##### phase A c=256 window 2700s warm-up 900s: a:thunder-lease-main b:thunder-lease-main c:baseline  (Wed Sep 30 06:28:57 PDT 2026)
+LANE_a_POD=program-aware-vllm-decode-679589c46c-w66mj
+LANE_a_IP=10.100.12.21
+LANE_a_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-trwg
+LANE_b_POD=program-aware-vllm-decode-679589c46c-hb2fm
+LANE_b_IP=10.100.2.13
+LANE_b_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-91qy
+LANE_c_POD=program-aware-vllm-decode-679589c46c-r4q5d
+LANE_c_IP=10.100.15.15
+LANE_c_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-zhnf
+run id: rep-20260930-062909-c256-t1900  concurrency=256 replicates=1 window=2700s arms=baseline client_timeout=1900s
+[c] ===== epp-baseline-c (arm=baseline lane=c pod=program-aware-vllm-decode-679589c46c-r4q5d) =====
+[c] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[c] [epp-baseline-c] epp pod thunder-lane-c-epp-6b677dd66f-tqll4, flow control lines: 0
+[c] 06:30:25 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:31:29 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:32:32 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:33:36 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:34:39 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:35:42 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:36:46 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:37:49 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:38:53 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:39:57 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:41:00 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:42:04 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:43:08 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:44:11 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:45:15 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:46:18 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:47:22 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:48:25 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:49:29 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:50:33 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:51:36 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:52:40 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:53:43 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:54:47 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:55:50 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:56:53 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:57:57 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 06:59:00 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:00:03 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:01:07 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:02:10 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:03:14 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:04:17 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:05:20 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:06:24 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:07:27 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:08:31 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:09:34 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:10:38 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:11:41 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:12:44 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:13:48 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:14:51 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:15:54 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:16:58 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:18:01 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] 07:19:04 [epp-baseline-c] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[c] └───────┴────────────────────┴────────────────┘
+[c] EXIT=0
+[c] REPORTS_COMPLETE=yes
+[b] ===== epp-thunder-lease-main-b (arm=thunder-lease-main lane=b pod=program-aware-vllm-decode-679589c46c-hb2fm) =====
+[b] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[b] [epp-thunder-lease-main-b] epp pod thunder-lane-b-epp-549886b67b-dsm7z, flow control lines: 1
+[b] 06:30:26 [epp-thunder-lease-main-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:31:29 [epp-thunder-lease-main-b] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[b] 06:32:32 [epp-thunder-lease-main-b] run 153 idle 2 paused 55 holds 0 pauses 56 resumes 0 queue 1
+[b] 06:33:37 [epp-thunder-lease-main-b] run 134 idle 0 paused 76 holds 0 pauses 76 resumes 0 queue 1
+[b] 06:34:42 [epp-thunder-lease-main-b] run 121 idle 3 paused 86 holds 0 pauses 86 resumes 0 queue 1
+[b] 06:35:46 [epp-thunder-lease-main-b] run 110 idle 0 paused 100 holds 0 pauses 100 resumes 0 queue 1
+[b] 06:36:51 [epp-thunder-lease-main-b] run 95 idle 0 paused 115 holds 0 pauses 115 resumes 0 queue 1
+[b] 06:37:56 [epp-thunder-lease-main-b] run 82 idle 2 paused 126 holds 0 pauses 126 resumes 0 queue 1
+[b] 06:39:01 [epp-thunder-lease-main-b] run 78 idle 0 paused 132 holds 0 pauses 132 resumes 0 queue 1
+[b] 06:40:06 [epp-thunder-lease-main-b] run 72 idle 0 paused 138 holds 0 pauses 138 resumes 0 queue 1
+[b] 06:41:11 [epp-thunder-lease-main-b] run 66 idle 0 paused 144 holds 0 pauses 144 resumes 0 queue 1
+[b] 06:42:16 [epp-thunder-lease-main-b] run 61 idle 0 paused 149 holds 0 pauses 149 resumes 0 queue 1
+[b] 06:43:20 [epp-thunder-lease-main-b] run 54 idle 0 paused 156 holds 0 pauses 156 resumes 0 queue 1
+[b] 06:44:25 [epp-thunder-lease-main-b] run 48 idle 0 paused 162 holds 0 pauses 162 resumes 0 queue 1
+[b] 06:45:30 [epp-thunder-lease-main-b] run 44 idle 0 paused 166 holds 0 pauses 166 resumes 0 queue 1
+[b] 06:46:35 [epp-thunder-lease-main-b] run 42 idle 0 paused 168 holds 0 pauses 168 resumes 0 queue 1
+[b] 06:47:40 [epp-thunder-lease-main-b] run 39 idle 0 paused 171 holds 0 pauses 171 resumes 0 queue 1
+[b] 06:48:45 [epp-thunder-lease-main-b] run 34 idle 0 paused 176 holds 0 pauses 176 resumes 0 queue 1
+[b] 06:49:50 [epp-thunder-lease-main-b] run 45 idle 2 paused 198 holds 38 pauses 201 resumes 3 queue 1
+[b] 06:50:54 [epp-thunder-lease-main-b] run 41 idle 0 paused 204 holds 44 pauses 213 resumes 9 queue 1
+[b] 06:51:59 [epp-thunder-lease-main-b] run 42 idle 1 paused 203 holds 58 pauses 225 resumes 22 queue 1
+[b] 06:53:04 [epp-thunder-lease-main-b] run 41 idle 0 paused 205 holds 65 pauses 234 resumes 29 queue 1
+[b] 06:54:09 [epp-thunder-lease-main-b] run 48 idle 0 paused 200 holds 87 pauses 249 resumes 49 queue 1
+[b] 06:55:15 [epp-thunder-lease-main-b] run 48 idle 1 paused 201 holds 99 pauses 261 resumes 60 queue 1
+[b] 06:56:20 [epp-thunder-lease-main-b] run 42 idle 0 paused 209 holds 107 pauses 276 resumes 67 queue 1
+[b] 06:57:25 [epp-thunder-lease-main-b] run 40 idle 2 paused 209 holds 119 pauses 288 resumes 79 queue 1
+[b] 06:58:30 [epp-thunder-lease-main-b] run 38 idle 2 paused 211 holds 124 pauses 295 resumes 84 queue 1
+[b] 06:59:35 [epp-thunder-lease-main-b] run 38 idle 0 paused 213 holds 128 pauses 301 resumes 88 queue 1
+[b] 07:00:40 [epp-thunder-lease-main-b] run 38 idle 0 paused 213 holds 128 pauses 301 resumes 88 queue 1
+[b] 07:01:45 [epp-thunder-lease-main-b] run 50 idle 0 paused 205 holds 148 pauses 309 resumes 104 queue 1
+[b] 07:02:50 [epp-thunder-lease-main-b] run 79 idle 0 paused 177 holds 182 pauses 314 resumes 137 queue 1
+[b] 07:03:56 [epp-thunder-lease-main-b] run 63 idle 5 paused 188 holds 195 pauses 338 resumes 150 queue 1
+[b] 07:05:01 [epp-thunder-lease-main-b] run 50 idle 2 paused 204 holds 198 pauses 357 resumes 153 queue 1
+[b] 07:06:06 [epp-thunder-lease-main-b] run 48 idle 0 paused 208 holds 206 pauses 369 resumes 161 queue 1
+[b] 07:07:11 [epp-thunder-lease-main-b] run 49 idle 0 paused 207 holds 215 pauses 377 resumes 170 queue 1
+[b] 07:08:16 [epp-thunder-lease-main-b] run 50 idle 0 paused 206 holds 226 pauses 387 resumes 181 queue 1
+[b] 07:09:22 [epp-thunder-lease-main-b] run 42 idle 0 paused 214 holds 228 pauses 397 resumes 183 queue 1
+[b] 07:10:27 [epp-thunder-lease-main-b] run 39 idle 2 paused 215 holds 233 pauses 403 resumes 188 queue 1
+[b] 07:11:32 [epp-thunder-lease-main-b] run 40 idle 0 paused 216 holds 236 pauses 407 resumes 191 queue 1
+[b] 07:12:37 [epp-thunder-lease-main-b] run 40 idle 1 paused 215 holds 243 pauses 413 resumes 198 queue 1
+[b] 07:13:42 [epp-thunder-lease-main-b] run 33 idle 1 paused 222 holds 244 pauses 421 resumes 199 queue 1
+[b] 07:14:47 [epp-thunder-lease-main-b] run 36 idle 0 paused 220 holds 249 pauses 424 resumes 204 queue 1
+[b] 07:15:52 [epp-thunder-lease-main-b] run 37 idle 0 paused 219 holds 254 pauses 428 resumes 209 queue 1
+[b] 07:16:57 [epp-thunder-lease-main-b] run 29 idle 9 paused 218 holds 256 pauses 429 resumes 211 queue 1
+[b] 07:18:02 [epp-thunder-lease-main-b] run 22 idle 54 paused 229 holds 308 pauses 443 resumes 214 queue 1
+[b] 07:19:08 [epp-thunder-lease-main-b] run 0 idle 27 paused 281 holds 316 pauses 497 resumes 216 queue 0
+[b] 07:20:13 [epp-thunder-lease-main-b] run 0 idle 27 paused 281 holds 316 pauses 497 resumes 216 queue 0
+[b] reports complete; stopping benchmark process
+[b] EXIT=0
+[b] REPORTS_COMPLETE=yes
+[a] ===== epp-thunder-lease-main-a (arm=thunder-lease-main lane=a pod=program-aware-vllm-decode-679589c46c-w66mj) =====
+[a] reset_prefix_cache?reset_external=true: {"status": 200, "body": {"success": true}}
+[a] [epp-thunder-lease-main-a] epp pod thunder-lane-a-epp-595fbc88bc-2nhbc, flow control lines: 1
+[a] 06:30:38 [epp-thunder-lease-main-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 06:31:42 [epp-thunder-lease-main-a] run 0 idle 0 paused 0 holds 0 pauses 0 resumes 0 queue 0
+[a] 06:32:45 [epp-thunder-lease-main-a] run 106 idle 0 paused 11 holds 0 pauses 11 resumes 0 queue 1
+[a] 06:33:49 [epp-thunder-lease-main-a] run 93 idle 0 paused 24 holds 0 pauses 24 resumes 0 queue 1
+[a] 06:34:54 [epp-thunder-lease-main-a] run 75 idle 0 paused 42 holds 0 pauses 42 resumes 0 queue 1
+[a] 06:35:58 [epp-thunder-lease-main-a] run 66 idle 0 paused 51 holds 0 pauses 51 resumes 0 queue 1
+[a] 06:37:03 [epp-thunder-lease-main-a] run 51 idle 0 paused 66 holds 0 pauses 66 resumes 0 queue 1
+[a] 06:38:07 [epp-thunder-lease-main-a] run 48 idle 0 paused 86 holds 19 pauses 88 resumes 2 queue 1
+[a] 06:39:12 [epp-thunder-lease-main-a] run 49 idle 0 paused 138 holds 74 pauses 142 resumes 4 queue 1
+[a] 06:40:17 [epp-thunder-lease-main-a] run 53 idle 1 paused 163 holds 107 pauses 170 resumes 7 queue 1
+[a] 06:41:23 [epp-thunder-lease-main-a] run 50 idle 1 paused 177 holds 118 pauses 184 resumes 7 queue 1
+[a] 06:42:28 [epp-thunder-lease-main-a] run 44 idle 0 paused 184 holds 118 pauses 191 resumes 7 queue 1
+[a] 06:43:35 [epp-thunder-lease-main-a] run 40 idle 1 paused 187 holds 118 pauses 194 resumes 7 queue 1
+[a] 06:44:40 [epp-thunder-lease-main-a] run 39 idle 0 paused 191 holds 120 pauses 198 resumes 7 queue 1
+[a] 06:45:46 [epp-thunder-lease-main-a] run 38 idle 0 paused 193 holds 122 pauses 201 resumes 8 queue 1
+[a] 06:46:52 [epp-thunder-lease-main-a] run 35 idle 0 paused 196 holds 123 pauses 205 resumes 9 queue 1
+[a] 06:47:57 [epp-thunder-lease-main-a] run 39 idle 0 paused 193 holds 138 pauses 216 resumes 23 queue 1
+[a] 06:49:03 [epp-thunder-lease-main-a] run 37 idle 0 paused 195 holds 142 pauses 222 resumes 27 queue 1
+[a] 06:50:08 [epp-thunder-lease-main-a] run 39 idle 1 paused 192 holds 152 pauses 229 resumes 37 queue 1
+[a] 06:51:14 [epp-thunder-lease-main-a] run 39 idle 0 paused 194 holds 154 pauses 232 resumes 38 queue 1
+[a] 06:52:19 [epp-thunder-lease-main-a] run 37 idle 0 paused 197 holds 159 pauses 239 resumes 42 queue 1
+[a] 06:53:24 [epp-thunder-lease-main-a] run 36 idle 1 paused 198 holds 168 pauses 248 resumes 50 queue 1
+[a] 06:54:30 [epp-thunder-lease-main-a] run 38 idle 0 paused 197 holds 174 pauses 253 resumes 56 queue 1
+[a] 06:55:35 [epp-thunder-lease-main-a] run 35 idle 0 paused 201 holds 177 pauses 259 resumes 58 queue 1
+[a] 06:56:41 [epp-thunder-lease-main-a] run 30 idle 0 paused 206 holds 177 pauses 264 resumes 58 queue 1
+[a] 06:57:47 [epp-thunder-lease-main-a] run 31 idle 0 paused 206 holds 183 pauses 269 resumes 63 queue 1
+[a] 06:58:52 [epp-thunder-lease-main-a] run 30 idle 0 paused 207 holds 184 pauses 271 resumes 64 queue 1
+[a] 06:59:58 [epp-thunder-lease-main-a] run 30 idle 1 paused 207 holds 190 pauses 276 resumes 69 queue 1
+[a] 07:01:03 [epp-thunder-lease-main-a] run 31 idle 0 paused 207 holds 195 pauses 281 resumes 74 queue 1
+[a] 07:02:09 [epp-thunder-lease-main-a] run 29 idle 1 paused 208 holds 198 pauses 286 resumes 78 queue 1
+[a] 07:03:15 [epp-thunder-lease-main-a] run 59 idle 0 paused 199 holds 233 pauses 293 resumes 94 queue 1
+[a] 07:04:20 [epp-thunder-lease-main-a] run 55 idle 8 paused 195 holds 246 pauses 302 resumes 107 queue 1
+[a] 07:05:27 [epp-thunder-lease-main-a] run 55 idle 0 paused 203 holds 255 pauses 319 resumes 116 queue 1
+[a] 07:06:32 [epp-thunder-lease-main-a] run 53 idle 0 paused 205 holds 266 pauses 332 resumes 127 queue 1
+[a] 07:07:38 [epp-thunder-lease-main-a] run 64 idle 0 paused 194 holds 283 pauses 338 resumes 144 queue 1
+[a] 07:08:44 [epp-thunder-lease-main-a] run 96 idle 0 paused 162 holds 320 pauses 343 resumes 181 queue 0
+[a] 07:09:49 [epp-thunder-lease-main-a] run 91 idle 0 paused 167 holds 330 pauses 358 resumes 191 queue 0
+[a] 07:10:56 [epp-thunder-lease-main-a] run 74 idle 0 paused 184 holds 352 pauses 397 resumes 213 queue 0
+[a] 07:12:01 [epp-thunder-lease-main-a] run 55 idle 0 paused 203 holds 358 pauses 422 resumes 219 queue 0
+[a] 07:13:07 [epp-thunder-lease-main-a] run 49 idle 0 paused 209 holds 362 pauses 432 resumes 223 queue 0
+[a] 07:14:13 [epp-thunder-lease-main-a] run 45 idle 1 paused 212 holds 366 pauses 439 resumes 227 queue 0
+[a] 07:15:18 [epp-thunder-lease-main-a] run 45 idle 1 paused 212 holds 369 pauses 442 resumes 230 queue 0
+[a] 07:16:24 [epp-thunder-lease-main-a] run 40 idle 0 paused 218 holds 370 pauses 449 resumes 231 queue 0
+[a] 07:17:30 [epp-thunder-lease-main-a] run 39 idle 5 paused 214 holds 376 pauses 451 resumes 237 queue 0
+[a] 07:18:35 [epp-thunder-lease-main-a] run 33 idle 14 paused 211 holds 379 pauses 451 resumes 240 queue 0
+[a] 07:19:41 [epp-thunder-lease-main-a] run 0 idle 105 paused 223 holds 457 pauses 471 resumes 248 queue 0
+[a] 07:20:47 [epp-thunder-lease-main-a] run 0 idle 105 paused 223 holds 457 pauses 471 resumes 248 queue 0
+[a] 07:21:52 [epp-thunder-lease-main-a] run 0 idle 105 paused 223 holds 457 pauses 471 resumes 248 queue 0
+[a] └───────┴────────────────────┴────────────────┘
+[a] EXIT=0
+[a] REPORTS_COMPLETE=yes
+
+===== analysis =====
+skipped (SKIP_ANALYSIS=1)
+artifacts: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-062909-c256-t1900
+phase A c=256 done: /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/rep-20260930-062909-c256-t1900 (exit 0)
+WARNING: phase A had a failed lane
+
+##### teardown and restore (Wed Sep 30 07:23:25 PDT 2026)
+removed thunder-lane-a
+unlabeled pod/program-aware-vllm-decode-679589c46c-w66mj
+removed thunder-lane-b
+unlabeled pod/program-aware-vllm-decode-679589c46c-hb2fm
+removed thunder-lane-c
+unlabeled pod/program-aware-vllm-decode-679589c46c-r4q5d
+applying /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/vllm-deploy-before-clean.json (Wed Sep 30 07:23:38 PDT 2026)
+deployment.apps/program-aware-vllm-decode replaced
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 out of 4 new replicas have been updated...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 out of 4 new replicas have been updated...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 out of 4 new replicas have been updated...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 out of 4 new replicas have been updated...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 0 of 4 updated replicas are available...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 1 of 4 updated replicas are available...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 2 of 4 updated replicas are available...
+Waiting for deployment "program-aware-vllm-decode" rollout to finish: 3 of 4 updated replicas are available...
+deployment "program-aware-vllm-decode" successfully rolled out
+POD                                         UID                                    NODE                                     IP             PHASE     RESTARTS
+program-aware-vllm-decode-9c9b54cb6-4w45v   3c471a95-ced7-4deb-8bef-7b625a713658   gke-bobbm-bobbm-spoth100-ef0c964e-trwg   10.100.12.25   Running   0
+program-aware-vllm-decode-9c9b54cb6-9mmf7   faade797-c200-43ef-b618-96c2d8720bd5   gke-bobbm-bobbm-spoth100-ef0c964e-trwg   10.100.12.26   Running   0
+program-aware-vllm-decode-9c9b54cb6-dnhzf   f482e132-812d-4b84-920f-ffdc7e64ca62   gke-bobbm-bobbm-spoth100-ef0c964e-zhnf   10.100.15.16   Running   0
+program-aware-vllm-decode-9c9b54cb6-qpprl   dcebe5a9-1d18-4a2e-b93f-4ef71311b5fe   gke-bobbm-bobbm-spoth100-ef0c964e-91qy   10.100.2.17    Running   0
+program-aware-vllm-decode-9c9b54cb6-4w45v kv_offloading_size=None num_gpu_blocks=139815
+program-aware-vllm-decode-9c9b54cb6-9mmf7 kv_offloading_size=None num_gpu_blocks=139815
+program-aware-vllm-decode-9c9b54cb6-dnhzf kv_offloading_size=None num_gpu_blocks=139815
+program-aware-vllm-decode-9c9b54cb6-qpprl kv_offloading_size=None num_gpu_blocks=139815
+restored: replicas and pod template match vllm-deploy-before.json
+release already matches /Users/bobzetian/projects/llmdthunder/thunderagent-original-setup/20-cpu-offload-pool/results/main-release-before.yaml
+
+##### 5. analysis (Wed Sep 30 07:27:26 PDT 2026)
+step 20 done Wed Sep 30 07:29:13 PDT 2026

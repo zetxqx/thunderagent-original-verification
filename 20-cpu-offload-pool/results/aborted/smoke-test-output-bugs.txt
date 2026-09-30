@@ -1,0 +1,198 @@
+smoke test Wed Sep 30 00:53:37 PDT 2026  image thunder-agent-lease-44544c04  tier capacityTokens 8738133
+
+=== lane a replica program-aware-vllm-decode-559bd4f57c-rjhp6 on gke-bobbm-bobbm-spoth100-ef0c964e-trwg: offloading (checks 1 to 3) ===
+vllm:cache_config_info{_block_size_resolved="True",block_size="16",cache_dtype="fp8_e4m3",enable_prefix_caching="True",engine="0",gpu_memory_utilization="0.88",is_attention_free="False",kv_cache_dtype_skip_layers="[]",kv_cache_max_concurrency="8.53363037109375",kv_cache_memory_bytes="None",kv_cache_size_tokens="2237040",kv_offloading_backend="native",kv_offloading_size="400.0",kv_sharing_fast_pref
+PASS  cache_config_info reports kv_offloading_size 400
+PASS  GPU KV unchanged: 16 x 139815 = 2237040 tokens
+FAIL  log names OffloadingConnector
+Created mmap file /dev/shm/vllm_offload_2f2a66d1-768d-46b8-84ec-d102501a23e7.mmap (429.50 GB)
+PASS  CPU tier from the log is 429.50 GB = 8738199 tokens, within 1% of the tier arm's capacityTokens 8738133
+PASS  /dev/shm holds the tier: 400 GiB used (>= 380)
+PASS  no restart or OOM kill (restarts, last reason: 0 )
+PASS  kv_offload_allocation_failure = 0
+
+=== lane a replica program-aware-vllm-decode-559bd4f57c-rjhp6: the CPU tier works (checks 4 and 5) ===
+{"reset_both_before": true, "cold": {"seconds": 1.9843017359962687, "prompt_tokens": 50019, "cached_tokens": 0}, "reset_gpu_only": true, "from_cpu": {"seconds": 0.20214780909009278, "prompt_tokens": 50019, "cached_tokens": 50016}, "reset_both": true, "after_reset": {"seconds": 1.4330417669843882, "prompt_tokens": 50019, "cached_tokens": 0}, "counters_cold": {"vllm:external_prefix_cache_hits": 0.0, "vllm:prefix_cache_hits": 0.0, "vllm:prefix_cache_queries": 50019.0, "vllm:external_prefix_cache_queries": 50019.0, "vllm:kv_offload_store_bytes": 2458386432.0}, "counters_from_cpu": {"vllm:kv_offload_load_bytes": 2458386432.0, "vllm:external_prefix_cache_hits": 50016.0, "vllm:prefix_cache_hits": 0.0, "vllm:prefix_cache_queries": 50019.0, "vllm:external_prefix_cache_queries": 50019.0, "vllm:kv_offload_store_bytes": 0.0}, "counters_after_reset": {"vllm:kv_offload_load_bytes": 0.0, "vllm:external_prefix_cache_hits": 0.0, "vllm:prefix_cache_hits": 0.0, "vllm:prefix_cache_queries": 50019.0, "vllm:external_prefix_cache_queries": 50019.0, "vllm:kv_offload_store_bytes": 2458386432.0}}
+PASS  resets returned success (both, GPU only, both)
+PASS  cold request computed its prompt (50019 tokens, cached 0)
+PASS  after a GPU-only reset, cached_tokens 50016 >= 90% of the prompt
+PASS  ... and they came from the CPU tier: external hits 50016
+PASS  ... load time 0.2 s vs recompute 1.98 s (at most half)
+PASS  offload counters are exported and move: stored 2.46 GB on the cold request, loaded 2.46 GB on the reload
+PASS  after reset_external=true: cached_tokens 0, external hits 0
+
+=== lane b replica program-aware-vllm-decode-559bd4f57c-mtrg8 on gke-bobbm-bobbm-spoth100-ef0c964e-91qy: offloading (checks 1 to 3) ===
+vllm:cache_config_info{_block_size_resolved="True",block_size="16",cache_dtype="fp8_e4m3",enable_prefix_caching="True",engine="0",gpu_memory_utilization="0.88",is_attention_free="False",kv_cache_dtype_skip_layers="[]",kv_cache_max_concurrency="8.53363037109375",kv_cache_memory_bytes="None",kv_cache_size_tokens="2237040",kv_offloading_backend="native",kv_offloading_size="400.0",kv_sharing_fast_pref
+PASS  cache_config_info reports kv_offloading_size 400
+PASS  GPU KV unchanged: 16 x 139815 = 2237040 tokens
+PASS  log names OffloadingConnector
+Created mmap file /dev/shm/vllm_offload_c44798c9-3a43-410d-b794-c3b05f4a6d39.mmap (429.50 GB)
+PASS  CPU tier from the log is 429.50 GB = 8738199 tokens, within 1% of the tier arm's capacityTokens 8738133
+PASS  /dev/shm holds the tier: 400 GiB used (>= 380)
+PASS  no restart or OOM kill (restarts, last reason: 0 )
+PASS  kv_offload_allocation_failure = 0
+
+=== lane b replica program-aware-vllm-decode-559bd4f57c-mtrg8: the CPU tier works (checks 4 and 5) ===
+{"reset_both_before": true, "cold": {"seconds": 1.5148447620449588, "prompt_tokens": 50022, "cached_tokens": 0}, "reset_gpu_only": true, "from_cpu": {"seconds": 0.25544582202564925, "prompt_tokens": 50022, "cached_tokens": 50016}, "reset_both": true, "after_reset": {"seconds": 1.4481037779478356, "prompt_tokens": 50022, "cached_tokens": 0}, "counters_cold": {"vllm:external_prefix_cache_queries": 50022.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_hits": 0.0, "vllm:prefix_cache_queries": 50022.0, "vllm:kv_offload_store_bytes": 2458386432.0}, "counters_from_cpu": {"vllm:external_prefix_cache_queries": 50022.0, "vllm:prefix_cache_hits": 0.0, "vllm:kv_offload_load_bytes": 2458386432.0, "vllm:external_prefix_cache_hits": 50016.0, "vllm:prefix_cache_queries": 50022.0, "vllm:kv_offload_store_bytes": 0.0}, "counters_after_reset": {"vllm:external_prefix_cache_queries": 50022.0, "vllm:prefix_cache_hits": 0.0, "vllm:kv_offload_load_bytes": 0.0, "vllm:external_prefix_cache_hits": 0.0, "vllm:prefix_cache_queries": 50022.0, "vllm:kv_offload_store_bytes": 2458386432.0}}
+PASS  resets returned success (both, GPU only, both)
+PASS  cold request computed its prompt (50022 tokens, cached 0)
+PASS  after a GPU-only reset, cached_tokens 50016 >= 90% of the prompt
+PASS  ... and they came from the CPU tier: external hits 50016
+PASS  ... load time 0.26 s vs recompute 1.51 s (at most half)
+PASS  offload counters are exported and move: stored 2.46 GB on the cold request, loaded 2.46 GB on the reload
+PASS  after reset_external=true: cached_tokens 0, external hits 0
+
+=== lane c replica program-aware-vllm-decode-559bd4f57c-c4csr on gke-bobbm-bobbm-spoth100-ef0c964e-zhnf: offloading (checks 1 to 3) ===
+vllm:cache_config_info{_block_size_resolved="True",block_size="16",cache_dtype="fp8_e4m3",enable_prefix_caching="True",engine="0",gpu_memory_utilization="0.88",is_attention_free="False",kv_cache_dtype_skip_layers="[]",kv_cache_max_concurrency="8.53363037109375",kv_cache_memory_bytes="None",kv_cache_size_tokens="2237040",kv_offloading_backend="native",kv_offloading_size="400.0",kv_sharing_fast_pref
+PASS  cache_config_info reports kv_offloading_size 400
+PASS  GPU KV unchanged: 16 x 139815 = 2237040 tokens
+FAIL  log names OffloadingConnector
+Created mmap file /dev/shm/vllm_offload_86af5f24-2637-4b22-9be0-4cd16e869a97.mmap (429.50 GB)
+PASS  CPU tier from the log is 429.50 GB = 8738199 tokens, within 1% of the tier arm's capacityTokens 8738133
+PASS  /dev/shm holds the tier: 400 GiB used (>= 380)
+PASS  no restart or OOM kill (restarts, last reason: 0 )
+PASS  kv_offload_allocation_failure = 0
+
+=== lane c replica program-aware-vllm-decode-559bd4f57c-c4csr: the CPU tier works (checks 4 and 5) ===
+{"reset_both_before": true, "cold": {"seconds": 1.493927325005643, "prompt_tokens": 50020, "cached_tokens": 0}, "reset_gpu_only": true, "from_cpu": {"seconds": 0.20339057897217572, "prompt_tokens": 50020, "cached_tokens": 50016}, "reset_both": true, "after_reset": {"seconds": 1.4370547630242072, "prompt_tokens": 50020, "cached_tokens": 0}, "counters_cold": {"vllm:external_prefix_cache_queries": 50020.0, "vllm:kv_offload_store_bytes": 2458386432.0, "vllm:external_prefix_cache_hits": 0.0, "vllm:prefix_cache_hits": 0.0, "vllm:prefix_cache_queries": 50020.0}, "counters_from_cpu": {"vllm:external_prefix_cache_queries": 50020.0, "vllm:kv_offload_store_bytes": 0.0, "vllm:external_prefix_cache_hits": 50016.0, "vllm:prefix_cache_hits": 0.0, "vllm:kv_offload_load_bytes": 2458386432.0, "vllm:prefix_cache_queries": 50020.0}, "counters_after_reset": {"vllm:external_prefix_cache_queries": 50020.0, "vllm:kv_offload_store_bytes": 2458386432.0, "vllm:external_prefix_cache_hits": 0.0, "vllm:prefix_cache_hits": 0.0, "vllm:kv_offload_load_bytes": 0.0, "vllm:prefix_cache_queries": 50020.0}}
+PASS  resets returned success (both, GPU only, both)
+PASS  cold request computed its prompt (50020 tokens, cached 0)
+PASS  after a GPU-only reset, cached_tokens 50016 >= 90% of the prompt
+PASS  ... and they came from the CPU tier: external hits 50016
+PASS  ... load time 0.2 s vs recompute 1.49 s (at most half)
+PASS  offload counters are exported and move: stored 2.46 GB on the cold request, loaded 2.46 GB on the reload
+PASS  after reset_external=true: cached_tokens 0, external hits 0
+
+=== lanes as at phase B's first point: a baseline, b lease, c tier ===
+LANE_a_POD=program-aware-vllm-decode-559bd4f57c-rjhp6
+LANE_a_IP=10.100.12.12
+LANE_a_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-trwg
+LANE_b_POD=program-aware-vllm-decode-559bd4f57c-mtrg8
+LANE_b_IP=10.100.2.10
+LANE_b_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-91qy
+LANE_c_POD=program-aware-vllm-decode-559bd4f57c-c4csr
+LANE_c_IP=10.100.15.12
+LANE_c_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-zhnf
+lane a: thunder-lane-a-epp, arm baseline, image thunder-agent-lease-44544c04
+lane b: thunder-lane-b-epp, arm thunder-lease-main, image thunder-agent-lease-44544c04
+lane c: thunder-lane-c-epp, arm thunder-lease-main-tier, image thunder-agent-lease-44544c04
+
+=== lane a (baseline): no gate, answers ===
+error: error executing jsonpath "{.items[0].metadata.name}": Error executing template: array index out of bounds: index 0, length 0. Printing more information for debugging the template:
+	template was:
+		{.items[0].metadata.name}
+	object given to jsonpath engine was:
+		map[string]interface {}{"apiVersion":"v1", "items":[]interface {}{}, "kind":"List", "metadata":map[string]interface {}{"resourceVersion":""}}
+
+
+error: You must provide one or more resources by argument or filename.
+Example resource specifications include:
+   '-f rsrc.yaml'
+   '--filename=rsrc.json'
+   '<resource> <name>'
+   '<resource>'
+PASS  no flow control in lane a's EPP log
+PASS  lane a answered: Hello from lane a.
+
+=== lane b: build, config and gate capacity (check 6) ===
+llm_d_epp_info{build_ref="thunder-agent-lease-1a98a6c5",commit="44544c04aa6febd453d1009f9ed34c8cc6ea1ca4"} 1
+PASS  build info reports commit 44544c04
+error: error executing jsonpath "{.items[0].metadata.name}": Error executing template: array index out of bounds: index 0, length 0. Printing more information for debugging the template:
+	template was:
+		{.items[0].metadata.name}
+	object given to jsonpath engine was:
+		map[string]interface {}{"apiVersion":"v1", "items":[]interface {}{}, "kind":"List", "metadata":map[string]interface {}{"resourceVersion":""}}
+
+
+error: You must provide one or more resources by argument or filename.
+Example resource specifications include:
+   '-f rsrc.yaml'
+   '--filename=rsrc.json'
+   '<resource> <name>'
+   '<resource>'
+FAIL  flow control on
+PASS  live ConfigMap has idleLeaseSeconds: 30
+thunder_agent_endpoint_capacity_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-559bd4f57c-mtrg8-rank-0"} 2.23704e+06
+PASS  one endpoint at capacity 2237040 tokens (got: 2.23704e+06)
+
+=== lane b: session and class accounting (check 7) ===
+PASS  smoke-b-a-1790754817 turn 1 answered: Hello from turn one.
+PASS  smoke-b-a-1790754817 turn 2 answered: Hello from turn two.
+PASS  smoke-b-b-1790754817 answered: Hello from b
+PASS  2 new sessions tracked (sessions 0 -> 2)
+PASS  no session running or paused after the turns
+PASS  releases: new +2 (want 2), admitted +1 (want 1)
+PASS  no holds or pauses on an idle replica (holds 0, pauses 0)
+
+=== lane c: build, config and gate capacity (check 6) ===
+llm_d_epp_info{build_ref="thunder-agent-lease-1a98a6c5",commit="44544c04aa6febd453d1009f9ed34c8cc6ea1ca4"} 1
+PASS  build info reports commit 44544c04
+error: error executing jsonpath "{.items[0].metadata.name}": Error executing template: array index out of bounds: index 0, length 0. Printing more information for debugging the template:
+	template was:
+		{.items[0].metadata.name}
+	object given to jsonpath engine was:
+		map[string]interface {}{"apiVersion":"v1", "items":[]interface {}{}, "kind":"List", "metadata":map[string]interface {}{"resourceVersion":""}}
+
+
+error: You must provide one or more resources by argument or filename.
+Example resource specifications include:
+   '-f rsrc.yaml'
+   '--filename=rsrc.json'
+   '<resource> <name>'
+   '<resource>'
+FAIL  flow control on
+PASS  live ConfigMap has idleLeaseSeconds: 30
+thunder_agent_endpoint_capacity_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-559bd4f57c-c4csr-rank-0"} 8.738133e+06
+PASS  one endpoint at capacity 8738133 tokens (got: 8.738133e+06)
+PASS  live ConfigMap has cacheInfoSpec "" and capacityTokens: 8738133
+error: error executing jsonpath "{.items[0].metadata.name}": Error executing template: array index out of bounds: index 0, length 0. Printing more information for debugging the template:
+	template was:
+		{.items[0].metadata.name}
+	object given to jsonpath engine was:
+		map[string]interface {}{"apiVersion":"v1", "items":[]interface {}{}, "kind":"List", "metadata":map[string]interface {}{"resourceVersion":""}}
+
+
+error: You must provide one or more resources by argument or filename.
+Example resource specifications include:
+   '-f rsrc.yaml'
+   '--filename=rsrc.json'
+   '<resource> <name>'
+   '<resource>'
+FAIL  EPP registered its own vllm engine mapping
+
+=== lane c: session and class accounting (check 7) ===
+PASS  smoke-c-a-1790754817 turn 1 answered: Hello from turn one.
+PASS  smoke-c-a-1790754817 turn 2 answered: Hello from turn two.
+PASS  smoke-c-b-1790754817 answered: Hello from b
+PASS  2 new sessions tracked (sessions 0 -> 2)
+PASS  no session running or paused after the turns
+PASS  releases: new +2 (want 2), admitted +1 (want 1)
+PASS  no holds or pauses on an idle replica (holds 0, pauses 0)
+
+=== EPP logs ===
+error: error executing jsonpath "{.items[0].metadata.name}": Error executing template: array index out of bounds: index 0, length 0. Printing more information for debugging the template:
+	template was:
+		{.items[0].metadata.name}
+	object given to jsonpath engine was:
+		map[string]interface {}{"apiVersion":"v1", "items":[]interface {}{}, "kind":"List", "metadata":map[string]interface {}{"resourceVersion":""}}
+
+
+FAIL  lane a: no error or panic lines (got 0 of 1 lines)
+error: error executing jsonpath "{.items[0].metadata.name}": Error executing template: array index out of bounds: index 0, length 0. Printing more information for debugging the template:
+	template was:
+		{.items[0].metadata.name}
+	object given to jsonpath engine was:
+		map[string]interface {}{"apiVersion":"v1", "items":[]interface {}{}, "kind":"List", "metadata":map[string]interface {}{"resourceVersion":""}}
+
+
+FAIL  lane b: no error or panic lines (got 0 of 1 lines)
+error: error executing jsonpath "{.items[0].metadata.name}": Error executing template: array index out of bounds: index 0, length 0. Printing more information for debugging the template:
+	template was:
+		{.items[0].metadata.name}
+	object given to jsonpath engine was:
+		map[string]interface {}{"apiVersion":"v1", "items":[]interface {}{}, "kind":"List", "metadata":map[string]interface {}{"resourceVersion":""}}
+
+
+FAIL  lane c: no error or panic lines (got 0 of 1 lines)
+
+=== 8 check(s) failed ===
