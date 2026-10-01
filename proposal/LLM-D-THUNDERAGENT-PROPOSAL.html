@@ -336,8 +336,209 @@ flowControl:
   <div class="card" style="margin-top:14px"><h3>Demand vs capacity, Benchmark C</h3><svg class="chart" id="ch-demand" viewBox="0 0 1000 120"></svg></div>
 </section>
 
-<section class="slide" id="s18">
+<section class="slide" id="simp1">
   <div class="num">18</div>
+  <h2>A simplified ThunderAgent in llm-d-router</h2>
+  <p class="sub">Very different from the original Python ThunderAgent, but much simpler: easy to understand, fewer parameters to tune, about the same effect. Code: <a href="https://github.com/llm-d/llm-d-router/pull/3076">llm-d-router PR #3076</a>.</p>
+  <div class="stat">
+    <div class="tile"><div class="v" style="color:var(--c-thunder)">1 knob</div><div class="l"><code>idleLeaseSeconds</code> is the only value to tune; the other 4 keys are a fallback, a ceiling and two backstops</div></div>
+    <div class="tile"><div class="v" style="color:var(--c-thunder)">1 ledger</div><div class="l">endpoint &rarr; sessions (<code>SessionManager</code>); one view of KV usage, no decayed second view, no background sweep</div></div>
+    <div class="tile"><div class="v" style="color:var(--c-thunder)">2042 tok/s</div><div class="l">4-pod pool, 128 sessions (step 19). Full port with origin-only resume: 1571; llm-d default: 1151 (one cell each)</div></div>
+  </div>
+  <div class="cols">
+    <div class="card"><h3 style="color:var(--c-base)">Port of the Python design (v3/v4): 8 keys</h3>
+<pre style="background:#fff">capacityTokens: 2237040
+utilThreshold: 1.0
+actingHalfLifeSeconds: 1      # idle decay
+bufferTokensPerProgram: 100
+pauseSweepSeconds: 5          # background sweep
+headWaitStarvationMs: 1800000
+evictionTtlSeconds: 3600
+resumePlacement: origin-only  # v4</pre>
+      <div class="small" style="margin-top:8px">Also: two views of a pod (decayed for admission, undecayed for the sweep), mark-to-pause of running sessions, most-room resume, a session-final header.</div>
+    </div>
+    <div class="card"><h3 style="color:var(--c-thunder)">Simplified: 5 keys</h3>
+<pre style="background:#fff">capacityTokens: 4194304       # fallback; scraped from vLLM
+utilThreshold: 1.0            # ceiling, 1.0 = 100%
+<b>idleLeaseSeconds: 30          # the knob: about a tool call</b>
+headWaitStarvationMs: 1800000 # forced admission backstop
+evictionTtlSeconds: 3600      # forget idle sessions</pre>
+      <div class="small" style="margin-top:8px">Room is reclaimed only when someone needs it, from sessions idle longer than the lease. Paused sessions return only to their own endpoint. Parameter comparison: <a href="https://screenshot-v2.corp.google.com/4t8h1t34tut88">screenshot</a>.</div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="simp2">
+  <div class="num">19</div>
+  <h2>Two assumptions about agentic workloads</h2>
+  <div class="cols">
+    <div class="card">
+      <h3>1. Prefill-heavy, and the prefix is reusable</h3>
+      <svg class="chart" viewBox="0 0 560 215" role="img" aria-label="three turns of one session, each turn resending the previous context">
+        <g font-size="14" fill="#4a4a4a">
+          <text x="0" y="37">turn 1</text><text x="0" y="87">turn 2</text><text x="0" y="137">turn 3</text>
+        </g>
+        <rect x="70" y="18" width="150" height="28" rx="3" fill="#F6E3B4" stroke="#1c1c1c" stroke-width="1"/>
+        <rect x="222" y="18" width="10" height="28" fill="#1c1c1c"/>
+        <rect x="70" y="68" width="162" height="28" rx="3" fill="#D6E8D6" stroke="#1c1c1c" stroke-width="1"/>
+        <rect x="234" y="68" width="70" height="28" rx="3" fill="#F6E3B4" stroke="#1c1c1c" stroke-width="1"/>
+        <rect x="306" y="68" width="10" height="28" fill="#1c1c1c"/>
+        <rect x="70" y="118" width="246" height="28" rx="3" fill="#D6E8D6" stroke="#1c1c1c" stroke-width="1"/>
+        <rect x="318" y="118" width="80" height="28" rx="3" fill="#F6E3B4" stroke="#1c1c1c" stroke-width="1"/>
+        <rect x="400" y="118" width="10" height="28" fill="#1c1c1c"/>
+        <text x="145" y="87" font-size="13" text-anchor="middle" fill="#1c1c1c">turn 1 context, cached</text>
+        <text x="193" y="137" font-size="13" text-anchor="middle" fill="#1c1c1c">turns 1 and 2, cached</text>
+        <g font-size="13" fill="#4a4a4a">
+          <rect x="70" y="170" width="14" height="14" fill="#D6E8D6" stroke="#1c1c1c"/><text x="90" y="182">prefill, KV cache hit</text>
+          <rect x="245" y="170" width="14" height="14" fill="#F6E3B4" stroke="#1c1c1c"/><text x="265" y="182">prefill, computed</text>
+          <rect x="400" y="170" width="14" height="14" fill="#1c1c1c"/><text x="420" y="182">decode</text>
+        </g>
+      </svg>
+      <div class="small">Each turn resends the whole history: tens of thousands of prompt tokens against a few hundred output tokens in the weka traces. If the session's KV stays on its endpoint, most of every turn's prefill is a cache hit.</div>
+    </div>
+    <div class="card">
+      <h3>2. One running request per session; a session is a fairness ID</h3>
+      <svg class="chart" viewBox="0 0 560 215" role="img" aria-label="a session alternates between one running request and idle tool calls, and maps to one flow control queue">
+        <g font-size="13">
+          <rect x="10" y="20" width="110" height="34" rx="4" fill="#2F6BB0"/><text x="65" y="42" text-anchor="middle" fill="#fff">LLM turn</text>
+          <rect x="124" y="20" width="90" height="34" rx="4" fill="#fff" stroke="#7a7a7a" stroke-dasharray="4 3"/><text x="169" y="42" text-anchor="middle" fill="#4a4a4a">tool call</text>
+          <rect x="218" y="20" width="130" height="34" rx="4" fill="#2F6BB0"/><text x="283" y="42" text-anchor="middle" fill="#fff">LLM turn</text>
+          <rect x="352" y="20" width="70" height="34" rx="4" fill="#fff" stroke="#7a7a7a" stroke-dasharray="4 3"/><text x="387" y="42" text-anchor="middle" fill="#4a4a4a">tool</text>
+          <rect x="426" y="20" width="124" height="34" rx="4" fill="#2F6BB0"/><text x="488" y="42" text-anchor="middle" fill="#fff">LLM turn</text>
+          <text x="10" y="76" fill="#4a4a4a">running: 1 request</text><text x="124" y="76" fill="#4a4a4a">idle</text>
+        </g>
+        <g font-size="14" fill="#1c1c1c">
+          <rect x="10" y="110" width="150" height="40" rx="6" fill="#f3f3f0" stroke="#d9d9d4"/><text x="85" y="135" text-anchor="middle">x-session-id: s42</text>
+          <rect x="205" y="110" width="140" height="40" rx="6" fill="#f3f3f0" stroke="#d9d9d4"/><text x="275" y="135" text-anchor="middle">FairnessID = s42</text>
+          <rect x="390" y="110" width="160" height="40" rx="6" fill="#f3f3f0" stroke="#d9d9d4"/><text x="470" y="135" text-anchor="middle">one flow-control queue</text>
+          <path d="M162 130 H200" stroke="#4a4a4a" stroke-width="2" marker-end="url(#simpArr)"/><path d="M347 130 H385" stroke="#4a4a4a" stroke-width="2" marker-end="url(#simpArr)"/>
+        </g>
+        <defs><marker id="simpArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#4a4a4a"/></marker></defs>
+        <text x="10" y="185" font-size="13" fill="#4a4a4a">agent-identity plugin</text><text x="205" y="185" font-size="13" fill="#4a4a4a">flow control</text><text x="390" y="185" font-size="13" fill="#4a4a4a">admitted per session</text>
+      </svg>
+      <div class="small">A session alternates between one LLM request and idle tool calls. The session ID becomes the flow-control fairness ID, so each session is one queue and the gate admits sessions, not requests. (The last commit of #3076 also accounts for clients that send overlapping turns, which inference-perf does.)</div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="simp3">
+  <div class="num">20</div>
+  <h2>One ledger for the whole system: SessionManager</h2>
+  <p class="sub"><code>map[endpoint][]session</code>. A session's size is its KV footprint: <code>max(last usage.total_tokens, in-flight estimate)</code>. An endpoint's room is <code>capacity &times; utilThreshold &minus; &sum; sizes</code>. KV cache is the only resource.</p>
+  <svg class="chart tall" viewBox="0 0 1200 400" role="img" aria-label="flow control queues on the left, the SessionManager ledger with two endpoints on the right">
+    <defs>
+      <pattern id="simpHatch1" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="9" height="9" fill="#E3ECF7"/><line x1="0" y1="0" x2="0" y2="9" stroke="#8FB1DA" stroke-width="3.5"/></pattern>
+      <marker id="simpArr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#4a4a4a"/></marker>
+    </defs>
+    <text x="20" y="30" font-size="17" font-weight="700">Flow-control queues</text>
+    <text x="20" y="52" font-size="14" fill="#4a4a4a">one per session, waiting for admission</text>
+    <g font-size="15">
+      <rect x="20" y="75" width="260" height="42" rx="6" fill="#fff" stroke="#1c1c1c"/><text x="36" y="102">s5  new</text>
+      <rect x="20" y="127" width="260" height="42" rx="6" fill="#fff" stroke="#1c1c1c"/><text x="36" y="154">s6  new</text>
+      <rect x="20" y="179" width="260" height="42" rx="6" fill="#E9DDB8" stroke="#1c1c1c"/><text x="36" y="206">s3  paused, origin pod-a</text>
+    </g>
+    <path d="M290 150 H335" stroke="#4a4a4a" stroke-width="2.5" marker-end="url(#simpArr2)"/>
+    <text x="290" y="140" font-size="13" fill="#4a4a4a">Pick</text>
+    <rect x="345" y="10" width="840" height="300" rx="10" fill="#f3f3f0" stroke="#d9d9d4"/>
+    <text x="365" y="40" font-size="17" font-weight="700">SessionManager (the ledger)</text>
+    <g font-size="15">
+      <text x="365" y="105" font-weight="600">pod-a</text><text x="365" y="125" font-size="13" fill="#4a4a4a">capacity 100%</text>
+      <rect x="480" y="80" width="204" height="56" fill="#2F6BB0" stroke="#fff" stroke-width="2"/><text x="582" y="113" text-anchor="middle" fill="#fff">s1 running</text>
+      <rect x="684" y="80" width="170" height="56" fill="#8FB1DA" stroke="#fff" stroke-width="2"/><text x="769" y="106" text-anchor="middle">s2 idle</text><text x="769" y="124" text-anchor="middle" font-size="13">12 s &lt; lease</text>
+      <rect x="854" y="80" width="136" height="56" fill="url(#simpHatch1)" stroke="#fff" stroke-width="2"/><text x="922" y="106" text-anchor="middle" style="paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round">s4 idle</text><text x="922" y="124" text-anchor="middle" font-size="13" style="paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round">50 s &ge; lease</text>
+      <rect x="990" y="80" width="170" height="56" fill="#fff" stroke="#7a7a7a" stroke-dasharray="5 4"/><text x="1075" y="113" text-anchor="middle" fill="#4a4a4a">room</text>
+      <text x="365" y="215" font-weight="600">pod-b</text><text x="365" y="235" font-size="13" fill="#4a4a4a">capacity 100%</text>
+      <rect x="480" y="190" width="306" height="56" fill="#2F6BB0" stroke="#fff" stroke-width="2"/><text x="633" y="223" text-anchor="middle" fill="#fff">s7 running</text>
+      <rect x="786" y="190" width="238" height="56" fill="#8FB1DA" stroke="#fff" stroke-width="2"/><text x="905" y="216" text-anchor="middle">s8 idle</text><text x="905" y="234" text-anchor="middle" font-size="13">3 s &lt; lease</text>
+      <rect x="1024" y="190" width="136" height="56" fill="#fff" stroke="#7a7a7a" stroke-dasharray="5 4"/><text x="1092" y="223" text-anchor="middle" fill="#4a4a4a">room</text>
+    </g>
+    <text x="480" y="285" font-size="13" fill="#4a4a4a">each bar is one endpoint's KV cache; each block is one session's size</text>
+    <g font-size="14" fill="#1c1c1c">
+      <rect x="20" y="340" width="18" height="18" fill="#2F6BB0"/><text x="46" y="354">running: a request in flight</text>
+      <rect x="270" y="340" width="18" height="18" fill="#8FB1DA"/><text x="296" y="354">idle, within idleLeaseSeconds: keeps its room</text>
+      <rect x="640" y="340" width="18" height="18" fill="url(#simpHatch1)"/><text x="666" y="354">idle past the lease: room can be reclaimed</text>
+      <rect x="990" y="340" width="18" height="18" fill="#E9DDB8" stroke="#1c1c1c"/><text x="1016" y="354">paused: not in the ledger</text>
+      <text x="20" y="386" fill="#4a4a4a">Pause = remove the session from the ledger. Its KV may still sit on the endpoint, but the gate no longer counts it; its next turn is admitted like a new session.</text>
+    </g>
+  </svg>
+</section>
+
+<section class="slide" id="simp4">
+  <div class="num">21</div>
+  <h2>Admission rules: FairnessPolicy.Pick</h2>
+  <svg class="chart tall" viewBox="0 0 1200 492" role="img" aria-label="flowchart of the admission rules">
+    <defs><marker id="simpArr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#4a4a4a"/></marker></defs>
+    <g font-size="15" fill="#1c1c1c">
+      <rect x="30" y="10" width="330" height="50" rx="8" fill="#fff" stroke="#1c1c1c"/><text x="195" y="41" text-anchor="middle" font-weight="600">queue head: a turn of session S</text>
+      <rect x="30" y="100" width="330" height="56" rx="8" fill="#FFF6DA" stroke="#B7791F"/><text x="195" y="124" text-anchor="middle">S admitted (in the ledger)?</text><text x="195" y="144" text-anchor="middle" font-size="13" fill="#4a4a4a">it has had room since its last turn</text>
+      <rect x="470" y="100" width="690" height="56" rx="8" fill="#D6E8D6" stroke="#3E9B4F"/><text x="490" y="124">dispatch now: an admitted session's turn always goes</text><text x="490" y="144" font-size="13" fill="#4a4a4a">if it outgrows its endpoint, sessions idle there give way, longest idle first</text>
+      <rect x="30" y="196" width="330" height="56" rx="8" fill="#fff" stroke="#1c1c1c"/><text x="195" y="220" text-anchor="middle">candidate endpoints</text><text x="195" y="240" text-anchor="middle" font-size="13" fill="#4a4a4a">new S: all; paused S: only its original one</text>
+      <rect x="30" y="292" width="330" height="56" rx="8" fill="#FFF6DA" stroke="#B7791F"/><text x="195" y="316" text-anchor="middle">a candidate has room &ge; size(S)?</text><text x="195" y="336" text-anchor="middle" font-size="13" fill="#4a4a4a">KV cache is the only resource</text>
+      <rect x="470" y="292" width="690" height="56" rx="8" fill="#D6E8D6" stroke="#3E9B4F"/><text x="490" y="316">admit on the endpoint with the most spare room</text><text x="490" y="336" font-size="13" fill="#4a4a4a">reserve the room until the request reaches the endpoint</text>
+      <rect x="30" y="388" width="330" height="66" rx="8" fill="#FFF6DA" stroke="#B7791F"/><text x="195" y="412" text-anchor="middle">enough room if sessions idle</text><text x="195" y="432" text-anchor="middle">&ge; idleLeaseSeconds are paused?</text>
+      <rect x="470" y="388" width="330" height="66" rx="8" fill="#D6E8D6" stroke="#3E9B4F"/><text x="490" y="412">pause them, longest idle first,</text><text x="490" y="432">then admit S there</text>
+      <rect x="850" y="388" width="310" height="66" rx="8" fill="#E9DDB8" stroke="#1c1c1c"/><text x="870" y="412" font-weight="600">HOLD: stay queued, retry next cycle</text><text x="870" y="432" font-size="13" fill="#4a4a4a">backstop: forced admission after 1800 s</text>
+    </g>
+    <g stroke="#4a4a4a" stroke-width="2" fill="none">
+      <path d="M195 60 V96" marker-end="url(#simpArr3)"/>
+      <path d="M360 128 H466" marker-end="url(#simpArr3)"/>
+      <path d="M195 156 V192" marker-end="url(#simpArr3)"/>
+      <path d="M195 252 V288" marker-end="url(#simpArr3)"/>
+      <path d="M360 320 H466" marker-end="url(#simpArr3)"/>
+      <path d="M195 348 V384" marker-end="url(#simpArr3)"/>
+      <path d="M360 421 H466" marker-end="url(#simpArr3)"/>
+      <path d="M195 454 V474 H1005 V458" marker-end="url(#simpArr3)"/>
+    </g>
+    <g font-size="13" fill="#4a4a4a">
+      <text x="380" y="120">yes</text><text x="205" y="182">no (new or paused)</text>
+      <text x="380" y="312">yes</text><text x="205" y="376">no</text>
+      <text x="380" y="413">yes</text><text x="600" y="489">no</text>
+    </g>
+  </svg>
+  <div class="cols3" style="margin-top:6px">
+    <div class="card small"><b>New includes paused.</b> A paused session's next turn goes through the same rules as a brand-new session.</div>
+    <div class="card small"><b>Pause = drop from the ledger.</b> Nothing is sent to vLLM; the gate just stops counting that session's KV.</div>
+    <div class="card small"><b>Paused sessions go home.</b> In this version a paused session can only return to its original endpoint, where its prefix may still be cached.</div>
+  </div>
+</section>
+
+<section class="slide" id="simp5">
+  <div class="num">22</div>
+  <h2>Example: one endpoint, lease 30 s</h2>
+  <svg class="chart tall" viewBox="0 0 1200 430" role="img" aria-label="four steps on one endpoint: a new session arrives, an idle session past the lease is paused, the new session is admitted, the paused session returns and holds">
+    <defs><pattern id="simpHatch2" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="9" height="9" fill="#E3ECF7"/><line x1="0" y1="0" x2="0" y2="9" stroke="#8FB1DA" stroke-width="3.5"/></pattern></defs>
+    <g font-size="15" fill="#1c1c1c">
+      <text x="20" y="46" font-weight="700">1. D arrives (new, 25k)</text><text x="20" y="68" font-size="14" fill="#4a4a4a">room 10k &lt; 25k</text>
+      <rect x="380" y="28" width="312" height="50" fill="#2F6BB0" stroke="#fff" stroke-width="2"/><text x="536" y="58" text-anchor="middle" fill="#fff">A running 40k</text>
+      <rect x="692" y="28" width="234" height="50" fill="#8FB1DA" stroke="#fff" stroke-width="2"/><text x="809" y="50" text-anchor="middle">B idle 5 s</text><text x="809" y="68" text-anchor="middle" font-size="13">30k</text>
+      <rect x="926" y="28" width="156" height="50" fill="url(#simpHatch2)" stroke="#fff" stroke-width="2"/><text x="1004" y="50" text-anchor="middle" style="paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round">C idle 45 s</text><text x="1004" y="68" text-anchor="middle" font-size="13" style="paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round">20k</text>
+      <rect x="1082" y="28" width="78" height="50" fill="#fff" stroke="#7a7a7a" stroke-dasharray="5 4"/><text x="1121" y="58" text-anchor="middle" font-size="13" fill="#4a4a4a">10k</text>
+
+      <text x="20" y="146" font-weight="700">2. Pause C</text><text x="20" y="168" font-size="14" fill="#4a4a4a">idle 45 s &ge; 30 s; B (5 s) keeps its room</text>
+      <rect x="380" y="128" width="312" height="50" fill="#2F6BB0" stroke="#fff" stroke-width="2"/><text x="536" y="158" text-anchor="middle" fill="#fff">A running 40k</text>
+      <rect x="692" y="128" width="234" height="50" fill="#8FB1DA" stroke="#fff" stroke-width="2"/><text x="809" y="150" text-anchor="middle">B idle 5 s</text><text x="809" y="168" text-anchor="middle" font-size="13">30k</text>
+      <rect x="926" y="128" width="234" height="50" fill="#fff" stroke="#7a7a7a" stroke-dasharray="5 4"/><text x="1043" y="158" text-anchor="middle" font-size="13" fill="#4a4a4a">room 30k</text>
+
+      <text x="20" y="246" font-weight="700">3. Admit D</text><text x="20" y="268" font-size="14" fill="#4a4a4a">30k &ge; 25k</text>
+      <rect x="380" y="228" width="312" height="50" fill="#2F6BB0" stroke="#fff" stroke-width="2"/><text x="536" y="258" text-anchor="middle" fill="#fff">A running 40k</text>
+      <rect x="692" y="228" width="234" height="50" fill="#8FB1DA" stroke="#fff" stroke-width="2"/><text x="809" y="250" text-anchor="middle">B idle 5 s</text><text x="809" y="268" text-anchor="middle" font-size="13">30k</text>
+      <rect x="926" y="228" width="195" height="50" fill="#2F6BB0" stroke="#fff" stroke-width="2"/><text x="1023" y="258" text-anchor="middle" fill="#fff">D running 25k</text>
+      <rect x="1121" y="228" width="39" height="50" fill="#fff" stroke="#7a7a7a" stroke-dasharray="5 4"/>
+
+      <text x="20" y="346" font-weight="700">4. C's next turn: HOLD</text><text x="20" y="368" font-size="14" fill="#4a4a4a">paused = new, only this endpoint;</text><text x="20" y="388" font-size="14" fill="#4a4a4a">needs 20k, room 5k, nobody past the lease</text>
+      <rect x="380" y="328" width="312" height="50" fill="#2F6BB0" stroke="#fff" stroke-width="2"/><text x="536" y="358" text-anchor="middle" fill="#fff">A running 40k</text>
+      <rect x="692" y="328" width="234" height="50" fill="#8FB1DA" stroke="#fff" stroke-width="2"/><text x="809" y="350" text-anchor="middle">B idle 20 s</text><text x="809" y="368" text-anchor="middle" font-size="13">30k</text>
+      <rect x="926" y="328" width="195" height="50" fill="#8FB1DA" stroke="#fff" stroke-width="2"/><text x="1023" y="350" text-anchor="middle">D idle 10 s</text><text x="1023" y="368" text-anchor="middle" font-size="13">25k</text>
+      <rect x="1121" y="328" width="39" height="50" fill="#fff" stroke="#7a7a7a" stroke-dasharray="5 4"/>
+      <rect x="1030" y="392" width="130" height="30" rx="5" fill="#E9DDB8" stroke="#1c1c1c"/><text x="1095" y="412" text-anchor="middle" font-size="13">C 20k waits</text>
+    </g>
+    <text x="380" y="18" font-size="13" fill="#4a4a4a">endpoint KV cache, 100k tokens (example numbers)</text>
+  </svg>
+  <div class="small" style="margin-top:4px">C gets in once B or D has been idle 30 s (its room is then reclaimable) or a session ends. A held turn is never dropped: after 1800 s it is admitted anyway.</div>
+</section>
+
+<section class="slide" id="s18">
+  <div class="num">23</div>
   <h2>Summary</h2>
   <div class="card big"><ul>
     <li>Over-subscribed agent sessions thrash the KV cache</li>
