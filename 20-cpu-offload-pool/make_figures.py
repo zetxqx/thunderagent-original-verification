@@ -8,10 +8,13 @@ results/figure-data.json, delete it to recompute) and writes to figures/:
   fig2-reuse-source    steady-state prefix reuse split into GPU hits and CPU tier hits
   fig4-offload-effect  throughput with offloading off and on, at the points that have both
   fig5-kv-budget       the setup, the KV cache one replica has, and the KV cache the workload needs
+  fig6-vllm-queues-offload  vLLM running and waiting requests over time, offloading on (phase B)
+  fig7-vllm-queues-off      the same with offloading off (phase A)
 
 Each as PNG (300 dpi) and PDF.
 Usage: uv run --with matplotlib --with numpy python make_figures.py
 """
+import csv
 import importlib.util
 import json
 from pathlib import Path
@@ -239,6 +242,74 @@ def fig5_kv_budget(data):
     finalize_figure(fig, "fig5-kv-budget")
 
 
+def queue_series(phase):
+    """{c: [(arm, lane, minutes, running, waiting)]} from each cell's prober CSV (every 2 s)."""
+    out, warm = {}, {}
+    for run in sorted((HERE / "results").glob("rep-*")):
+        mp = run / "step20.json"
+        if not mp.exists():
+            continue
+        meta = json.loads(mp.read_text())
+        if meta["phase"] != phase:
+            continue
+        warm[meta["concurrency"]] = meta["warmup_s"] / 60
+        for lane, arm in sorted(meta["lane_arms"].items()):
+            path = run / f"epp-{arm}-{lane}" / "results" / "vllm-metrics.csv"
+            if not path.exists():
+                continue
+            rows = list(csv.DictReader(open(path)))
+            t0 = float(rows[0]["ts"])
+            t = np.array([(float(r["ts"]) - t0) / 60 for r in rows])
+            run_ = np.array([float(r["num_requests_running"] or 0) for r in rows])
+            wait = np.array([float(r["num_requests_waiting"] or 0) for r in rows])
+            out.setdefault(meta["concurrency"], []).append((arm, lane, t, run_, wait))
+    return out, warm
+
+
+def rolling(y, n=15):  # 15 samples of 2 s = 30 s
+    k = np.ones(n) / n
+    return np.convolve(np.pad(y, (n // 2, n - 1 - n // 2), mode="edge"), k, mode="valid")
+
+
+def queues_figure(phase, name, title):
+    series, warm = queue_series(phase)
+    cs = sorted(series)
+    fig, axes = plt.subplots(len(cs), 2, figsize=(13, 2.35 * len(cs) + 1.0), sharex=True, squeeze=False)
+    wmax = max(max(w.max() for *_, w in series[c]) for c in cs)
+    rmax = max(max(rolling(r).max() for *_, r, _ in series[c]) for c in cs)
+    seen = set()
+    for row, c in enumerate(cs):
+        for col, (idx, ylabel) in enumerate(((3, "running"), (4, "waiting"))):
+            ax = axes[row][col]
+            dashes = {}
+            for arm, lane, t, r, w in series[c]:
+                y = r if idx == 3 else w
+                n = dashes.get(arm, 0); dashes[arm] = n + 1
+                label = LABEL[arm] if arm not in seen else None
+                ax.plot(t, rolling(y), color=COLOR[arm], lw=2.0, ls="-" if n == 0 else "--", label=label)
+                if col == 1:
+                    seen.add(arm)
+            ax.axvline(warm[c], color="#7a7a7a", lw=1.2, ls=":")
+            ax.set_ylim(0, rmax * 1.08 if idx == 3 else wmax * 1.08)
+            ax.grid(axis="y", color="#E5E5E5", lw=1)
+            ax.set_axisbelow(True)
+            if row == 0:
+                ax.set_title(f"vLLM requests {ylabel}", loc="left", fontweight="bold", fontsize=14)
+            if col == 0:
+                ax.set_ylabel(f"c = {c}", fontsize=13)
+            ax.tick_params(labelsize=11)
+    for ax in axes[-1]:
+        ax.set_xlabel("minutes since the bench started")
+    handles = [Line2D([], [], color=COLOR[a], lw=2.4, label=LABEL[a]) for a in LABEL if a in seen]
+    if phase == "A":
+        handles.append(Line2D([], [], color=COLOR["thunder-lease-main"], lw=2.4, ls="--", label="second llm-d-thunder-simplified cell (other pod)"))
+    handles.append(Line2D([], [], color="#7a7a7a", lw=1.2, ls=":", label="end of warm-up"))
+    fig.legend(handles=handles, loc="lower center", ncol=2, fontsize=12, bbox_to_anchor=(0.5, -0.01))
+    fig.suptitle(title, x=0.01, ha="left", fontsize=14)
+    fig.tight_layout(rect=(0, 0.06 if phase == "B" else 0.09, 1, 0.97))
+    finalize_figure(fig, name)
+
+
 def main():
     apply_publication_style()
     data = load_data()
@@ -246,6 +317,8 @@ def main():
     fig2_reuse_source(data)
     fig4_offload_effect(data)
     fig5_kv_budget(data)
+    queues_figure("B", "fig6-vllm-queues-offload", "One vLLM replica per arm, CPU offloading 400 GiB (30 s rolling mean)")
+    queues_figure("A", "fig7-vllm-queues-off", "One vLLM replica per arm, offloading off (30 s rolling mean)")
 
 
 if __name__ == "__main__":
