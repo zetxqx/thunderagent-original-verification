@@ -1,0 +1,140 @@
+smoke test Fri Oct  2 00:34:10 PDT 2026  image thunder-agent-lease-tier-a13a87ed  tier capacityTokens 8738133
+
+=== lane a replica program-aware-vllm-decode-559bd4f57c-sfjxp on gke-bobbm-bobbm-spoth100-ef0c964e-trwg: offloading (checks 1 to 3) ===
+vllm:cache_config_info{_block_size_resolved="True",block_size="16",cache_dtype="fp8_e4m3",enable_prefix_caching="True",engine="0",gpu_memory_utilization="0.88",is_attention_free="False",kv_cache_dtype_skip_layers="[]",kv_cache_max_concurrency="8.53363037109375",kv_cache_memory_bytes="None",kv_cache_size_tokens="2237040",kv_offloading_backend="native",kv_offloading_size="400.0",kv_sharing_fast_pref
+PASS  cache_config_info reports kv_offloading_size 400
+PASS  GPU KV unchanged: 16 x 139815 = 2237040 tokens
+PASS  log names OffloadingConnector
+Created mmap file /dev/shm/vllm_offload_52454a91-1ac8-4610-ae41-63cd57cffe4f.mmap (429.50 GB)
+PASS  CPU tier from the log is 429.50 GB = 8738199 tokens, within 1% of the tier arm's capacityTokens 8738133
+PASS  /dev/shm holds the tier: 400 GiB used (>= 380)
+PASS  no restart or OOM kill (restarts, last reason: 0 )
+PASS  kv_offload_allocation_failure = 0
+
+=== lane a replica program-aware-vllm-decode-559bd4f57c-sfjxp: the CPU tier works (checks 4 and 5) ===
+{"reset_both_before": true, "cold": {"seconds": 2.0268248909851536, "prompt_tokens": 50021, "cached_tokens": 0}, "reset_gpu_only": true, "from_cpu": {"seconds": 0.24688043899368495, "prompt_tokens": 50021, "cached_tokens": 50016}, "reset_both": true, "after_reset": {"seconds": 1.4368280109483749, "prompt_tokens": 50021, "cached_tokens": 0}, "counters_cold": {"vllm:kv_offload_store_bytes": 2458386432.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_queries": 50021.0, "vllm:prefix_cache_queries": 50021.0, "vllm:external_prefix_cache_hits": 0.0}, "counters_from_cpu": {"vllm:kv_offload_load_bytes": 2458386432.0, "vllm:kv_offload_store_bytes": 0.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_queries": 50021.0, "vllm:prefix_cache_queries": 50021.0, "vllm:external_prefix_cache_hits": 50016.0}, "counters_after_reset": {"vllm:kv_offload_load_bytes": 0.0, "vllm:kv_offload_store_bytes": 2458386432.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_queries": 50021.0, "vllm:prefix_cache_queries": 50021.0, "vllm:external_prefix_cache_hits": 0.0}}
+PASS  resets returned success (both, GPU only, both)
+PASS  cold request computed its prompt (50021 tokens, cached 0)
+PASS  after a GPU-only reset, cached_tokens 50016 >= 90% of the prompt
+PASS  ... and they came from the CPU tier: external hits 50016
+PASS  ... load time 0.25 s vs recompute 2.03 s (at most half)
+PASS  offload counters are exported and move: stored 2.46 GB on the cold request, loaded 2.46 GB on the reload
+PASS  after reset_external=true: cached_tokens 0, external hits 0
+
+=== lane b replica program-aware-vllm-decode-559bd4f57c-8pc96 on gke-bobbm-bobbm-spoth100-ef0c964e-91qy: offloading (checks 1 to 3) ===
+vllm:cache_config_info{_block_size_resolved="True",block_size="16",cache_dtype="fp8_e4m3",enable_prefix_caching="True",engine="0",gpu_memory_utilization="0.88",is_attention_free="False",kv_cache_dtype_skip_layers="[]",kv_cache_max_concurrency="8.53363037109375",kv_cache_memory_bytes="None",kv_cache_size_tokens="2237040",kv_offloading_backend="native",kv_offloading_size="400.0",kv_sharing_fast_pref
+PASS  cache_config_info reports kv_offloading_size 400
+PASS  GPU KV unchanged: 16 x 139815 = 2237040 tokens
+PASS  log names OffloadingConnector
+Created mmap file /dev/shm/vllm_offload_daf0d7ca-abcc-45ab-9796-cf8e7593370e.mmap (429.50 GB)
+PASS  CPU tier from the log is 429.50 GB = 8738199 tokens, within 1% of the tier arm's capacityTokens 8738133
+PASS  /dev/shm holds the tier: 400 GiB used (>= 380)
+PASS  no restart or OOM kill (restarts, last reason: 0 )
+PASS  kv_offload_allocation_failure = 0
+
+=== lane b replica program-aware-vllm-decode-559bd4f57c-8pc96: the CPU tier works (checks 4 and 5) ===
+{"reset_both_before": true, "cold": {"seconds": 2.0215747619513422, "prompt_tokens": 50021, "cached_tokens": 0}, "reset_gpu_only": true, "from_cpu": {"seconds": 0.24925879703368992, "prompt_tokens": 50021, "cached_tokens": 50016}, "reset_both": true, "after_reset": {"seconds": 1.444290304905735, "prompt_tokens": 50021, "cached_tokens": 0}, "counters_cold": {"vllm:external_prefix_cache_queries": 50021.0, "vllm:kv_offload_store_bytes": 2458386432.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_hits": 0.0, "vllm:prefix_cache_queries": 50021.0}, "counters_from_cpu": {"vllm:external_prefix_cache_queries": 50021.0, "vllm:kv_offload_store_bytes": 0.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_hits": 50016.0, "vllm:kv_offload_load_bytes": 2458386432.0, "vllm:prefix_cache_queries": 50021.0}, "counters_after_reset": {"vllm:external_prefix_cache_queries": 50021.0, "vllm:kv_offload_store_bytes": 2458386432.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_hits": 0.0, "vllm:kv_offload_load_bytes": 0.0, "vllm:prefix_cache_queries": 50021.0}}
+PASS  resets returned success (both, GPU only, both)
+PASS  cold request computed its prompt (50021 tokens, cached 0)
+PASS  after a GPU-only reset, cached_tokens 50016 >= 90% of the prompt
+PASS  ... and they came from the CPU tier: external hits 50016
+PASS  ... load time 0.25 s vs recompute 2.02 s (at most half)
+PASS  offload counters are exported and move: stored 2.46 GB on the cold request, loaded 2.46 GB on the reload
+PASS  after reset_external=true: cached_tokens 0, external hits 0
+
+=== lane c replica program-aware-vllm-decode-559bd4f57c-bkxwf on gke-bobbm-bobbm-spoth100-ef0c964e-zhnf: offloading (checks 1 to 3) ===
+vllm:cache_config_info{_block_size_resolved="True",block_size="16",cache_dtype="fp8_e4m3",enable_prefix_caching="True",engine="0",gpu_memory_utilization="0.88",is_attention_free="False",kv_cache_dtype_skip_layers="[]",kv_cache_max_concurrency="8.53363037109375",kv_cache_memory_bytes="None",kv_cache_size_tokens="2237040",kv_offloading_backend="native",kv_offloading_size="400.0",kv_sharing_fast_pref
+PASS  cache_config_info reports kv_offloading_size 400
+PASS  GPU KV unchanged: 16 x 139815 = 2237040 tokens
+PASS  log names OffloadingConnector
+Created mmap file /dev/shm/vllm_offload_a9e743f0-9914-4c9b-8598-d92b86bbac06.mmap (429.50 GB)
+PASS  CPU tier from the log is 429.50 GB = 8738199 tokens, within 1% of the tier arm's capacityTokens 8738133
+PASS  /dev/shm holds the tier: 400 GiB used (>= 380)
+PASS  no restart or OOM kill (restarts, last reason: 0 )
+PASS  kv_offload_allocation_failure = 0
+
+=== lane c replica program-aware-vllm-decode-559bd4f57c-bkxwf: the CPU tier works (checks 4 and 5) ===
+{"reset_both_before": true, "cold": {"seconds": 1.500145964906551, "prompt_tokens": 50022, "cached_tokens": 0}, "reset_gpu_only": true, "from_cpu": {"seconds": 0.19806657906156033, "prompt_tokens": 50022, "cached_tokens": 50016}, "reset_both": true, "after_reset": {"seconds": 1.4357792130904272, "prompt_tokens": 50022, "cached_tokens": 0}, "counters_cold": {"vllm:kv_offload_store_bytes": 2458386432.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_queries": 50022.0, "vllm:prefix_cache_queries": 50022.0, "vllm:external_prefix_cache_hits": 0.0}, "counters_from_cpu": {"vllm:kv_offload_store_bytes": 0.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_queries": 50022.0, "vllm:prefix_cache_queries": 50022.0, "vllm:external_prefix_cache_hits": 50016.0, "vllm:kv_offload_load_bytes": 2458386432.0}, "counters_after_reset": {"vllm:kv_offload_store_bytes": 2458386432.0, "vllm:prefix_cache_hits": 0.0, "vllm:external_prefix_cache_queries": 50022.0, "vllm:prefix_cache_queries": 50022.0, "vllm:external_prefix_cache_hits": 0.0, "vllm:kv_offload_load_bytes": 0.0}}
+PASS  resets returned success (both, GPU only, both)
+PASS  cold request computed its prompt (50022 tokens, cached 0)
+PASS  after a GPU-only reset, cached_tokens 50016 >= 90% of the prompt
+PASS  ... and they came from the CPU tier: external hits 50016
+PASS  ... load time 0.2 s vs recompute 1.5 s (at most half)
+PASS  offload counters are exported and move: stored 2.46 GB on the cold request, loaded 2.46 GB on the reload
+PASS  after reset_external=true: cached_tokens 0, external hits 0
+
+=== lanes: a:thunder-lease-budget30 b:thunder-lease-budget5 c:thunder-lease-main5 ===
+LANE_a_POD=program-aware-vllm-decode-559bd4f57c-sfjxp
+LANE_a_IP=10.100.12.40
+LANE_a_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-trwg
+LANE_b_POD=program-aware-vllm-decode-559bd4f57c-8pc96
+LANE_b_IP=10.100.2.20
+LANE_b_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-91qy
+LANE_c_POD=program-aware-vllm-decode-559bd4f57c-bkxwf
+LANE_c_IP=10.100.15.19
+LANE_c_NODE=gke-bobbm-bobbm-spoth100-ef0c964e-zhnf
+lane a: thunder-lane-a-epp, arm thunder-lease-budget30, image thunder-agent-lease-tier-a13a87ed
+lane b: thunder-lane-b-epp, arm thunder-lease-budget5, image thunder-agent-lease-tier-a13a87ed
+lane c: thunder-lane-c-epp, arm thunder-lease-main5, image thunder-agent-lease-tier-a13a87ed
+
+=== lane a (thunder-lease-budget30): build, config and gate capacity (check 6) ===
+llm_d_epp_info{build_ref="v0.10.0-rc.1",commit="a13a87ed09e50f317fb8728566a0ee00d899cbe2"} 1
+PASS  build info reports commit a13a87ed
+PASS  flow control on
+PASS  live ConfigMap has idleLeaseSeconds: 30
+thunder_agent_endpoint_capacity_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-559bd4f57c-sfjxp-rank-0"} 2.23704e+06
+PASS  one endpoint at capacity 2237040 tokens (got: 2.23704e+06)
+PASS  live ConfigMap has offloadCapacityTokens: 8738133
+PASS  the tier budget's resident footprint is exported (1 series)
+
+=== lane a: session and class accounting (check 7) ===
+PASS  smoke-a-a-1790926450 turn 1 answered: Hello from turn one.
+PASS  smoke-a-a-1790926450 turn 2 answered: Hello from turn two.
+PASS  smoke-a-b-1790926450 answered: Hello from b
+PASS  2 new sessions tracked (sessions 0 -> 2)
+PASS  no session running or paused after the turns
+PASS  releases: new +2 (want 2), admitted +1 (want 1)
+PASS  no holds or pauses on an idle replica (holds 0, pauses 0)
+
+=== lane b (thunder-lease-budget5): build, config and gate capacity (check 6) ===
+llm_d_epp_info{build_ref="v0.10.0-rc.1",commit="a13a87ed09e50f317fb8728566a0ee00d899cbe2"} 1
+PASS  build info reports commit a13a87ed
+PASS  flow control on
+PASS  live ConfigMap has idleLeaseSeconds: 5
+thunder_agent_endpoint_capacity_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-559bd4f57c-8pc96-rank-0"} 2.23704e+06
+PASS  one endpoint at capacity 2237040 tokens (got: 2.23704e+06)
+PASS  live ConfigMap has offloadCapacityTokens: 8738133
+PASS  the tier budget's resident footprint is exported (1 series)
+
+=== lane b: session and class accounting (check 7) ===
+PASS  smoke-b-a-1790926450 turn 1 answered: Hello from turn one.
+PASS  smoke-b-a-1790926450 turn 2 answered: Hello from turn two.
+PASS  smoke-b-b-1790926450 answered: Hello from b
+PASS  2 new sessions tracked (sessions 0 -> 2)
+PASS  no session running or paused after the turns
+PASS  releases: new +2 (want 2), admitted +1 (want 1)
+PASS  no holds or pauses on an idle replica (holds 0, pauses 0)
+
+=== lane c (thunder-lease-main5): build, config and gate capacity (check 6) ===
+llm_d_epp_info{build_ref="v0.10.0-rc.1",commit="a13a87ed09e50f317fb8728566a0ee00d899cbe2"} 1
+PASS  build info reports commit a13a87ed
+PASS  flow control on
+PASS  live ConfigMap has idleLeaseSeconds: 5
+thunder_agent_endpoint_capacity_tokens{endpoint="llm-d-program-aware-scheduling/program-aware-vllm-decode-559bd4f57c-bkxwf-rank-0"} 2.23704e+06
+PASS  one endpoint at capacity 2237040 tokens (got: 2.23704e+06)
+
+=== lane c: session and class accounting (check 7) ===
+PASS  smoke-c-a-1790926450 turn 1 answered: Hello from turn one.
+PASS  smoke-c-a-1790926450 turn 2 answered: Hello from turn two.
+PASS  smoke-c-b-1790926450 answered: Hello from b
+PASS  2 new sessions tracked (sessions 0 -> 2)
+PASS  no session running or paused after the turns
+PASS  releases: new +2 (want 2), admitted +1 (want 1)
+PASS  no holds or pauses on an idle replica (holds 0, pauses 0)
+
+=== EPP logs ===
+PASS  lane a: no error or panic lines (got 0 of 61 lines)
+PASS  lane b: no error or panic lines (got 0 of 61 lines)
+PASS  lane c: no error or panic lines (got 0 of 61 lines)
+
+=== 0 check(s) failed ===

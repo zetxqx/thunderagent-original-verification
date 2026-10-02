@@ -1,0 +1,37 @@
+# Step 21 arm thunder-lease-main5: the lease gate without a tier budget and a 5 s lease
+# (llm-d-router thunder-agent-lease-tier at a13a87ed, image
+# thunder-agent-lease-tier-a13a87ed). Capacity is the scraped GPU KV.
+# offloadCapacityTokens is the CPU tier of --kv-offloading-size=400 (400 GiB
+# at 48 KiB per token); when set, a new session also needs room in a tier
+# budget that counts paused sessions. 0 keeps the step 20 GPU tier behavior.
+apiVersion: llm-d.ai/v1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- type: agent-identity
+  parameters:
+    additionalSessionHeaders:
+    - x-session-id
+- type: thunder-agent
+  name: thunder
+  parameters:
+    capacityTokens: 2237040
+    evictionTtlSeconds: 3600
+    utilThreshold: 1.0
+    idleLeaseSeconds: 5
+    headWaitStarvationMs: 1800000
+    offloadCapacityTokens: 0
+- type: max-score-picker
+- type: single-profile-handler
+flowControl:
+  defaultRequestTTL: "0s"
+  saturationDetector:
+    pluginRef: thunder
+  defaultPriorityBand:
+    fairnessPolicyRef: thunder
+schedulingProfiles:
+- name: default
+  plugins:
+  - pluginRef: thunder
+  - pluginRef: max-score-picker
