@@ -418,3 +418,28 @@ Full tables are in `results/analysis.md`, curves in `results/summary.png`, and h
 - Phase A has no c=64 or 192 points.
 - Bench pods shared nodes with some vLLM pods.
 - c=192 and 256 have 45-minute windows. At c=256 a session gets only a few turns in the window, so those points weigh early turns more.
+
+## Replicates (2026-10-01)
+
+Phase B ran twice more, on 2026-10-01 from 14:53 to 22:53 (`run-replicates-B.sh`, `REP=2` and `REP=3`).
+
+- **Design:** each replicate moved every arm one lane over, so over the 3 runs every arm ran once on every pod at every concurrency.
+- **Completeness:** all 30 new cells completed, with no preemption, no vLLM or EPP restart and no OOM kill. Peak memory was again 445 GiB. The model server and main release were restored and checked.
+- **Files:** state and smoke-test files of this run carry the suffix `-replicates`.
+- **Figures and tables:** `results/analysis.md` and the figures now give the mean (min-max) over the 3 cells of each arm and point. `figures/fig3-ttft` (median and p99 TTFT) was added.
+
+**Output throughput (tok/s), mean (min-max) of 3 runs:**
+
+| c | llm-d default | lease, GPU capacity | lease, CPU-tier capacity |
+|---|---|---|---|
+| 32 | 560 (551-567) | 578 (570-584) | 554 (546-560) |
+| 64 | 565 (545-584) | 636 (627-643) | 566 (538-585) |
+| 128 | 567 (561-578) | 635 (624-649) | 579 (568-585) |
+| 192 | 366 (361-370) | 551 (535-560) | 569 (564-576) |
+| 256 | 288 (286-292) | 516 (500-527) | 533 (530-535) |
+
+The first run's readings hold. Most metrics vary by about 2 percent across runs, the TTFT p99 more.
+
+- **c = 64 and 128:** the GPU-capacity gate's 12 to 13 percent gain over llm-d default is outside the pod noise. Its median TTFT stays at 0.6 to 1.1 s, against 44 to 104 s for the other two arms, which queue 30 to 87 requests inside vLLM.
+- **c = 192 and 256:** the CPU-tier-capacity gate is about 3 percent ahead of the GPU-capacity gate, with non-overlapping ranges, and has fewer forced admissions (23 and 73 against 111 and 163). llm-d default falls to 366 and 288.
+- **Tail:** from c = 128 the GPU-capacity gate's p99 TTFT reaches the 1800 s forced admission in every run.

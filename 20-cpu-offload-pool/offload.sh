@@ -6,7 +6,10 @@
 #                release under results/.
 #   off          apply vllm-deploy-3rep-off.yaml (phase A)
 #   on           apply vllm-deploy-3rep-offload400.yaml (phase B)
-#   restore      apply results/vllm-deploy-before-clean.yaml (the original)
+#   restore      apply results/vllm-deploy-before-clean.json (the original)
+#   check-original  exit 0 if the live deployment is the saved original
+# STATE_SUFFIX (default empty) is appended to the state names in the files
+# below, so a later run does not overwrite an earlier run's records.
 # Each switch waits for the rollout and writes results/vllm-deploy-live-<state>.yaml,
 # vllm-pods-<state>.txt, vllm-cache-config-<state>.txt and
 # vllm-startup-<state>-<pod>.log. Manifests are applied with kubectl replace,
@@ -14,7 +17,8 @@
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 pin_kube
-CMD="${1:?usage: offload.sh save-before|off|on|restore}"
+CMD="${1:?usage: offload.sh save-before|off|on|restore|check-original}"
+SFX="${STATE_SUFFIX:-}"
 
 # template_of <file|-> : the replicas and pod template of a deployment, as
 # canonical JSON (runtime and kubectl-added fields dropped), for comparison.
@@ -62,7 +66,7 @@ switch() { # switch <manifest> <state> <expected --kv-offloading-size or none>
   record "$S"
   # One replica per node, on the lane nodes: only for the step 20 states (the
   # original deployment puts two replicas on one node).
-  [ "$S" != after-restore ] || return 0
+  [ "${S%"$SFX"}" != after-restore ] || return 0
   local NODES; NODES=$(kubectl get pods -n "$NS" -l llm-d.ai/role=decode --field-selector=status.phase=Running -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort)
   [ "$(echo "$NODES" | uniq | wc -l | tr -d ' ')" = "$(echo "$NODES" | wc -l | tr -d ' ')" ] || { echo "FATAL: two replicas share a node" >&2; exit 1; }
   for L in $LANES; do
@@ -96,16 +100,22 @@ PY
     helm get manifest "$RELEASE" -n "$NS" > "$RESULTS/main-release-before.yaml"
     record before
     echo "saved: vllm-deploy-before.{yaml,json}, vllm-deploy-before-clean.json, main-release-before.yaml" ;;
-  off) switch "$STEP20/vllm-deploy-3rep-off.yaml" off none ;;
-  on)  switch "$STEP20/vllm-deploy-3rep-offload400.yaml" offload400 400 ;;
+  off) switch "$STEP20/vllm-deploy-3rep-off.yaml" "off$SFX" none ;;
+  on)  switch "$STEP20/vllm-deploy-3rep-offload400.yaml" "offload400$SFX" 400 ;;
+  check-original)
+    if [ "$(kubectl get deploy "$DEPLOY" -n "$NS" -o json | template_of -)" = "$(template_of - < "$RESULTS/vllm-deploy-before.json")" ]; then
+      echo "live deployment is the saved original"
+    else
+      echo "live deployment differs from results/vllm-deploy-before.json" >&2; exit 1
+    fi ;;
   restore)
     [ -f "$RESULTS/vllm-deploy-before-clean.json" ] || { echo "FATAL: no saved deployment; run save-before first" >&2; exit 1; }
-    switch "$RESULTS/vllm-deploy-before-clean.json" after-restore none
-    kubectl get deploy "$DEPLOY" -n "$NS" -o yaml > "$RESULTS/vllm-deploy-after-restore.yaml"
+    switch "$RESULTS/vllm-deploy-before-clean.json" "after-restore$SFX" none
+    kubectl get deploy "$DEPLOY" -n "$NS" -o yaml > "$RESULTS/vllm-deploy-after-restore$SFX.yaml"
     if [ "$(kubectl get deploy "$DEPLOY" -n "$NS" -o json | template_of -)" = "$(template_of - < "$RESULTS/vllm-deploy-before.json")" ]; then
       echo "restored: replicas and pod template match vllm-deploy-before.json"
     else
       echo "FATAL: the restored deployment differs from vllm-deploy-before.json" >&2; exit 1
     fi ;;
-  *) echo "usage: offload.sh save-before|off|on|restore" >&2; exit 2 ;;
+  *) echo "usage: offload.sh save-before|off|on|restore|check-original" >&2; exit 2 ;;
 esac

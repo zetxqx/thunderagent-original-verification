@@ -1,0 +1,56 @@
+# Step 20 arm thunder-lease-main-tier: the lease gate sized to the CPU KV
+# tier instead of the GPU (llm-d-router thunder-agent-lease-main, image
+# thunder-agent-lease-44544c04). Same thunder-agent keys as
+# thunder-lease-main except capacityTokens.
+# thunder-agent takes a pod's capacity from the block size and GPU block count
+# in vllm:cache_config_info, and uses capacityTokens only when the pod reports
+# none (accounting.go endpointCapacity). The core-metrics-extractor below
+# restates the built-in vllm engine config with cacheInfoSpec "" (a nil spec,
+# as the built-in sglang and trtllm-serve configs use), so this EPP never
+# reads cache_config_info and capacityTokens applies. Declaring engine vllm
+# replaces the whole built-in vllm entry, so the other four specs are
+# carried over unchanged.
+# capacityTokens: the CPU tier of --kv-offloading-size=400, 400 GiB at 48 KiB
+# per token (48 layers x K,V x 4 KV heads x 128 dims x 1 byte FP8). vLLM's
+# offloading connector copies every computed block to CPU, so the tier holds
+# what the GPU holds and a pod keeps about the tier size, not GPU plus CPU.
+# The step 20 smoke test checks this value against the tier vLLM reports.
+apiVersion: llm-d.ai/v1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- type: core-metrics-extractor
+  parameters:
+    engineConfigs:
+    - name: vllm
+      queuedRequestsSpec: "vllm:num_requests_waiting"
+      runningRequestsSpec: "vllm:num_requests_running"
+      kvUsageSpec: "vllm:kv_cache_usage_perc"
+      loraSpec: "vllm:lora_requests_info"
+      cacheInfoSpec: ""
+- type: agent-identity
+  parameters:
+    additionalSessionHeaders:
+    - x-session-id
+- type: thunder-agent
+  name: thunder
+  parameters:
+    capacityTokens: 8738133
+    evictionTtlSeconds: 3600
+    utilThreshold: 1.0
+    idleLeaseSeconds: 30
+    headWaitStarvationMs: 1800000
+- type: max-score-picker
+- type: single-profile-handler
+flowControl:
+  defaultRequestTTL: "0s"
+  saturationDetector:
+    pluginRef: thunder
+  defaultPriorityBand:
+    fairnessPolicyRef: thunder
+schedulingProfiles:
+- name: default
+  plugins:
+  - pluginRef: thunder
+  - pluginRef: max-score-picker

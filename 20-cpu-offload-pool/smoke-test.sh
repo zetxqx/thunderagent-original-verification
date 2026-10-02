@@ -2,9 +2,10 @@
 # Step 20 smoke test, after `offload.sh on`. On each replica: offloading is on
 # at 400 GiB with the GPU KV unchanged, no restart or allocation failure, the
 # CPU tier serves a prefix the GPU lost and reset_external clears it
-# (cpu-tier-probe.py). Then the lanes as at phase B's first point (a baseline,
-# b lease, c tier): build, live config, the gate capacity each lane uses,
-# session and class accounting over a few turns, and clean EPP logs.
+# (cpu-tier-probe.py). Then the lanes, deployed with SMOKE_LANE_ARMS (default:
+# phase B's first point, a baseline, b lease, c tier): build, live config, the
+# gate capacity each lane uses, session and class accounting over a few turns,
+# and clean EPP logs.
 # Exit code is the number of failed checks. Output also goes to
 # results/smoke-test-output.txt.
 set -uo pipefail
@@ -13,8 +14,10 @@ set -uo pipefail
 # into a variable and searched with here-strings (grep -q ... <<< "$VAR").
 source "$(dirname "$0")/lib.sh"
 pin_kube
-exec > >(tee "$RESULTS/smoke-test-output.txt") 2>&1
+SFX="${SMOKE_SUFFIX:-}"  # appended to this test's output files, so a later run keeps the earlier ones
+exec > >(tee "$RESULTS/smoke-test-output$SFX.txt") 2>&1
 MODEL="Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8"
+LANE_ARMS="${SMOKE_LANE_ARMS:-a:baseline b:thunder-lease-main c:thunder-lease-main-tier}"
 COMMIT="${EPP_IMAGE_TAG##*-}"
 TIER_CAP=$(grep -oE "capacityTokens: [0-9]+" "$STEP10/thunder-lease-main-tier-plugins.yaml" | awk '{print $2}')
 FAILS=0
@@ -68,8 +71,8 @@ for L in $LANES; do
   fi
 done
 
-step "lanes as at phase B's first point: a baseline, b lease, c tier"
-"$STEP20/lanes.sh" deploy a:baseline b:thunder-lease-main c:thunder-lease-main-tier || { echo "FATAL: lane deploy failed"; exit 1; }
+step "lanes: $LANE_ARMS"
+"$STEP20/lanes.sh" deploy $LANE_ARMS || { echo "FATAL: lane deploy failed"; exit 1; }
 sleep 10
 TOKEN=$(kubectl create token thunderagent-metrics-reader -n "$NS" --duration=1h)
 PF=()
@@ -100,28 +103,43 @@ print(max(pods, key=lambda p: p["metadata"]["creationTimestamp"])["metadata"]["n
 }
 epp_log() { kubectl logs "$(epp_pod "$1")" -n "$NS" -c epp 2>/dev/null; }
 
-step "lane a (baseline): no gate, answers"
-ELOG=$(epp_log a)
-check "lane a's EPP log is readable ($(wc -l <<< "$ELOG" | tr -d ' ') lines)" $([ "$(wc -l <<< "$ELOG")" -gt 5 ]; echo $?)
-check "no flow control in lane a's EPP log" $(grep -q "Initializing Flow Control layer" <<< "$ELOG"; [ $? -ne 0 ]; echo $?)
-R=$(chat a "smoke-a-$RUN" '[{"role":"user","content":"Say exactly: hello from lane a"}]')
-check "lane a answered: $(echo "$R" | reply 2>/dev/null)" $(echo "$R" | reply >/dev/null 2>&1; echo $?)
+GATE_LANES=""
+for LA in $LANE_ARMS; do
+  L=${LA%%:*}
+  if [ "${LA#*:}" != baseline ]; then GATE_LANES="$GATE_LANES $L"; continue; fi
+  step "lane $L (baseline): no gate, answers"
+  ELOG=$(epp_log "$L")
+  check "lane $L's EPP log is readable ($(wc -l <<< "$ELOG" | tr -d ' ') lines)" $([ "$(wc -l <<< "$ELOG")" -gt 5 ]; echo $?)
+  check "no flow control in lane $L's EPP log" $(grep -q "Initializing Flow Control layer" <<< "$ELOG"; [ $? -ne 0 ]; echo $?)
+  R=$(chat "$L" "smoke-$L-$RUN" "[{\"role\":\"user\",\"content\":\"Say exactly: hello from lane $L\"}]")
+  check "lane $L answered: $(echo "$R" | reply 2>/dev/null)" $(echo "$R" | reply >/dev/null 2>&1; echo $?)
+done
 
-for L in b c; do
+for L in $GATE_LANES; do
+  ARM=$(for LA in $LANE_ARMS; do [ "${LA%%:*}" = "$L" ] && echo "${LA#*:}"; done)
+  PF="$STEP10/$ARM-plugins.yaml"
   CM=$(kubectl get cm "thunder-lane-$L-epp" -n "$NS" -o yaml)
-  step "lane $L: build, config and gate capacity (check 6)"
+  step "lane $L ($ARM): build, config and gate capacity (check 6)"
   INFO=$(mget "$L" | grep -E "^[a-z_]*(inference_extension|llm_d_epp)_info\{" | head -1); echo "$INFO"
   check "build info reports commit $COMMIT" $(grep -q "commit=\"$COMMIT" <<< "$INFO"; echo $?)
   ELOG=$(epp_log "$L")
   check "flow control on" $(grep -q "Initializing Flow Control layer" <<< "$ELOG"; echo $?)
-  check "live ConfigMap has idleLeaseSeconds: 30" $(grep -q "idleLeaseSeconds: 30" <<< "$CM"; echo $?)
+  LEASE=$(grep -oE "idleLeaseSeconds: [0-9.]+" "$PF")
+  check "live ConfigMap has $LEASE" $(grep -q "$LEASE" <<< "$CM"; echo $?)
   mget "$L" | grep -E "^[a-z_]*thunder_agent_endpoint_capacity_tokens" | sed 's/^.*thunder_agent_/thunder_agent_/'
   CAPS=$(mget "$L" | grep -E "^[a-z_]*thunder_agent_endpoint_capacity_tokens\{" | awk '{print $NF}')
-  if [ "$L" = b ]; then WANT=$GPU_KV_TOKENS; else WANT=$TIER_CAP; fi
+  # a config that turns cache info off runs on its capacityTokens; any other on the scraped GPU KV
+  if grep -q 'cacheInfoSpec: ""' "$PF"; then WANT=$TIER_CAP; else WANT=$GPU_KV_TOKENS; fi
   check "one endpoint at capacity $WANT tokens (got: $(echo $CAPS))" $([ "$(echo "$CAPS" | wc -w | tr -d ' ')" = 1 ] && python3 -c "import sys; sys.exit(0 if int(float('$CAPS')) == $WANT else 1)"; echo $?)
-  if [ "$L" = c ]; then
+  if grep -q 'cacheInfoSpec: ""' "$PF"; then
     check "live ConfigMap has cacheInfoSpec \"\" and capacityTokens: $TIER_CAP" $(grep -q 'cacheInfoSpec: ""' <<< "$CM" && grep -q "capacityTokens: $TIER_CAP" <<< "$CM"; echo $?)
     check "EPP registered its own vllm engine mapping" $(grep "Registered engine mapping" <<< "$ELOG" | grep -q vllm; echo $?)
+  fi
+  OFF=$(grep -oE "offloadCapacityTokens: [0-9]+" "$PF" | awk '{print $2}')
+  if [ "${OFF:-0}" -gt 0 ]; then
+    check "live ConfigMap has offloadCapacityTokens: $OFF" $(grep -q "offloadCapacityTokens: $OFF" <<< "$CM"; echo $?)
+    RES=$(mget "$L" | grep -cE "^[a-z_]*thunder_agent_endpoint_resident_tokens\{")
+    check "the tier budget's resident footprint is exported ($RES series)" $([ "$RES" = 1 ]; echo $?)
   fi
 
   step "lane $L: session and class accounting (check 7)"
@@ -151,7 +169,7 @@ for L in $LANES; do
   LOG=$(epp_log "$L")
   ERRS=$(grep -ciE '"level":"(error|dpanic|panic|fatal)"|"severity_text":"(ERROR|FATAL)"|panic:' <<< "$LOG" || true)
   check "lane $L: no error or panic lines (got $ERRS of $(wc -l <<< "$LOG" | tr -d ' ') lines)" $([ "$(wc -l <<< "$LOG")" -gt 5 ] && [ "$ERRS" -eq 0 ]; echo $?)
-  echo "$LOG" > "$RESULTS/smoke-epp-lane-$L.log"
+  echo "$LOG" > "$RESULTS/smoke-epp-lane-$L$SFX.log"
 done
 
 echo; echo "=== $FAILS check(s) failed ==="

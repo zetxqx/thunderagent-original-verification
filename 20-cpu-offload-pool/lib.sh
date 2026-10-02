@@ -9,7 +9,7 @@ RELEASE=program-aware-scheduling
 CTX=gke_bobzetian-gke-dev_us-central1_bobbm
 STEP20="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STEP10="$STEP20/../10-llm-d-router-replicates"
-RESULTS="$STEP20/results"
+RESULTS="${STEP_RESULTS:-$STEP20/results}"  # a later step reuses these scripts with its own results folder
 
 # One lane per node. Lane a gets the node with no other workloads; the other
 # two have neighbors (91qy: vllm-omni and a dynamo worker; zhnf: comfyui and sglang).

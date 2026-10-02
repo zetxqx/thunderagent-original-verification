@@ -6,6 +6,7 @@ results/figure-data.json, delete it to recompute) and writes to figures/:
 
   fig1-throughput      output throughput against concurrency, every arm, offload off and on
   fig2-reuse-source    steady-state prefix reuse split into GPU hits and CPU tier hits
+  fig3-ttft            median and p99 TTFT against concurrency, offloading on, values labeled
   fig4-offload-effect  throughput with offloading off and on, at the points that have both
   fig5-kv-budget       the setup, the KV cache one replica has, and the KV cache the workload needs
   fig6-vllm-queues-offload  vLLM running and waiting requests over time, offloading on (phase B)
@@ -112,6 +113,7 @@ def fig1_throughput(data):
         if arm in data.get("B", {}):
             c, m, lo, hi = series(data["B"][arm], "throughput")
             ax.plot(c, m, color=COLOR[arm], lw=2.8, marker="o", ms=8, zorder=3)
+            ax.vlines(c, lo, hi, color=COLOR[arm], lw=2, zorder=2)
         if arm in data.get("A", {}):
             c, m, lo, hi = series(data["A"][arm], "throughput")
             ax.plot(c, m, color=COLOR[arm], lw=2.2, ls="--", marker="o", ms=8, mfc="white", mew=2, zorder=3)
@@ -140,10 +142,13 @@ def fig2_reuse_source(data):
         cpu = np.array([np.mean([r["cpu_hit_steady"] for r in b[arm][c]]) for c in C_ALL])
         ax.bar(pos, gpu, width, color=COLOR[arm], edgecolor="black", lw=1.2, zorder=3)
         ax.bar(pos, cpu, width, bottom=gpu, color=LIGHT[arm], edgecolor="black", lw=1.2, hatch="//", zorder=3)
-        for p, t in zip(pos, gpu + cpu):
-            ax.text(p, t + 0.015, f"{t:.2f}", ha="center", va="bottom", fontsize=9.5)
+        tot = [[r["gpu_hit_steady"] + r["cpu_hit_steady"] for r in b[arm][c]] for c in C_ALL]
+        lo, hi = np.array([min(t) for t in tot]), np.array([max(t) for t in tot])
+        ax.vlines(pos, lo, hi, color="black", lw=1.4, zorder=4)
+        for p, t, h in zip(pos, gpu + cpu, hi):
+            ax.text(p, h + 0.015, f"{t:.2f}", ha="center", va="bottom", fontsize=9.5)
     ax.set_xticks(x, [str(c) for c in C_ALL])
-    ax.set_xlabel("concurrent sessions per vLLM replica (CPU offloading 400 GiB)")
+    ax.set_xlabel("concurrent sessions per vLLM replica (CPU offloading 400 GiB; mean of 3 runs, line: min-max)")
     ax.set_ylabel("prompt tokens served from cache\n(steady state)")
     ax.set_ylim(0, 1.08)
     ax.grid(axis="y", color="#E5E5E5", lw=1)
@@ -155,6 +160,57 @@ def fig2_reuse_source(data):
     finalize_figure(fig, "fig2-reuse-source")
 
 
+def fig3_ttft(data):
+    b = data["B"]
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5.6))
+    for ax, (key, title) in zip(axes, (("ttft_p50", "(a) median TTFT: a typical turn"),
+                                       ("ttft_p99", "(b) p99 TTFT: the slowest 1% of turns"))):
+        means = {}
+        for arm in LABEL:
+            if arm not in b:
+                continue
+            c, m, lo, hi = series(b[arm], key)
+            ax.plot(c, m, color=COLOR[arm], lw=2.6, marker="o", ms=7, zorder=3)
+            ax.vlines(c, lo, hi, color=COLOR[arm], lw=2, zorder=2)
+            means[arm] = dict(zip(c, m))
+        # label each point above if its line is the highest there, below if the lowest; the middle one
+        # goes to the side with more room (log distance to the nearest neighbour)
+        for x in sorted(next(iter(means.values()))):
+            ranked = sorted(means, key=lambda a: means[a][x])
+            for i, arm in enumerate(ranked):
+                y = means[arm][x]
+                if i == len(ranked) - 1:
+                    up = True
+                elif i == 0:
+                    up = False
+                else:
+                    up = np.log10(means[ranked[i + 1]][x] / y) > np.log10(y / means[ranked[i - 1]][x])
+                ax.annotate(f"{y:.0f}" if y >= 10 else f"{y:.1f}", (x, y), xytext=(0, 12 if up else -16),
+                            textcoords="offset points", ha="center", va="center", fontsize=10.5,
+                            color=COLOR[arm], fontweight="bold")
+        if key == "ttft_p50":
+            ax.axhline(30, color="#7a7a7a", lw=1.4, ls=":")
+            ax.text(29, 36, "30 s SLO", fontsize=11, color="#555555")
+        else:
+            ax.axhline(1800, color="#7a7a7a", lw=1.4, ls=":")
+            ax.text(29, 2150, "forced admission at 1800 s", fontsize=11, color="#555555")
+        ax.set_yscale("log")
+        ax.set_ylim(0.15, 5000)
+        ax.set_yticks([1, 10, 100, 1000], ["1 s", "10 s", "100 s", "1000 s"])
+        ax.minorticks_off()
+        c_axis(ax)
+        ax.set_title(title, loc="left", fontweight="bold", fontsize=14)
+        ax.set_ylabel("time to first token")
+        ax.grid(axis="y", color="#E5E5E5", lw=1)
+        ax.set_axisbelow(True)
+    handles = [Line2D([], [], color=COLOR[a], lw=2.6, marker="o", ms=7, label=LABEL[a]) for a in LABEL if a in b]
+    fig.legend(handles=handles, loc="lower center", ncol=3, fontsize=12.5, bbox_to_anchor=(0.5, -0.02))
+    fig.suptitle("One vLLM replica per arm, CPU offloading 400 GiB; mean of 3 runs, vertical line: min-max",
+                 x=0.01, ha="left", fontsize=12, color="#555555")
+    fig.tight_layout(rect=(0, 0.08, 1, 0.95))
+    finalize_figure(fig, "fig3-ttft")
+
+
 def fig4_offload_effect(data):
     both = sorted(set(data["A"]["baseline"]) & set(data["B"]["baseline"]))
     groups = [("baseline", "A"), ("baseline", "B"), ("thunder-lease-main", "A"), ("thunder-lease-main", "B")]
@@ -163,19 +219,22 @@ def fig4_offload_effect(data):
     x = np.arange(len(both))
     for i, (arm, phase) in enumerate(groups):
         pos = x + (i - 1.5) * (width + 0.02)
-        vals = np.array([np.mean([r["throughput"] for r in data[phase][arm][c]]) for c in both])
+        cell = [[r["throughput"] for r in data[phase][arm][c]] for c in both]
+        vals = np.array([np.mean(v) for v in cell])
+        lo, hi = np.array([min(v) for v in cell]), np.array([max(v) for v in cell])
         on = phase == "B"
-        bars = ax.bar(pos, vals, width, color=COLOR[arm] if on else LIGHT[arm], edgecolor="black", lw=1.2,
-                      hatch=None if on else "..", zorder=3)
-        for p, v in zip(pos, vals):
-            ax.text(p, v + 8, f"{v:.0f}", ha="center", va="bottom", fontsize=9.5)
+        ax.bar(pos, vals, width, color=COLOR[arm] if on else LIGHT[arm], edgecolor="black", lw=1.2,
+               hatch=None if on else "..", zorder=3)
+        ax.vlines(pos, lo, hi, color="black", lw=1.4, zorder=4)
+        for p, v, h in zip(pos, vals, hi):
+            ax.text(p, h + 8, f"{v:.0f}", ha="center", va="bottom", fontsize=9.5)
         if on:
             off = np.array([np.mean([r["throughput"] for r in data["A"][arm][c]]) for c in both])
             for p, v, o in zip(pos, vals, off):
                 ax.text(p - (width + 0.02) / 2, max(v, o) + 42, f"x{v / o:.2f}", ha="center", va="bottom",
                         fontsize=11, fontweight="bold", color=COLOR[arm])
     ax.set_xticks(x, [str(c) for c in both])
-    ax.set_xlabel("concurrent sessions per vLLM replica")
+    ax.set_xlabel("concurrent sessions per vLLM replica (bars: mean; line: min-max over cells)")
     ax.set_ylabel("output throughput (tokens/s)")
     ax.set_ylim(0, 760)
     ax.grid(axis="y", color="#E5E5E5", lw=1)
@@ -194,6 +253,8 @@ def fig5_kv_budget(data):
     need = data["B"]["baseline"]
     cs = [c for c in C_ALL if c in need]
     tok = np.array([np.mean([r["ws_over_tier"] for r in need[c]]) * tier_tok for c in cs])
+    tok_lo = np.array([min(r["ws_over_tier"] for r in need[c]) * tier_tok for c in cs])
+    tok_hi = np.array([max(r["ws_over_tier"] for r in need[c]) * tier_tok for c in cs])
 
     fig = plt.figure(figsize=(14, 5.4))
     box = fig.add_axes([0.0, 0.0, 0.34, 1.0])
@@ -223,8 +284,9 @@ def fig5_kv_budget(data):
     ax = fig.add_axes([0.46, 0.14, 0.52, 0.78])
     x = np.arange(len(cs))
     ax.bar(x, tok / 1e6, 0.55, color=PALETTE["neutral"], edgecolor="black", lw=1.2, zorder=3)
-    for xi, t in zip(x, tok):
-        ax.text(xi, t / 1e6 + 0.2, f"{t / 1e6:.1f}M\n({t * GIB_PER_TOKEN:.0f} GiB)", ha="center", va="bottom", fontsize=10.5)
+    ax.vlines(x, tok_lo / 1e6, tok_hi / 1e6, color="black", lw=1.4, zorder=4)
+    for xi, t, h in zip(x, tok, tok_hi):
+        ax.text(xi, h / 1e6 + 0.2, f"{t / 1e6:.1f}M\n({t * GIB_PER_TOKEN:.0f} GiB)", ha="center", va="bottom", fontsize=10.5)
     for level, color, label in ((gpu_tok, PALETTE["red_strong"], "GPU KV cache"),
                                 (tier_tok, PALETTE["blue_main"], "CPU tier (offloading)")):
         ax.axhline(level / 1e6, color=color, lw=2.4, ls="--", zorder=4,
@@ -237,8 +299,9 @@ def fig5_kv_budget(data):
     ax.legend(handles[::-1], labels[::-1], loc="upper left", fontsize=11.5)
     ax.grid(axis="y", color="#E5E5E5", lw=1)
     ax.set_axisbelow(True)
-    ax.set_title("Working set: live sessions' latest prompt sizes, summed (mean over steady state,\n"
-                 "llm-d default with offloading on, so no gate holds sessions back)", loc="left", fontsize=10.5, color="#555555")
+    ax.set_title("Working set: live sessions' latest prompt sizes, summed (mean over steady state;\n"
+                 "llm-d default with offloading on, so no gate holds sessions back; mean of 3 runs, line: min-max)",
+                 loc="left", fontsize=10.5, color="#555555")
     finalize_figure(fig, "fig5-kv-budget")
 
 
@@ -277,18 +340,19 @@ def queues_figure(phase, name, title):
     fig, axes = plt.subplots(len(cs), 2, figsize=(13, 2.35 * len(cs) + 1.0), sharex=True, squeeze=False)
     wmax = max(max(w.max() for *_, w in series[c]) for c in cs)
     rmax = max(max(rolling(r).max() for *_, r, _ in series[c]) for c in cs)
-    seen = set()
+    grid = np.arange(0, 55, 0.1)
     for row, c in enumerate(cs):
         for col, (idx, ylabel) in enumerate(((3, "running"), (4, "waiting"))):
             ax = axes[row][col]
-            dashes = {}
-            for arm, lane, t, r, w in series[c]:
-                y = r if idx == 3 else w
-                n = dashes.get(arm, 0); dashes[arm] = n + 1
-                label = LABEL[arm] if arm not in seen else None
-                ax.plot(t, rolling(y), color=COLOR[arm], lw=2.0, ls="-" if n == 0 else "--", label=label)
-                if col == 1:
-                    seen.add(arm)
+            for arm in LABEL:
+                cells = [x for x in series[c] if x[0] == arm]
+                if not cells:
+                    continue
+                # each cell resampled onto one minute grid (0 after it ended), then mean and min-max over cells
+                ys = np.array([np.interp(grid, x[2], rolling(x[idx]), right=0.0) for x in cells])
+                ax.plot(grid, ys.mean(axis=0), color=COLOR[arm], lw=2.0)
+                if len(cells) > 1:
+                    ax.fill_between(grid, ys.min(axis=0), ys.max(axis=0), color=COLOR[arm], alpha=0.18, lw=0)
             ax.axvline(warm[c], color="#7a7a7a", lw=1.2, ls=":")
             ax.set_ylim(0, rmax * 1.08 if idx == 3 else wmax * 1.08)
             ax.grid(axis="y", color="#E5E5E5", lw=1)
@@ -300,13 +364,13 @@ def queues_figure(phase, name, title):
             ax.tick_params(labelsize=11)
     for ax in axes[-1]:
         ax.set_xlabel("minutes since the bench started")
-    handles = [Line2D([], [], color=COLOR[a], lw=2.4, label=LABEL[a]) for a in LABEL if a in seen]
-    if phase == "A":
-        handles.append(Line2D([], [], color=COLOR["thunder-lease-main"], lw=2.4, ls="--", label="second llm-d-thunder-simplified cell (other pod)"))
+    present = [a for a in LABEL if any(x[0] == a for c in cs for x in series[c])]
+    handles = [Line2D([], [], color=COLOR[a], lw=2.4, label=LABEL[a]) for a in present]
+    handles.append(Patch(facecolor="#7a7a7a", alpha=0.25, label="min-max over cells (replicates or pods)"))
     handles.append(Line2D([], [], color="#7a7a7a", lw=1.2, ls=":", label="end of warm-up"))
     fig.legend(handles=handles, loc="lower center", ncol=2, fontsize=12, bbox_to_anchor=(0.5, -0.01))
     fig.suptitle(title, x=0.01, ha="left", fontsize=14)
-    fig.tight_layout(rect=(0, 0.06 if phase == "B" else 0.09, 1, 0.97))
+    fig.tight_layout(rect=(0, 0.06 if len(cs) > 3 else 0.09, 1, 0.97))
     finalize_figure(fig, name)
 
 
@@ -315,6 +379,7 @@ def main():
     data = load_data()
     fig1_throughput(data)
     fig2_reuse_source(data)
+    fig3_ttft(data)
     fig4_offload_effect(data)
     fig5_kv_budget(data)
     queues_figure("B", "fig6-vllm-queues-offload", "One vLLM replica per arm, CPU offloading 400 GiB (30 s rolling mean)")

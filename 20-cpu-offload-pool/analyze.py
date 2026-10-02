@@ -22,6 +22,7 @@ import bisect
 import gzip
 import importlib.util
 import json
+import os
 import statistics as st
 from pathlib import Path
 
@@ -31,12 +32,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-RESULTS = HERE / "results"
+RESULTS = Path(os.environ["STEP_RESULTS"]) if os.environ.get("STEP_RESULTS") else HERE / "results"  # step 21 reuses this analyzer
 GPU_KV_TOKENS = 2237040
 TIER_TOKENS = 8738133  # 400 GiB at 48 KiB per token
 ARM_LABEL = {"baseline": "llm-d default", "thunder-lease-main": "lease, GPU capacity",
-             "thunder-lease-main-tier": "lease, CPU-tier capacity"}
-ARM_COLOR = {"baseline": "#8C8C8C", "thunder-lease-main": "#0F4D92", "thunder-lease-main-tier": "#E08A00"}
+             "thunder-lease-main-tier": "lease, CPU-tier capacity",
+             "thunder-lease-budget30": "lease + tier budget, lease 30 s",
+             "thunder-lease-budget5": "lease + tier budget, lease 5 s",
+             "thunder-lease-main5": "lease, GPU capacity, lease 5 s"}
+# chart labels (the tables keep the arm names above)
+PLOT_LABEL = {"baseline": "llm-d default (no gate)", "thunder-lease-main": "llm-d-thunder-simplified (GPU tier)",
+              "thunder-lease-main-tier": "llm-d-thunder-simplified (CPU tier)",
+              "thunder-lease-budget30": "llm-d-thunder-simplified + tier budget (lease 30 s)",
+              "thunder-lease-budget5": "llm-d-thunder-simplified + tier budget (lease 5 s)",
+              "thunder-lease-main5": "llm-d-thunder-simplified (GPU tier, lease 5 s)"}
+ARM_COLOR = {"baseline": "#B64342", "thunder-lease-main": "#0F4D92", "thunder-lease-main-tier": "#42949E",
+             "thunder-lease-budget30": "#9A4D8E", "thunder-lease-budget5": "#E08A00", "thunder-lease-main5": "#3775BA"}  # same as make_figures.py
 
 
 def load(name, path):
@@ -243,22 +254,46 @@ def collect():
     return runs
 
 
+def fmt_cells(cells, keys, spec, scale):
+    """One value, or mean (min-max) over repeated cells, per key."""
+    keys = keys if isinstance(keys, tuple) else (keys,)
+    parts = []
+    for k in keys:
+        v = [c[k] * scale for c in cells if isinstance(c.get(k), (int, float)) and np.isfinite(c[k])]
+        if not v:
+            parts.append("-")
+        elif len(v) == 1:
+            parts.append(spec.format(v[0]))
+        else:
+            parts.append(f"{spec.format(np.mean(v))} ({spec.format(min(v))}-{spec.format(max(v))})")
+    return " / ".join(parts)
+
+
 def tables(runs):
     L = ["# Step 20: CPU KV offloading (400 GiB) on single vLLM replicas\n",
-         "One cell per arm and point; the three lanes of a point ran at the same time on three replicas. "
+         "The three lanes of a run ran at the same time on three replicas. Where an arm has several cells at a "
+         "point (phase B replicates, or phase A's two lease cells), values are mean (min-max). "
          "Hit rates and CPU traffic are from vLLM's counters; the CPU hit rate is external hits over all prompt "
          "tokens queried. Working set: each live session's latest prompt size, summed. "
          "Phase A has offloading off, so its CPU rows must be 0.\n"]
-    for meta, run, cells in sorted(runs, key=lambda r: (r[0]["phase"], r[0]["concurrency"])):
-        L.append(f"## Phase {meta['phase']}, c={meta['concurrency']} "
+    groups = {}
+    for meta, run, cells in runs:
+        g = groups.setdefault((meta["phase"], meta["concurrency"]), {"meta": meta, "runs": [], "arms": {}})
+        g["runs"].append(run.name)
+        for c in cells:
+            g["arms"].setdefault(c["arm"], []).append(c)
+    for (phase, conc), g in sorted(groups.items()):
+        meta = g["meta"]
+        arms = [a for a in ARM_LABEL if a in g["arms"]]
+        L.append(f"## Phase {phase}, c={conc} "
                  f"({'offload ' + str(meta['offload_gib']) + ' GiB' if meta['offload_gib'] else 'offload off'}, "
                  f"window {meta['window_s'] // 60} min, warm-up {meta['warmup_s'] // 60} min)\n")
-        L.append(f"Run `{run.name}`.\n")
-        L.append("| metric | " + " | ".join(f"{ARM_LABEL.get(c['arm'], c['arm'])} (lane {c['lane']})" for c in cells) + " |")
-        L.append("|" + "---|" * (1 + len(cells)))
-        L.append("| node | " + " | ".join(c["node"].rsplit("-", 1)[-1] for c in cells) + " |")
+        L.append("Runs: " + ", ".join(f"`{r}`" for r in sorted(g["runs"])) + ".\n")
+        L.append("| metric | " + " | ".join(f"{ARM_LABEL[a]} (n={len(g['arms'][a])})" for a in arms) + " |")
+        L.append("|" + "---|" * (1 + len(arms)))
+        L.append("| pods (node) | " + " | ".join(", ".join(c["node"].rsplit("-", 1)[-1] for c in g["arms"][a]) for a in arms) + " |")
         for name, keys, spec, scale in ROWS:
-            L.append(f"| {name} | " + " | ".join(fmt(c, keys, spec, scale) for c in cells) + " |")
+            L.append(f"| {name} | " + " | ".join(fmt_cells(g["arms"][a], keys, spec, scale) for a in arms) + " |")
         L.append("")
     return L
 
@@ -285,11 +320,15 @@ def summary(runs, out):
     for ax, (key, title, ylabel, scale) in zip(axes.flat, panels):
         for phase, style in (("B", dict(ls="-", marker="o")), ("A", dict(ls="--", marker="o", mfc="white"))):
             for arm, pts in by_arm(runs, phase).items():
-                xs = [c for c, s in pts if isinstance(s.get(key), (int, float)) and np.isfinite(s[key])]
-                ys = [s[key] * scale for c, s in pts if isinstance(s.get(key), (int, float)) and np.isfinite(s[key])]
+                per_c = {}
+                for c, s in pts:
+                    if isinstance(s.get(key), (int, float)) and np.isfinite(s[key]):
+                        per_c.setdefault(c, []).append(s[key] * scale)
+                xs = sorted(per_c)
+                ys = [np.mean(per_c[c]) for c in xs]
                 if xs:
                     ax.plot(xs, ys, color=ARM_COLOR.get(arm, "#333333"), lw=2, ms=6, **style,
-                            label=f"{ARM_LABEL.get(arm, arm)}{'' if phase == 'B' else ', offload off'}")
+                            label=f"{PLOT_LABEL.get(arm, arm)}{'' if phase == 'B' else ', offload off'}")
         if key == "ws_over_tier":
             ax.axhspan(0.75, 0.87, color="#e5e5e5", zorder=0)
         ax.set_ylim(bottom=0)
@@ -297,7 +336,7 @@ def summary(runs, out):
         ax.set_xticks([32, 64, 128, 192, 256], ["32", "64", "128", "192", "256"])
         ax.set_title(title, loc="left", fontweight="bold")
         ax.set_ylabel(ylabel)
-        ax.set_xlabel("concurrent sessions per replica")
+        ax.set_xlabel("concurrent sessions per replica (mean over cells)")
         ax.grid(axis="y", color="#e5e5e5", lw=0.8)
         ax.set_axisbelow(True)
     h, l = axes.flat[0].get_legend_handles_labels()
@@ -324,7 +363,7 @@ def timeseries(meta, cells, out):
                 gpu.append((b.get("gpu_hits", 0) - a.get("gpu_hits", 0)) / dq)
                 cpu.append((b.get("cpu_hits", 0) - a.get("cpu_hits", 0)) / dq)
         col = ARM_COLOR.get(c["arm"], "#333333")
-        axes[0].plot(ts, gpu, color=col, lw=1.5, label=f"{ARM_LABEL.get(c['arm'], c['arm'])} (lane {c['lane']})")
+        axes[0].plot(ts, gpu, color=col, lw=1.5, label=f"{PLOT_LABEL.get(c['arm'], c['arm'])} (lane {c['lane']})")
         axes[1].plot(ts, cpu, color=col, lw=1.5)
     axes[0].set_ylim(0, 1.02)
     for ax, title in zip(axes, ("GPU hit rate, 60 s windows", "CPU tier hit rate, 60 s windows")):
@@ -333,7 +372,7 @@ def timeseries(meta, cells, out):
         ax.set_xlabel("minutes since the bench started")
         ax.grid(axis="y", color="#e5e5e5", lw=0.8)
     axes[0].legend(frameon=False, fontsize=8)
-    fig.suptitle(f"Phase {meta['phase']}, c={meta['concurrency']}", x=0.01, ha="left", fontsize=10)
+    fig.suptitle(f"Phase {meta['phase']}, c={meta['concurrency']}, replicate {meta.get('replicate', 1)}", x=0.01, ha="left", fontsize=10)
     fig.tight_layout()
     fig.savefig(out, dpi=130)
     plt.close(fig)
@@ -349,7 +388,8 @@ def main():
     print("\n".join(L))
     summary(runs, RESULTS / "summary.png")
     for meta, _, cells in runs:
-        timeseries(meta, cells, RESULTS / f"timeseries-{meta['phase']}-c{meta['concurrency']}.png")
+        r = meta.get("replicate", 1)
+        timeseries(meta, cells, RESULTS / f"timeseries-{meta['phase']}{'' if r == 1 else f'-r{r}'}-c{meta['concurrency']}.png")
     print(f"wrote {RESULTS / 'analysis.md'}, summary.png, timeseries-*.png")
 
 

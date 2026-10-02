@@ -5,12 +5,29 @@
 # 1900 s. Each run directory gets step20.json (phase, c, window, warm-up, lane
 # arms and nodes). Before each point the deployment is checked against the
 # phase and the lanes are re-labeled (a spot replacement brings a new pod).
-# Usage: run-cells.sh A|B [c ...]    (default: every point of the phase)
+# REP=<n> (default 1) is the replicate number: replicate n moves every arm n-1
+# lanes over (a <- b <- c <- a), so over replicates 1 to 3 each arm runs once on
+# each pod at each point.
+# Phase T is step 21 (offload tier budget arms, same offloading as phase B).
+# Usage: [REP=n] run-cells.sh A|B|T [c ...]    (default: every point of the phase)
 set -uo pipefail
 source "$(dirname "$0")/lib.sh"
 pin_kube
-PHASE="${1:?usage: run-cells.sh A|B [c ...]}"; shift
+PHASE="${1:?usage: run-cells.sh A|B|T [c ...]}"; shift
 ONLY=" $* "
+REP="${REP:-1}"
+
+# rotate "a:X b:Y c:Z" by k lanes: k=1 gives "a:Y b:Z c:X"
+rotate() {
+  python3 - "$1" "$2" <<'PY'
+import sys
+pairs = [p.split(":", 1) for p in sys.argv[1].split()]
+k = int(sys.argv[2]) % len(pairs)
+arms = [a for _, a in pairs]
+arms = arms[k:] + arms[:k]
+print(" ".join(f"{l}:{a}" for (l, _), a in zip(pairs, arms)))
+PY
+}
 
 # c  window_s  warmup_s  lane arms (lane a on trwg, b on 91qy, c on zhnf)
 case "$PHASE" in
@@ -24,7 +41,12 @@ case "$PHASE" in
 128 1800 600 a:thunder-lease-main b:thunder-lease-main-tier c:baseline
 192 2700 900 a:baseline b:thunder-lease-main c:thunder-lease-main-tier
 256 2700 900 a:thunder-lease-main-tier b:baseline c:thunder-lease-main" ;;
-  *) echo "usage: run-cells.sh A|B [c ...]" >&2; exit 2 ;;
+  T) WANT="400 3"; POINTS="
+64  1800 600 a:thunder-lease-budget30 b:thunder-lease-budget5 c:thunder-lease-main5
+128 1800 600 a:thunder-lease-main5 b:thunder-lease-budget30 c:thunder-lease-budget5
+192 2700 900 a:thunder-lease-budget5 b:thunder-lease-main5 c:thunder-lease-budget30
+256 2700 900 a:thunder-lease-budget30 b:thunder-lease-budget5 c:thunder-lease-main5" ;;
+  *) echo "usage: run-cells.sh A|B|T [c ...]" >&2; exit 2 ;;
 esac
 
 # memory <phase> <c> <when>: each lane pod's cgroup memory, OOM kills and /dev/shm use, to results/vllm-memory.csv
@@ -43,12 +65,13 @@ FAIL=0
 while read -r C WINDOW WARMUP ARMS; do
   [ -n "$C" ] || continue
   [ "$ONLY" = "  " ] || [[ "$ONLY" == *" $C "* ]] || continue
-  echo; echo "##### phase $PHASE c=$C window ${WINDOW}s warm-up ${WARMUP}s: $ARMS  ($(date))"
+  ARMS=$(rotate "$ARMS" $((REP - 1)))
+  echo; echo "##### phase $PHASE replicate $REP c=$C window ${WINDOW}s warm-up ${WARMUP}s: $ARMS  ($(date))"
   GOT=$(deploy_offload_size)
   [ "$GOT" = "$WANT" ] || { echo "FATAL: deployment is (offloading, replicas) = ($GOT), phase $PHASE needs ($WANT)" >&2; exit 1; }
   "$STEP20/lanes.sh" label || { echo "FATAL: lanes could not be labeled" >&2; exit 1; }
   memory "$PHASE" "$C" before
-  LOG="$RESULTS/run-$PHASE-c$C-$(date +%Y%m%d-%H%M%S).log"
+  LOG="$RESULTS/run-$PHASE-r$REP-c$C-$(date +%Y%m%d-%H%M%S).log"
   LANE_ARMS="$ARMS" RESET_EXTERNAL=1 SKIP_ANALYSIS=1 \
     "$STEP10/run-replicates.sh" "$C" 1 "$WINDOW" baseline 1900 2>&1 | tee "$LOG"
   RC=${PIPESTATUS[0]}
@@ -56,17 +79,17 @@ while read -r C WINDOW WARMUP ARMS; do
   RUN=$(grep -oE '^artifacts: .*' "$LOG" | tail -1 | cut -d' ' -f2)
   if [ -n "$RUN" ] && [ -d "$RUN" ]; then
     mv "$LOG" "$RUN/driver.log"
-    python3 - "$RUN/step20.json" "$PHASE" "$C" "$WINDOW" "$WARMUP" "$ARMS" "$RESULTS/lanes.env" "$EPP_IMAGE_TAG" "$BENCH_IMAGE" <<'PY'
+    python3 - "$RUN/step20.json" "$PHASE" "$C" "$WINDOW" "$WARMUP" "$ARMS" "$RESULTS/lanes.env" "$EPP_IMAGE_TAG" "$BENCH_IMAGE" "$REP" <<'PY'
 import json, sys
-out, phase, c, window, warmup, arms, lanes_env, epp, bench = sys.argv[1:]
+out, phase, c, window, warmup, arms, lanes_env, epp, bench, rep = sys.argv[1:]
 lanes = dict(l.strip().split("=", 1) for l in open(lanes_env) if "=" in l)
-json.dump({"phase": phase, "offload_gib": 400 if phase == "B" else 0, "concurrency": int(c),
+json.dump({"phase": phase, "replicate": int(rep), "offload_gib": 400 if phase in ("B", "T") else 0, "concurrency": int(c),
            "window_s": int(window), "warmup_s": int(warmup), "client_timeout_s": 1900,
            "lane_arms": dict(a.split(":", 1) for a in arms.split()),
            "lanes": {l: {"pod": lanes.get(f"LANE_{l}_POD"), "ip": lanes.get(f"LANE_{l}_IP"), "node": lanes.get(f"LANE_{l}_NODE")} for l in "abc"},
            "epp_image_tag": epp, "bench_image": bench}, open(out, "w"), indent=1)
 PY
-    echo "phase $PHASE c=$C done: $RUN (exit $RC)"
+    echo "phase $PHASE replicate $REP c=$C done: $RUN (exit $RC)"
   else
     echo "WARNING: phase $PHASE c=$C left no run directory; log in $LOG"
   fi
