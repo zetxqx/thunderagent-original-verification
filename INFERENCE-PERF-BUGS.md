@@ -6,7 +6,7 @@ Canonical list for this campaign. Found while replaying the weka agentic trace c
 
 **Environment**: GKE, Qwen3-Coder-30B-A3B-Instruct-FP8 on H100 TP2, `load.type: trace_session_replay`, `data.type: weka_trace_replay`, `api.type: chat` with streaming. Raw evidence in `07-inference-perf-weka/` and `08-weka-replicates/`.
 
-Status: none filed yet. Each section is written to be pasted into an issue as-is.
+Status: issue 2 filed as kubernetes-sigs/inference-perf#826 (2026-09-24); the rest not filed yet. Each section is written to be pasted into an issue as-is.
 
 | # | Issue | Severity | Impact on us |
 |---|---|---|---|
