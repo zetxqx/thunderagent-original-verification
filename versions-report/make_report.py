@@ -39,19 +39,19 @@ S17 = ROOT / "17-thunder-lease-pool" / "results" / "rep-20260928-115246-c128-t19
 # families take categorical slots 1-3 of the validated reference palette.
 FAMILIES = {
     "llm-d default": "#8f8e89",
-    "v3/v4 port": "#2a78d6",
-    "minimal": "#eb6834",
-    "lease": "#1baf7a",
+    "llm-d-thunder (v3/v4 port)": "#2a78d6",
+    "llm-d-thunder (minimal)": "#eb6834",
+    "llm-d-thunder (lease)": "#1baf7a",
 }
 VERSIONS = [
     ("llm-d default", "llm-d default (no admission)", S13 / "epp-baseline-c128"),
-    ("v3/v4 port", "v3 port, most-room", S13 / "epp-thunder-c128"),
-    ("v3/v4 port", "v4 port, origin-only", S13 / "epp-thunder-origin-c128"),
-    ("minimal", "minimal, half-life 1 s", S16 / "epp-thunder-min-c128"),
-    ("minimal", "minimal, half-life 10 s", S16 / "epp-thunder-min-hl10-c128"),
-    ("minimal", "minimal, half-life 10 s, sweep 1 s", S16 / "epp-thunder-min-hl10-s1-c128"),
-    ("lease", "lease, lease 30 s", S17 / "epp-thunder-lease-c128"),
-    ("lease", "lease, lease 5 s", S17 / "epp-thunder-lease5-c128"),
+    ("llm-d-thunder (v3/v4 port)", "llm-d-thunder (v3 port, most-room)", S13 / "epp-thunder-c128"),
+    ("llm-d-thunder (v3/v4 port)", "llm-d-thunder (v4 port, origin-only)", S13 / "epp-thunder-origin-c128"),
+    ("llm-d-thunder (minimal)", "llm-d-thunder (minimal, 1s half-life)", S16 / "epp-thunder-min-c128"),
+    ("llm-d-thunder (minimal)", "llm-d-thunder (minimal, 10s half-life)", S16 / "epp-thunder-min-hl10-c128"),
+    ("llm-d-thunder (minimal)", "llm-d-thunder (minimal, 10s half-life, 1s sweep)", S16 / "epp-thunder-min-hl10-s1-c128"),
+    ("llm-d-thunder (lease)", "llm-d-thunder (30s lease)", S17 / "epp-thunder-lease-c128"),
+    ("llm-d-thunder (lease)", "llm-d-thunder (5s lease)", S17 / "epp-thunder-lease5-c128"),
 ]
 PANELS = [
     ("throughput", "Output throughput (tok/s)", "higher is better", "{:.0f}", 1),

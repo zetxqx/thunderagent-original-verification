@@ -1,4 +1,4 @@
-| metric | llm-d default (no admission) | v3 port, most-room | v4 port, origin-only | minimal, half-life 1 s | minimal, half-life 10 s | minimal, half-life 10 s, sweep 1 s | lease, lease 30 s | lease, lease 5 s |
+| metric | llm-d default (no admission) | llm-d-thunder (v3 port, most-room) | llm-d-thunder (v4 port, origin-only) | llm-d-thunder (minimal, 1s half-life) | llm-d-thunder (minimal, 10s half-life) | llm-d-thunder (minimal, 10s half-life, 1s sweep) | llm-d-thunder (30s lease) | llm-d-thunder (5s lease) |
 |---|---|---|---|---|---|---|---|---|
 | output throughput (tok/s) | 1151 | 1382 | 1571 | 1752 | 1817 | 1867 | 1871 | 1863 |
 | steady-state hit rate | 0.040 | 0.353 | 0.629 | 0.691 | 0.733 | 0.752 | 0.778 | 0.766 |

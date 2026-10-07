@@ -14,13 +14,13 @@ The names below match the labels in the figure and the table.
 
 - **llm-d default (no admission)**: upstream llm-d-router scheduling, with no thunder-agent. Every request is sent at once to the pod with the best mix of short queue, free KV cache and prefix-cache match. Nothing is held back, so the KV cache of every session competes on every pod.
 - **upstream Python ThunderAgent**: the original ThunderAgent from the paper, a separate proxy in front of vLLM. It was tested only on single pods in this repo, so it is not in the figure.
-- **v3 port, most-room**: the first port of ThunderAgent into llm-d-router (commit `ae371354`), faithful to upstream. Admission counts idle sessions as shrinking over time (idle decay), a sweep every 5 s pauses sessions when a pod is over its limit, and a paused session comes back on its own pod if it fits there, otherwise on the pod with the most room.
-- **v4 port, origin-only**: v3 with one change (`8ee881c2`): a paused session comes back **only** on its own pod, where its KV cache still is.
-- **minimal**: a smaller rewrite of v4 (`33dde5d2`, step 16). Same idea with fewer parts: origin-only is the only placement, and the sweep pauses only idle sessions. Three settings are shown:
-  - **half-life 1 s**: the default; an idle session counts half after 1 s.
-  - **half-life 10 s**: idle sessions keep counting longer.
-  - **half-life 10 s, sweep 1 s**: the same, with the pause sweep every 1 s instead of 5 s.
-- **lease**: the minimal gate with a different way for idle sessions to give up room (`20e3b1ee`, step 17). There is no decay and no sweep. When a waiting session does not fit, idle sessions are paused right then, longest idle first, but only those idle for at least the **idle lease**; when an admitted session's own turn outgrows its pod, any idle session may give up room. Two settings are shown: **lease 30 s** (the default) and **lease 5 s**.
+- **llm-d-thunder (v3 port, most-room)**: the first port of ThunderAgent into llm-d-router (commit `ae371354`), faithful to upstream. Admission counts idle sessions as shrinking over time (idle decay), a sweep every 5 s pauses sessions when a pod is over its limit, and a paused session comes back on its own pod if it fits there, otherwise on the pod with the most room.
+- **llm-d-thunder (v4 port, origin-only)**: v3 with one change (`8ee881c2`): a paused session comes back **only** on its own pod, where its KV cache still is.
+- **llm-d-thunder (minimal)**: a smaller rewrite of v4 (`33dde5d2`, step 16). Same idea with fewer parts: origin-only is the only placement, and the sweep pauses only idle sessions. Three settings are shown:
+  - **1s half-life**: the default; an idle session counts half after 1 s.
+  - **10s half-life**: idle sessions keep counting longer.
+  - **10s half-life, 1s sweep**: the same, with the pause sweep every 1 s instead of 5 s.
+- **llm-d-thunder (lease)**: the minimal gate with a different way for idle sessions to give up room (`20e3b1ee`, step 17). There is no decay and no sweep. When a waiting session does not fit, idle sessions are paused right then, longest idle first, but only those idle for at least the **idle lease**; when an admitted session's own turn outgrows its pod, any idle session may give up room. Two settings are shown: **llm-d-thunder (30s lease)** (the default) and **llm-d-thunder (5s lease)**.
   - Later builds of the same gate are not in the figure. It was rebuilt on another ledger (`1a98a6c5`, step 18), which counted only one in-flight request per session and fell to 1477 tok/s; the fix that counts every in-flight request (`44544c04`, step 19) brought it back to 2042 tok/s and hit rate 0.844, in line with the lease 30 s version shown here.
 
 ### Terms
@@ -65,7 +65,7 @@ Common to every thunder-agent version in llm-d-router: a session (agent trajecto
 
 Protocol for every cell: one EPP over the four vLLM pods (Qwen3-Coder-30B-A3B-FP8, TP=2, 2,237,040 KV tokens each), prefix-cache reset and a fresh EPP per cell, c=128 (32 sessions per pod), weka trace replay, 30 min window with 10 min warm-up, client timeout 1900 s, load generator with the permit fix.
 
-| metric | llm-d default (no admission) | v3 port, most-room | v4 port, origin-only | minimal, half-life 1 s | minimal, half-life 10 s | minimal, half-life 10 s, sweep 1 s | lease, lease 30 s | lease, lease 5 s |
+| metric | llm-d default (no admission) | llm-d-thunder (v3 port, most-room) | llm-d-thunder (v4 port, origin-only) | llm-d-thunder (minimal, 1s half-life) | llm-d-thunder (minimal, 10s half-life) | llm-d-thunder (minimal, 10s half-life, 1s sweep) | llm-d-thunder (30s lease) | llm-d-thunder (5s lease) |
 |---|---|---|---|---|---|---|---|---|
 | output throughput (tok/s) | 1151 | 1382 | 1571 | 1752 | 1817 | 1867 | 1871 | 1863 |
 | steady-state hit rate | 0.040 | 0.353 | 0.629 | 0.691 | 0.733 | 0.752 | 0.778 | 0.766 |
