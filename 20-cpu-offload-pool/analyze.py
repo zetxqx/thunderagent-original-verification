@@ -318,7 +318,8 @@ def summary(runs, out):
     plt.rcParams.update({"font.size": 10, "axes.spines.top": False, "axes.spines.right": False})
     fig, axes = plt.subplots(2, 3, figsize=(13, 7.5))
     for ax, (key, title, ylabel, scale) in zip(axes.flat, panels):
-        for phase, style in (("B", dict(ls="-", marker="o")), ("A", dict(ls="--", marker="o", mfc="white"))):
+        for phase, style in (("B", dict(ls="-", marker="o")), ("T", dict(ls="-", marker="s")),
+                             ("A", dict(ls="--", marker="o", mfc="white"))):
             for arm, pts in by_arm(runs, phase).items():
                 per_c = {}
                 for c, s in pts:
@@ -328,7 +329,7 @@ def summary(runs, out):
                 ys = [np.mean(per_c[c]) for c in xs]
                 if xs:
                     ax.plot(xs, ys, color=ARM_COLOR.get(arm, "#333333"), lw=2, ms=6, **style,
-                            label=f"{PLOT_LABEL.get(arm, arm)}{'' if phase == 'B' else ', offload off'}")
+                            label=f"{PLOT_LABEL.get(arm, arm)}{', offload off' if phase == 'A' else ''}")
         if key == "ws_over_tier":
             ax.axhspan(0.75, 0.87, color="#e5e5e5", zorder=0)
         ax.set_ylim(bottom=0)
@@ -340,10 +341,10 @@ def summary(runs, out):
         ax.grid(axis="y", color="#e5e5e5", lw=0.8)
         ax.set_axisbelow(True)
     h, l = axes.flat[0].get_legend_handles_labels()
-    fig.legend(h, l, loc="lower center", ncol=3, frameon=False)
+    fig.legend(h, l, loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 0.02))
     fig.text(0.01, 0.005, "Solid: 400 GiB CPU tier (phase B). Dashed, hollow: offloading off (phase A). "
              "Shaded band: 0.75 to 0.87 of reach, where step 13's hit rate collapsed.", fontsize=8, color="#666666")
-    fig.tight_layout(rect=(0, 0.07, 1, 1))
+    fig.tight_layout(rect=(0, 0.08, 1, 1))
     fig.savefig(out, dpi=150)
     plt.close(fig)
 

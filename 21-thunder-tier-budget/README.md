@@ -141,3 +141,12 @@ Two replicates more of this design are not planned. Directions with more promise
 
 - **A time slice:** when sessions are held, pause an admitted session between turns after a quantum, so held sessions get in; this bounds the wait instead of leaving it to the 1800 s backstop.
 - **Held demand as an autoscaling signal.**
+
+### Figures
+
+`make_figures.py` writes `figures/` (PNG and PDF). It compares the three arms with step 20's GPU tier and CPU tier arms (mean of 3 runs, min-max lines).
+
+- `fig1-throughput`: output throughput.
+- `fig2-reuse`: total prefix reuse and the CPU tier hit rate.
+- `fig3-wait`: median TTFT, p99 TTFT and forced admissions.
+- `fig4-tier-budget`: at c = 192 and 256, the budget arms' resident footprint against the 8.74M tier budget, and forced admissions over time. Forced admissions start at 30 minutes (the 1800 s backstop), and the footprint passes the budget before that. The drop at about 48 minutes is after the bench ends.
