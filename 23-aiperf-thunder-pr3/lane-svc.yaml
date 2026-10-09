@@ -1,0 +1,16 @@
+# Lane a for MODE=lane: the one vLLM pod labeled agentx-lane=a, reached directly
+# (no envoy, no EPP). run-point.sh labels the pod; this Service only selects it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: agentx-lane
+  namespace: llm-d-program-aware-scheduling
+spec:
+  selector:
+    llm-d.ai/guide: program-aware-scheduling
+    llm-d.ai/role: decode
+    agentx-lane: a
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000

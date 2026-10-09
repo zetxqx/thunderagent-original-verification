@@ -1,0 +1,38 @@
+# thunder-agent gate as in PR3 (llm-d/llm-d-router#3076, image
+# llm-d-router-endpoint-picker:thunder-agent-pr3-a025437b). Same pipeline as
+# deploy/config/thunderagent-config.yaml in that branch, with capacityTokens set
+# to this pool's real KV size (the fallback when cache_config_info is absent).
+# Timeouts: the 1800 s backstop needs defaultRequestTTL 0 (no queue eviction),
+# envoy ext_proc message_timeout above 1800 s (2400 s in the lane values), and a
+# client that waits longer than that. PR3's own default backstop is 30 s, below
+# the 60 s default TTL; if you use it, drop defaultRequestTTL and say so.
+apiVersion: llm-d.ai/v1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- type: agent-identity
+  parameters:
+    additionalSessionHeaders:
+    - x-session-id
+- type: thunder-agent
+  name: thunder
+  parameters:
+    capacityTokens: 2237040
+    utilThreshold: 1.0
+    idleLeaseSeconds: 30
+    headWaitStarvationMs: 1800000
+    evictionTtlSeconds: 3600
+- type: max-score-picker
+- type: single-profile-handler
+flowControl:
+  defaultRequestTTL: "0s"
+  saturationDetector:
+    pluginRef: thunder
+  defaultPriorityBand:
+    fairnessPolicyRef: thunder
+schedulingProfiles:
+- name: default
+  plugins:
+  - pluginRef: thunder
+  - pluginRef: max-score-picker

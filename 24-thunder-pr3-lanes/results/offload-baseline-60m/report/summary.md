@@ -1,0 +1,29 @@
+# AgentX sweep report
+
+## Whole profiling window (AgentX)
+
+| label                |   conc |   completed |   errors |   total_tput_per_gpu |   output_tput_per_gpu |   p90_intvty |   p90_ttft_s |   p90_e2el_s |   p90_e2e_norm_intvty |   overall_hit_pct |   theoretical_hit_pct |   kv_usage_avg_pct |   waiting_avg_sum |   preemptions |   goodput_output_tput |   working_set_over_pool_mean |   batch_B |   step_time_T_ms |
+|:---------------------|-------:|------------:|---------:|---------------------:|----------------------:|-------------:|-------------:|-------------:|----------------------:|------------------:|----------------------:|-------------------:|------------------:|--------------:|----------------------:|-----------------------------:|----------:|-----------------:|
+| offload-baseline-60m |     32 |        1594 |        0 |             2.08e+04 |                 173   |        18    |    67.7      |   134        |                 1.9   |              95.3 |                  95.8 |               89.9 |              16.6 |           171 |                 280   |                         1.88 |      14.1 |             39.3 |
+| offload-baseline-60m |     64 |        1601 |        0 |             1.96e+04 |                 177   |        16    |   205        |   262        |                 0.642 |              92.5 |                  95.1 |               92.4 |              60.4 |           287 |                  53.3 |                         3.48 |      19.3 |             47.5 |
+| offload-baseline-60m |     96 |         690 |        0 |             8.07e+03 |                  78.7 |         6.56 |   837        |   973        |                 0.183 |              30.5 |                  94.4 |               92.6 |             104   |           113 |                  48.8 |                         4.59 |      21   |            107   |
+| offload-baseline-60m |    128 |         785 |        0 |             7.68e+03 |                  93.2 |         5.98 |     1.17e+03 |     1.26e+03 |                 0.148 |              23.5 |                  92.5 |               92.7 |             176   |            87 |                  43.7 |                         5.6  |      25.4 |            109   |
+| offload-baseline-60m |    192 |         752 |        0 |             7.61e+03 |                  82.8 |         5.14 |     1.73e+03 |     1.82e+03 |                 0.107 |              20.2 |                  90.9 |               92.8 |             268   |           105 |                  26.5 |                         7.32 |      23.4 |            116   |
+
+## Steady state: requests started after minute 5 (sweep figures use these)
+
+| label                |   conc |   ss_completed |   ss_total_tput_per_gpu |   ss_output_tput_per_gpu |   ss_p50_intvty |   ss_p90_intvty |   ss_p50_ttft_s |   ss_p90_ttft_s |   ss_goodput_output_tput |   ss_overall_hit_pct |   ss_kv_usage_avg_pct |   ss_waiting_avg_sum |
+|:---------------------|-------:|---------------:|------------------------:|-------------------------:|----------------:|----------------:|----------------:|----------------:|-------------------------:|---------------------:|----------------------:|---------------------:|
+| offload-baseline-60m |     32 |           1350 |                2.02e+04 |                    167   |           21.1  |           17.7  |       43        |       70.7      |                   261    |                 95.5 |                  96.3 |                 18.1 |
+| offload-baseline-60m |     64 |           1362 |                1.86e+04 |                    168   |           20.4  |           15.8  |      150        |      210        |                     6.84 |                 92.6 |                  96.3 |                 65.8 |
+| offload-baseline-60m |     96 |            419 |                5.9e+03  |                     57.1 |            8.63 |            6.26 |      805        |      849        |                     0    |                 12   |                  93.9 |                113   |
+| offload-baseline-60m |    128 |            484 |                5.92e+03 |                     64.8 |            8.41 |            5.74 |        1.04e+03 |        1.19e+03 |                     0    |                 12.6 |                  93.7 |                189   |
+| offload-baseline-60m |    192 |            447 |                5.72e+03 |                     64.1 |            8.63 |            6.01 |        1.64e+03 |        1.75e+03 |                     0    |                 12.4 |                  93.7 |                288   |
+
+## Validity checks
+
+- offload-baseline-60m c=32: in-flight working set peaked at 2.13x the KV pool; working set peaked at 2.37x the KV pool (expect evictions)
+- offload-baseline-60m c=64: in-flight working set peaked at 3.99x the KV pool; working set peaked at 4.19x the KV pool (expect evictions)
+- offload-baseline-60m c=96: 129 requests cancelled when the grace period ended (not in the exports); server hit 30.5% is 63.9 points below theoretical 94.4%; in-flight working set peaked at 5.82x the KV pool; working set peaked at 5.85x the KV pool (expect evictions)
+- offload-baseline-60m c=128: 255 requests cancelled when the grace period ended (not in the exports); server hit 23.5% is 69.0 points below theoretical 92.5%; in-flight working set peaked at 7.37x the KV pool; working set peaked at 7.51x the KV pool (expect evictions)
+- offload-baseline-60m c=192: 315 requests cancelled when the grace period ended (not in the exports); server hit 20.2% is 70.7 points below theoretical 90.9%; in-flight working set peaked at 10.93x the KV pool; working set peaked at 10.93x the KV pool (expect evictions)

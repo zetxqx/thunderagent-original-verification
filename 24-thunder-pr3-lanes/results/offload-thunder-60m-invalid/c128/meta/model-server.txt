@@ -1,0 +1,99 @@
+sampling pod program-aware-vllm-decode-68496d555b-8h4xs on node gke-bobbm-bobbm-spoth100-ef0c964e-blnx
+
+===== 1. launch arguments, image, resources =====
+image     : vllm/vllm-openai:v0.28.0
+replicas  : 4 strategy: Recreate
+command   : vllm serve
+args      :
+    Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8
+    --host=0.0.0.0
+    --port=8000
+    --tensor-parallel-size=2
+    --max-model-len=262144
+    --kv-cache-dtype=fp8_e4m3
+    --gpu-memory-utilization=0.88
+    --compilation-config={"pass_config":{"fuse_allreduce_rms":false}}
+    --enable-prompt-tokens-details
+    --kv-offloading-size=400
+env       : ['VLLM_USE_DEEP_GEMM', 'VLLM_ALLREDUCE_USE_SYMM_MEM', 'VLLM_SERVER_DEV_MODE', 'HF_TOKEN']
+resources : {"limits": {"cpu": "16", "memory": "450Gi", "nvidia.com/gpu": "2"}, "requests": {"cpu": "8", "memory": "450Gi", "nvidia.com/gpu": "2"}}
+
+===== 2. hardware =====
+nodepool=bobbm-spoth100
+machine=a3-highgpu-4g
+gpu=nvidia-h100-80gb
+spot=true
+zone=us-central1-a
+kubelet=v1.35.6-gke.1250001
+capacity={"cpu":"104","ephemeral-storage":"3094171904Ki","hugepages-1Gi":"0","hugepages-2Mi":"0","memory":"965596036Ki","nvidia.com/gpu":"4","pods":"110"}
+
+===== 3. pod placement =====
+NAME                                         NODE                                     IP            START
+program-aware-vllm-decode-68496d555b-8h4xs   gke-bobbm-bobbm-spoth100-ef0c964e-blnx   10.100.3.13   2026-10-09T12:50:52Z
+program-aware-vllm-decode-68496d555b-gqk8x   gke-bobbm-bobbm-spoth100-ef0c964e-zwsd   10.100.13.6   2026-10-09T12:50:47Z
+program-aware-vllm-decode-68496d555b-pzxc7   gke-bobbm-bobbm-spoth100-8d5fa059-pmq7   10.100.9.14   2026-10-09T12:50:36Z
+program-aware-vllm-decode-68496d555b-twsxm   gke-bobbm-bobbm-spoth100-ef0c964e-dff8   10.100.2.14   2026-10-09T12:50:43Z
+
+===== 4. deployment revision history =====
+RS                                     REV   CREATED                REPLICAS
+program-aware-vllm-decode-767f46885f   1     2026-09-10T08:05:05Z   0
+program-aware-vllm-decode-99cb4d6d     2     2026-09-10T08:07:38Z   0
+program-aware-vllm-decode-9c9b54cb6    13    2026-09-16T15:01:04Z   0
+program-aware-vllm-decode-679589c46c   8     2026-09-30T07:34:54Z   0
+program-aware-vllm-decode-559bd4f57c   12    2026-09-30T07:48:26Z   0
+program-aware-vllm-decode-68496d555b   14    2026-10-09T12:41:05Z   4
+
+===== 5. engine version and resolved config (live) =====
+version: {"version":"0.28.0"}
+  tensor_parallel_size     2
+  pipeline_parallel_size   1
+  max_seq_len              262144
+  dtype                    torch.bfloat16
+  quantization             fp8
+  kv_cache_dtype           fp8_e4m3
+  enable_prefix_caching    True
+  enable_chunked_prefill   True
+
+===== 6. KV cache pool (live metric) =====
+vllm:cache_config_info{_block_size_resolved="True"
+block_size="16"
+cache_dtype="fp8_e4m3"
+enable_prefix_caching="True"
+gpu_memory_utilization="0.88"
+kv_cache_dtype_skip_layers="[]"
+kv_cache_max_concurrency="8.53363037109375"
+kv_cache_size_tokens="2237040"
+mamba_block_size="None"
+mamba_cache_dtype="auto"
+mamba_ssm_cache_dtype="auto"
+num_gpu_blocks="139815"
+num_gpu_blocks_override="None"
+user_specified_block_size="False"
+user_specified_mamba_block_size="False"} 1.0
+
+===== 7. batch limits (REPRODUCED, not read from the engine) =====
+v0.28.0 exposes neither max_num_batched_tokens nor max_num_seqs at runtime.
+Re-running vLLM's own resolution with the same flags and usage context:
+INFO 10-09 12:56:31 [model.py:672] Resolved architecture: Qwen3MoeForCausalLM
+INFO 10-09 12:56:31 [model.py:1965] Using max model len 262144
+INFO 10-09 12:56:34 [cache.py:282] Using fp8_e4m3 data type to store kv cache. It reduces the GPU memory footprint and boosts the performance. Meanwhile, it may cause accuracy drop without a proper scaling factor
+INFO 10-09 12:56:34 [scheduler.py:242] Chunked prefill is enabled with max_num_batched_tokens=8192.
+INFO 10-09 12:56:34 [kernel.py:308] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+INFO 10-09 12:56:34 [compilation.py:329] Enabled custom fusions: norm_quant, act_quant, allreduce_rms
+  max_num_batched_tokens         8192
+  max_num_seqs                   1024
+  enable_chunked_prefill         True
+  long_prefill_token_threshold   0
+  policy                         fcfs
+  async_scheduling               True
+
+===== 8. model architecture =====
+  model_type                 qwen3_moe
+  num_hidden_layers          48
+  hidden_size                2048
+  num_attention_heads        32
+  num_key_value_heads        4
+  num_experts_per_tok        8
+  max_position_embeddings    262144
+  vocab_size                 151936
+  quantization               {'quant_method': 'fp8', 'fmt': 'e4m3', 'weight_block_size': [128, 128], 'activation_scheme': 'dynamic'}

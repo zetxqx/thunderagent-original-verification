@@ -1,0 +1,66 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: agentx-c96-offload-thunder-60m
+  namespace: llm-d-program-aware-scheduling
+  labels: {app: agentx-bench, agentx-label: "offload-thunder-60m", agentx-conc: "96"}
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 21600
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app: agentx-bench}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: thunderagent-metrics-reader
+      nodeSelector: {cloud.google.com/gke-nodepool: default-pool}
+      securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
+      initContainers:
+      - name: epp-scrape
+        image: python:3.12-alpine
+        restartPolicy: Always
+        command: [python, /scripts/epp_scrape.py]
+        env:
+        - {name: EPP_METRICS_URLS, value: "http://10.100.5.21:9090/metrics"}
+        - {name: OUT_DIR, value: /data/results/offload-thunder-60m/c96/epp}
+        - {name: INTERVAL, value: "10"}
+        - {name: PYTHONUNBUFFERED, value: "1"}
+        resources:
+          requests: {cpu: 100m, memory: 128Mi}
+          limits: {memory: 512Mi}
+        volumeMounts:
+        - {name: data, mountPath: /data}
+        - {name: scripts, mountPath: /scripts}
+      containers:
+      - name: aiperf
+        image: us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/agentx-harness:agentx-v1.0.6
+        # The image is distroless: bash and the aiperf venv only, no coreutils.
+        args:
+        - |
+          aiperf profile --scenario agentx \
+            --url http://agentx-epp-c-epp:80 --model Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8 --tokenizer Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8 \
+            --concurrency 96 --public-dataset semianalysis_cc_traces_weka_062126_256k  \
+            --server-metrics http://10.100.13.7:8000/metrics \
+            --server-metrics-formats json csv parquet \
+            --output-artifact-dir /data/results/offload-thunder-60m/c96/aiperf_artifacts 
+          rc=$?
+          aiperf analyze swim-lane /data/results/offload-thunder-60m/c96/aiperf_artifacts -c 96 --html \
+            || echo "swim-lane render failed"
+          exit $rc
+        env:
+        - {name: HF_HOME, value: /data/hf}
+        - {name: AIPERF_DATASET_MMAP_CACHE_DIR, value: /data/mmap}
+        - {name: AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID, value: "true"}
+        - {name: AIPERF_SERVER_METRICS_COLLECTION_INTERVAL, value: "1.0"}
+        - {name: PYTHONUNBUFFERED, value: "1"}
+        resources:
+          requests: {cpu: "4", memory: 32Gi}
+          limits: {memory: 32Gi}
+        volumeMounts:
+        - {name: data, mountPath: /data}
+      volumes:
+      - name: data
+        persistentVolumeClaim: {claimName: agentx-data-c}
+      - name: scripts
+        configMap: {name: agentic-bench-scripts}

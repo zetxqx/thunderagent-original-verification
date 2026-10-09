@@ -1,0 +1,207 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "4"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"agentx-epp-c-epp","app.kubernetes.io/version":"0.0.0","llm-d.ai/igw-mode":"llm-d-router-standalone"},"name":"agentx-epp-c-epp","namespace":"llm-d-program-aware-scheduling"},"spec":{"replicas":1,"selector":{"matchLabels":{"llm-d-router-standalone":"agentx-epp-c-epp"}},"strategy":{"type":"Recreate"},"template":{"metadata":{"annotations":{"checksum/config":"a524105333a47795e5710dadcaddbbf1d2e02d96258e32e34c847ea09df98189"},"labels":{"llm-d-router-standalone":"agentx-epp-c-epp","llm-d.ai/igw-mode":"llm-d-router-standalone"}},"spec":{"containers":[{"args":["--service-node","envoy-sidecar","--log-level","warn","--concurrency","8","--drain-strategy","immediate","--drain-time-s","60","-c","/etc/envoy/envoy.yaml"],"command":["envoy"],"env":[{"name":"NS_NAME","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"POD_NAME","valueFrom":{"fieldRef":{"fieldPath":"metadata.name"}}}],"image":"docker.io/envoyproxy/envoy:distroless-v1.33.2","imagePullPolicy":"IfNotPresent","name":"envoy-proxy","ports":[{"containerPort":8081,"name":"http-8081"},{"containerPort":19001,"name":"metrics-19001"}],"readinessProbe":{"failureThreshold":1,"httpGet":{"path":"/ready","port":19001,"scheme":"HTTP"},"periodSeconds":5,"successThreshold":1,"timeoutSeconds":1},"resources":{"limits":{"memory":"8Gi"},"requests":{"cpu":"1","memory":"2Gi"}},"volumeMounts":[{"mountPath":"/etc/envoy","name":"config","readOnly":true}]},{"args":["--endpoint-selector","agentx-lane=c","--endpoint-target-ports","8000","--zap-encoder","json","--config-file","/config/thunder-plugins.yaml","--grpc-health-port","9003","--allow-experimental-plugins=true","--v=2","--tracing=false"],"env":[{"name":"NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"POD_NAME","valueFrom":{"fieldRef":{"fieldPath":"metadata.name"}}},{"name":"HF_TOKEN","valueFrom":{"secretKeyRef":{"key":"HF_TOKEN","name":"llm-d-hf-token"}}}],"image":"us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker:thunder-agent-pr3-a025437b-produces","imagePullPolicy":"IfNotPresent","lifecycle":{"preStop":{"sleep":{"seconds":5}}},"livenessProbe":{"grpc":{"port":9003,"service":"liveness"},"initialDelaySeconds":5,"periodSeconds":10},"name":"epp","ports":[{"containerPort":9002,"name":"grpc"},{"containerPort":9003,"name":"grpc-health"},{"containerPort":9090,"name":"metrics"}],"readinessProbe":{"grpc":{"port":9003,"service":"readiness"},"periodSeconds":2},"resources":{"limits":{"memory":"8Gi"},"requests":{"cpu":"1","memory":"2Gi"}},"volumeMounts":[{"mountPath":"/config","name":"plugins-config-volume"}]}],"serviceAccountName":"agentx-epp-c-epp","terminationGracePeriodSeconds":130,"volumes":[{"configMap":{"items":[{"key":"envoy.yaml","path":"envoy.yaml"}],"name":"agentx-epp-c-envoy"},"name":"config"},{"configMap":{"name":"agentx-epp-c-epp"},"name":"plugins-config-volume"}]}}}}
+  creationTimestamp: "2026-10-09T07:22:05Z"
+  generation: 4
+  labels:
+    app.kubernetes.io/name: agentx-epp-c-epp
+    app.kubernetes.io/version: 0.0.0
+    llm-d.ai/igw-mode: llm-d-router-standalone
+  name: agentx-epp-c-epp
+  namespace: llm-d-program-aware-scheduling
+  resourceVersion: "1791532374949919024"
+  uid: 1d574077-f322-441f-8146-bbc19c10f697
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      llm-d-router-standalone: agentx-epp-c-epp
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        checksum/config: a524105333a47795e5710dadcaddbbf1d2e02d96258e32e34c847ea09df98189
+        kubectl.kubernetes.io/restartedAt: "2026-10-09T00:52:17-07:00"
+      labels:
+        llm-d-router-standalone: agentx-epp-c-epp
+        llm-d.ai/igw-mode: llm-d-router-standalone
+    spec:
+      containers:
+      - args:
+        - --service-node
+        - envoy-sidecar
+        - --log-level
+        - warn
+        - --concurrency
+        - "8"
+        - --drain-strategy
+        - immediate
+        - --drain-time-s
+        - "60"
+        - -c
+        - /etc/envoy/envoy.yaml
+        command:
+        - envoy
+        env:
+        - name: NS_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        image: docker.io/envoyproxy/envoy:distroless-v1.33.2
+        imagePullPolicy: IfNotPresent
+        name: envoy-proxy
+        ports:
+        - containerPort: 8081
+          name: http-8081
+          protocol: TCP
+        - containerPort: 19001
+          name: metrics-19001
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 1
+          httpGet:
+            path: /ready
+            port: 19001
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            memory: 8Gi
+          requests:
+            cpu: "1"
+            memory: 2Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/envoy
+          name: config
+          readOnly: true
+      - args:
+        - --endpoint-selector
+        - agentx-lane=c
+        - --endpoint-target-ports
+        - "8000"
+        - --zap-encoder
+        - json
+        - --config-file
+        - /config/thunder-plugins.yaml
+        - --grpc-health-port
+        - "9003"
+        - --allow-experimental-plugins=true
+        - --v=2
+        - --tracing=false
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: HF_TOKEN
+              name: llm-d-hf-token
+        image: us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker:thunder-agent-pr3-a025437b-produces
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            sleep:
+              seconds: 5
+        livenessProbe:
+          failureThreshold: 3
+          grpc:
+            port: 9003
+            service: liveness
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: epp
+        ports:
+        - containerPort: 9002
+          name: grpc
+          protocol: TCP
+        - containerPort: 9003
+          name: grpc-health
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          grpc:
+            port: 9003
+            service: readiness
+          periodSeconds: 2
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            memory: 8Gi
+          requests:
+            cpu: "1"
+            memory: 2Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /config
+          name: plugins-config-volume
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: agentx-epp-c-epp
+      serviceAccountName: agentx-epp-c-epp
+      terminationGracePeriodSeconds: 130
+      volumes:
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: envoy.yaml
+            path: envoy.yaml
+          name: agentx-epp-c-envoy
+        name: config
+      - configMap:
+          defaultMode: 420
+          name: agentx-epp-c-epp
+        name: plugins-config-volume
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-10-09T07:52:54Z"
+    lastUpdateTime: "2026-10-09T07:52:54Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-10-09T07:22:05Z"
+    lastUpdateTime: "2026-10-09T07:52:54Z"
+    message: ReplicaSet "agentx-epp-c-epp-77d954d468" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 4
+  readyReplicas: 1
+  replicas: 1
+  terminatingReplicas: 0
+  updatedReplicas: 1

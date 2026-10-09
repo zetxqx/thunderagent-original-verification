@@ -1,0 +1,17 @@
+# The standalone chart creates only namespaced RBAC for a lane EPP's service account,
+# but the EPP metrics port authenticates readers through TokenReview and
+# SubjectAccessReview, which need cluster scope. Bind the lane accounts to the
+# standard auth-delegator role, as the main release has. Apply once.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: agentx-epp-auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- {kind: ServiceAccount, name: agentx-epp-a-epp, namespace: llm-d-program-aware-scheduling}
+- {kind: ServiceAccount, name: agentx-epp-b-epp, namespace: llm-d-program-aware-scheduling}
+- {kind: ServiceAccount, name: agentx-epp-c-epp, namespace: llm-d-program-aware-scheduling}
+- {kind: ServiceAccount, name: agentx-epp-d-epp, namespace: llm-d-program-aware-scheduling}
