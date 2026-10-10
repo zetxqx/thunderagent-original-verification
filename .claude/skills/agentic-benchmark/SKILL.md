@@ -28,6 +28,7 @@ Open the reference you need, not all of them:
 | `scripts/analyze.py` | `summary.csv`, `summary.md` with validity checks; calls `point_figures.py` |
 | `scripts/point_figures.py` | per-point figures, the sweep Pareto and the concurrency view, into the report folder (style rules: references/figures.md) |
 | `scripts/make_figures.py` | across-arm figures fig1 to fig5 and `ratios.md` |
+| `scripts/export_bundle.py` | one JSON bundle per step for the interactive dashboard (repo `dashboard/`, format in `dashboard/SCHEMA.md`) |
 | `scripts/figstyle.py` | the `scientific-figure-making` style for every figure, PNG only |
 | `scripts/epp_scrape.py` | EPP metrics scraper (runs in the Job) |
 | `scripts/lib.sh` | cluster constants, `pin_kube`, `vllm_get` |
@@ -49,7 +50,7 @@ Scripts live only here. A step folder holds its README, its own config (arm file
    Alternate arms between replicates so time-of-day effects do not line up with one arm.
    Lane mode can run one point per vLLM pod in parallel (`LANE=a|b|c|d`, references/deployment.md section 3).
 7. **Analyze all arms together**: `uv run <skill>/scripts/analyze.py --ttft-slo 60 --skip-minutes 5 --out results/compare/report results/*/c*`. `summary.csv` holds whole-window (AgentX) and steady-state (`ss_*`) columns; the sweep figures use the steady state (references/metrics.md section 2). Read every point's validity line; fix or exclude before going on.
-8. **Across-arm figures**: `uv run <skill>/scripts/make_figures.py --out results/compare/report --baseline baseline --name baseline="llm-d default" --name thunder="thunder gate (PR3)" results/compare/report/summary.csv` (steady state by default; `--window whole` for InferenceX-comparable numbers). Open every png.
+8. **Across-arm figures**: `uv run <skill>/scripts/make_figures.py --out results/compare/report --baseline baseline --name baseline="llm-d default" --name thunder="thunder gate (PR3)" results/compare/report/summary.csv` (steady state by default; `--window whole` for InferenceX-comparable numbers). Open every png. Then export the step for the dashboard: `uv run <skill>/scripts/export_bundle.py --out ../dashboard/data/<step>.json --title "..." --baseline baseline --name baseline="..." results/*/c*` (same `--name` values; one point at a time, about 1 MB per 20 points).
 9. **Write the report** in the step README (references/report.md), then add the step to the repo `README.md` "Steps" list. Restore any shared state you changed.
 
 ## Gotchas that cost hours before
@@ -62,6 +63,8 @@ Scripts live only here. A step folder holds its README, its own config (arm file
 - **Counters are cumulative across runs.** Always use deltas inside the profiling window (the scripts do).
 - **aiperf's server-metrics CSV and JSON include the warmup** in their counter totals (CSV prompt tokens = profiling delta + warmup ISL). `analyze.py` reads only the parquet, which covers the profiling window.
 - **Requests cancelled at the end of the grace period** appear in no export file, only in `logs/aiperf.log` (`Phase profiling ... cancelled=N`); `analyze.py` reads it from there.
+- **aiperf writes thousands separators** in its log counts (`completed=1,269, cancelled=30`); a plain `\d+` pattern silently missed the cancelled count of every point with 1,000+ requests (all step 24 thunder points showed 0).
+- **EPP per-flow series appear mid-window** (the queue-duration histogram has one series per session): their base is 0, not their first value in the window. The histogram's top finite bucket is 60 s, so a router-wait quantile above 60 s is unknown; `analyze.py` leaves it empty and reports `epp_queue_wait_over_top_bucket_pct`.
 - **The first 5 minutes of profiling run at low load**: lanes wait out recorded first-request gaps until the 300 s per-tree idle cap fires (harness behavior; 25% of a 20 min run, 8% of 60 min).
 - **The cluster autoscaler evicts vLLM pods mid-run.** On 2026-10-09 GKE scaled down a spot H100 node that held one lane pod (`deleting pod for node scale down`); the point failed the 10% error threshold. Annotate every vLLM pod used by a run with `cluster-autoscaler.kubernetes.io/safe-to-evict=false` (`run-point.sh` annotates every target pod). Moving lane pods around can also make the autoscaler add a node in another zone.
 - **Lane claims: an unclaimed pod is fresh.** Lanes never remove their label, so a pod without one has served no point. The first version of the claim excluded pods that existed before the lane's own delete; with four lanes restarting within seconds, two lanes took each other's replacements and two waited 45 min for a pod that never came (step 24 phase 2). Fixed in `run-point.sh`.

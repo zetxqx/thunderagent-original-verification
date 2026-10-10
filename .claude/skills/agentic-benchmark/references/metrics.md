@@ -63,7 +63,8 @@ A session is an AgentX session tree (main agent plus subagents, `root_correlatio
 | Column | Meaning |
 |---|---|
 | `goodput_output_tput` | output tok/s from turns whose TTFT meets the SLO |
-| `turn_slo_share_pct` | turns meeting the SLO; an error counts as a miss |
+| `turn_slo_share_pct` | turns meeting the SLO; an error and an unserved request count as misses |
+| `unserved` | requests cancelled at the end without a first token (held at the router gate or waiting in the vLLM queue): cancelled minus those running in vLLM at the cancel; SLO misses in every arm |
 | `session_worst_ttft_p90_s`, `sessions_worst_ttft_over_slo_pct` | per-session worst turn. Turn percentiles hide sessions held for a long time |
 | `turns_per_session_p10/p50/p90` | progress per session in the window |
 | `lanes_seen`, `effective_conc_requests`, `effective_sessions_inflight` | how much of the configured concurrency was really on the server. Sessions sit in tool gaps, so this is well below `conc` |

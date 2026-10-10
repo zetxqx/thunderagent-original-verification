@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic benchmark dashboard</title>
+<link rel="stylesheet" href="style.css">
+<script src="vendor/plotly-basic.min.js"></script>
+<script src="metrics.js"></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<aside id="sidebar">
+  <h1>Benchmark dashboard</h1>
+
+  <section>
+    <h2>Data</h2>
+    <div id="bundle-list"></div>
+    <div id="available-list"></div>
+    <label class="button">Open bundle files<input id="file-input" type="file" accept=".json,application/json" multiple hidden></label>
+    <p class="hint">Or drop bundle files anywhere on the page. Format: SCHEMA.md.</p>
+  </section>
+
+  <section id="arms-section" hidden>
+    <h2>Arms <span class="hint">click a name to focus</span></h2>
+    <div id="arm-list"></div>
+    <div class="row">
+      <button id="arms-all" type="button">all</button>
+      <button id="arms-none" type="button">none</button>
+      <button id="focus-clear" type="button">clear focus</button>
+    </div>
+    <label class="field">Baseline (red, ratios)
+      <select id="baseline-select"></select>
+    </label>
+  </section>
+
+  <section id="filters-section" hidden>
+    <h2>Concurrency</h2>
+    <div id="conc-list" class="chips"></div>
+    <h2>Window</h2>
+    <div class="row">
+      <label><input type="radio" name="window" value="steady"> steady state</label>
+      <label><input type="radio" name="window" value="whole"> whole run</label>
+    </div>
+    <p class="hint" id="window-hint"></p>
+    <h2>Charts</h2>
+    <label><input id="legend-toggle" type="checkbox"> legend inside charts</label>
+    <div class="row"><button id="reset-layout" type="button">reset layout</button></div>
+  </section>
+</aside>
+
+<main>
+  <nav id="tabs">
+    <button data-tab="compare" type="button">Compare arms</button>
+    <button data-tab="points" type="button">Points over time</button>
+    <button data-tab="table" type="button">Table</button>
+    <button data-tab="config" type="button">Configuration</button>
+    <span id="title"></span>
+  </nav>
+  <div id="messages"></div>
+  <div id="empty" class="empty">
+    <p>No data loaded.</p>
+    <p>Serve this folder over HTTP to list the bundles in <code>data/</code>:<br><code>python3 -m http.server -d dashboard 8000</code>, then open <code>http://localhost:8000</code>.</p>
+    <p>Or open bundle files with the button on the left, or drop them here.</p>
+  </div>
+
+  <section id="tab-compare" class="tab" hidden>
+    <div class="toolbar">
+      <button id="add-conc" type="button">+ metric vs concurrency</button>
+      <button id="add-pareto" type="button">+ x vs y (Pareto)</button>
+      <button id="add-source" type="button">+ prompt token source</button>
+      <button id="add-cache" type="button">+ cache (token source + working set)</button>
+    </div>
+    <div id="compare-cards" class="cards"></div>
+  </section>
+
+  <section id="tab-points" class="tab" hidden>
+    <div id="point-picker"></div>
+    <div class="toolbar">
+      <button id="add-ts" type="button">+ time series</button>
+      <button id="add-dist" type="button">+ distribution (CDF)</button>
+      <button id="add-slo" type="button">+ share meeting a TTFT target</button>
+    </div>
+    <div id="point-cards" class="cards"></div>
+  </section>
+
+  <section id="tab-table" class="tab" hidden>
+    <div class="toolbar" id="table-groups"></div>
+    <div class="table-wrap"><table id="summary-table"></table></div>
+    <h3>Validity checks</h3>
+    <ul id="checks-list"></ul>
+  </section>
+
+  <section id="tab-config" class="tab" hidden>
+    <h3>Differs between the visible arms</h3>
+    <p class="hint">Settings that are the same for every point of an arm but differ between arms. Values come from each point's meta/ folder.</p>
+    <div class="table-wrap"><table id="config-diff"></table></div>
+    <details><summary>Same in all visible arms</summary><div class="table-wrap"><table id="config-same"></table></div></details>
+    <details><summary>Changes from point to point inside an arm</summary><div class="table-wrap"><table id="config-varies"></table></div></details>
+    <h3>One point</h3>
+    <select id="config-point"></select>
+    <pre id="config-raw"></pre>
+  </section>
+</main>
+</body>
+</html>

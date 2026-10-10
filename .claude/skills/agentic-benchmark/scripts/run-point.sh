@@ -346,9 +346,23 @@ EOF
 log "submitting job $JOB (mode $MODE, concurrency $CONC, $NUM_GPUS GPUs)"
 kc apply -f "$OUT/meta/job.yaml"
 
+# The GKE auth plugin can fail for minutes ("print credential failed"); with set -e one
+# failed kubectl call ended the script while the job ran on (step 24, offload c192).
+# wait_api waits up to 30 min for the API instead.
+wait_api() {
+  local i
+  for i in $(seq 1 60); do
+    kc get job "$JOB" >/dev/null 2>&1 && return 0
+    [ "$i" = 1 ] && log "kubectl cannot reach the cluster; waiting up to 30 min"
+    sleep 30
+  done
+  log "WARNING: kubectl still cannot reach the cluster"
+  return 1
+}
+
 STATUS=""
 while :; do
-  s=$(kc get job "$JOB" -o jsonpath='{.status.succeeded}/{.status.failed}')
+  s=$(kc get job "$JOB" -o jsonpath='{.status.succeeded}/{.status.failed}' 2>/dev/null) || { wait_api || true; continue; }
   case "$s" in
     1/*) STATUS=succeeded; break ;;
     */1) STATUS=failed; break ;;
@@ -358,6 +372,7 @@ while :; do
   [ -n "$line" ] && log "${line:0:200}"
 done
 log "job $STATUS"
+wait_api || true
 kc logs "job/$JOB" -c aiperf > "$OUT/bench-stdout.log" 2>&1 || true
 [ "$EPP_SCRAPE" = 1 ] && { kc logs "job/$JOB" -c epp-scrape > "$OUT/epp-scrape.log" 2>&1 || true; }
 
@@ -378,6 +393,7 @@ for p in $EPPS; do
 done
 
 # kubectl cp needs tar, which the distroless image lacks, so read the PVC from busybox.
+wait_api || true
 FETCH="agentx-fetch-$(date +%s)"
 kc run "$FETCH" --image=busybox:1.36 --restart=Never \
   --overrides="{\"spec\":{\"nodeSelector\":{\"cloud.google.com/gke-nodepool\":\"$CLIENT_POOL\"},\"volumes\":[{\"name\":\"data\",\"persistentVolumeClaim\":{\"claimName\":\"$PVC\",\"readOnly\":true}}],\"containers\":[{\"name\":\"fetch\",\"image\":\"busybox:1.36\",\"command\":[\"sleep\",\"3600\"],\"volumeMounts\":[{\"name\":\"data\",\"mountPath\":\"/data\",\"readOnly\":true}]}]}}"

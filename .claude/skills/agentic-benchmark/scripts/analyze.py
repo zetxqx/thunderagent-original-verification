@@ -96,11 +96,37 @@ def phase_counts(art: Path) -> dict:
     log = art / "logs" / "aiperf.log"
     if not log.exists():
         return {}
-    pat = re.compile(r"Phase profiling \(profiling\) complete \| completed=(\d+), cancelled=(\d+), errors=(\d+)")
+    # aiperf writes thousands separators ("completed=1,269"); missing them dropped the
+    # cancelled count of every point with 1,000 or more completed requests.
+    pat = re.compile(r"Phase profiling \(profiling\) complete \| completed=([\d,]+), cancelled=([\d,]+), errors=([\d,]+)")
     for line in reversed(log.read_text(errors="replace").splitlines()):
         if m := pat.search(line):
-            return {"phase_completed": int(m[1]), "cancelled": int(m[2]), "phase_errors": int(m[3])}
+            n = [int(x.replace(",", "")) for x in m.groups()]
+            return {"phase_completed": n[0], "cancelled": n[1], "phase_errors": n[2]}
     return {}
+
+
+def unserved_requests(art: Path, pods: set[str], cancelled: int) -> int:
+    """Requests still unfinished when aiperf cancelled them that had no first token yet:
+    held at the router gate or waiting in the vLLM queue. aiperf exports none of the
+    cancelled requests; those running in vLLM at the cancel (mostly decoding, first token
+    already sent) are left out, the rest count as SLO misses in every arm. Without a vLLM
+    scrape in the 30 s before the cancel, every cancelled request counts."""
+    log, parquet = art / "logs" / "aiperf.log", art / "server_metrics_export.parquet"
+    if not cancelled or not log.exists() or not parquet.exists():
+        return cancelled
+    pat = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+) - PhaseRunner - WARNING - Phase profiling timed out")
+    stamp = next((m[1] for line in log.read_text(errors="replace").splitlines() if (m := pat.match(line))), None)
+    if not stamp:
+        return cancelled
+    cancel_ns = pd.Timestamp(stamp, tz="UTC").value  # aiperf logs in UTC (matches the EPP's cancel times)
+    pq = read_server(parquet, columns=["endpoint_url", "metric_name", "timestamp_ns", "value"],
+                     metrics=["vllm:num_requests_running"])
+    pq = pq[pq["endpoint_url"].map(netloc).isin(pods) & pq["timestamp_ns"].between(cancel_ns - 30e9, cancel_ns)]
+    if pq.empty:
+        return cancelled
+    running = pq.sort_values("timestamp_ns").groupby("endpoint_url")["value"].last().sum()
+    return max(cancelled - int(running), 0)
 
 
 def metric(pj: dict, tag: str, stat: str = "avg") -> float | None:
@@ -261,12 +287,22 @@ def epp_window(epp: pd.DataFrame, metric: str, t0: float, t1: float) -> pd.DataF
     return d[(d["ts"] >= lo) & (d["ts"] <= t1)]
 
 
-def epp_delta(epp: pd.DataFrame, metric: str, t0: float, t1: float) -> float:
-    d = epp_window(epp, metric, t0, t1)
+def epp_increase(epp: pd.DataFrame, metric: str, t0: float, t1: float) -> pd.Series:
+    """Increase of every series of a counter from t0 to t1. Per-flow series (one per
+    session) appear with their first request, so a series first seen after t0 starts
+    from 0; taking its first value in the window as the base dropped that request
+    (thunder c32: 1132 of 1298 queue waits counted, non-monotonic histogram buckets)."""
+    d = epp[(epp["metric"] == metric) & (epp["ts"] <= t1)].sort_values("ts")
     if d.empty:
-        return float("nan")
-    g = d.sort_values("ts").groupby(["url", "labels"])["value"]
-    return float((g.last() - g.first()).clip(lower=0).sum())
+        return pd.Series(dtype=float)
+    last = d.groupby(["url", "labels"])["value"].last()
+    base = d[d["ts"] <= t0].groupby(["url", "labels"])["value"].last()
+    return (last - base.reindex(last.index).fillna(0)).clip(lower=0)
+
+
+def epp_delta(epp: pd.DataFrame, metric: str, t0: float, t1: float) -> float:
+    inc = epp_increase(epp, metric, t0, t1)
+    return float(inc.sum()) if len(inc) else float("nan")
 
 
 def epp_gauge(epp: pd.DataFrame, metric: str, t0: float, t1: float) -> pd.Series:
@@ -275,23 +311,26 @@ def epp_gauge(epp: pd.DataFrame, metric: str, t0: float, t1: float) -> pd.Series
     return d.groupby("ts")["value"].sum()
 
 
-def epp_hist_quantile(epp: pd.DataFrame, base: str, q: float, t0: float, t1: float) -> float | None:
-    """Quantile of a Prometheus histogram over the window, from bucket deltas
-    summed across series, interpolated linearly inside the bucket."""
-    d = epp_window(epp, base + "_bucket", t0, t1)
-    if d.empty:
+def epp_hist_buckets(epp: pd.DataFrame, base: str, t0: float, t1: float) -> pd.Series:
+    """Cumulative count at or below each bucket bound (le) over the window, summed across series."""
+    inc = epp_increase(epp, base + "_bucket", t0, t1)
+    if inc.empty:
+        return pd.Series(dtype=float)
+    le = inc.index.get_level_values("labels").str.extract(r'le="([^"]+)"')[0].astype(float).to_numpy()
+    return inc.groupby(le).sum().sort_index()
+
+
+def epp_hist_quantile(cum: pd.Series, q: float) -> float | None:
+    """Quantile from cumulative bucket counts, interpolated linearly inside the bucket.
+    None when it lies above the largest finite bound: the histogram cannot tell how far
+    (the EPP queue-duration histogram stops at 60 s, gate holds last up to 1800 s)."""
+    if cum.empty or not cum.iloc[-1]:
         return None
-    d = d.assign(le=d["labels"].str.extract(r'le="([^"]+)"')[0].astype(float))
-    g = d.sort_values("ts").groupby(["url", "labels", "le"])["value"]
-    cum = (g.last() - g.first()).clip(lower=0).groupby(level="le").sum().sort_index()
-    total = cum.iloc[-1]
-    if not total:
-        return None
-    rank, prev_le, prev_c = q * total, 0.0, 0.0
+    rank, prev_le, prev_c = q * cum.iloc[-1], 0.0, 0.0
     for le, c in cum.items():
         if c >= rank:
             if np.isinf(le):
-                return prev_le
+                return None
             return prev_le + (le - prev_le) * (rank - prev_c) / (c - prev_c) if c > prev_c else le
         prev_le, prev_c = le, c
     return None
@@ -309,8 +348,13 @@ def epp_columns(epp: pd.DataFrame, t0: float, t1: float) -> dict:
     out["epp_queue_wait_mean_s"] = s / c if c else None
     # Most turns of admitted sessions pass the gate at once, so the p90 is often
     # near zero while the held minority sets the mean and the p99.
-    out["epp_queue_wait_p90_s"] = epp_hist_quantile(epp, EPP_QUEUE, 0.9, t0, t1)
-    out["epp_queue_wait_p99_s"] = epp_hist_quantile(epp, EPP_QUEUE, 0.99, t0, t1)
+    cum = epp_hist_buckets(epp, EPP_QUEUE, t0, t1)
+    out["epp_queue_wait_p90_s"] = epp_hist_quantile(cum, 0.9)
+    out["epp_queue_wait_p99_s"] = epp_hist_quantile(cum, 0.99)
+    finite = cum[~np.isinf(cum.index)] if len(cum) else cum
+    if len(finite) and cum.iloc[-1]:
+        out["epp_queue_wait_top_bucket_s"] = float(finite.index[-1])
+        out["epp_queue_wait_over_top_bucket_pct"] = 100 * (1 - finite.iloc[-1] / cum.iloc[-1])
     qs = epp_gauge(epp, "llm_d_epp_flow_control_queue_size", t0, t1)
     out["epp_queue_size_mean"], out["epp_queue_size_max"] = (qs.mean(), qs.max()) if len(qs) else (None, None)
     ws = epp_gauge(epp, GATE + "endpoint_working_set_tokens", t0, t1)
@@ -385,6 +429,8 @@ def analyze_point(d: Path, out: Path, cost: float | None, slo: float, skip_minut
     overflow = metric(pj, "context_overflow_count") or 0.0
     skipped = metric(pj, "skipped_context_overflow_count") or 0.0
     errors = prof["err_type"].notna().sum()
+    phase = phase_counts(art)
+    unserved = unserved_requests(art, pods, phase.get("cancelled", 0))
 
     row = {
         "label": meta.get("label", d.parent.name),
@@ -398,14 +444,17 @@ def analyze_point(d: Path, out: Path, cost: float | None, slo: float, skip_minut
         "errors": int(errors),
         "error_types": ";".join(f"{k}:{v}" for k, v in prof["err_type"].value_counts().items()),
         "cancelled": int(prof["cancelled"].sum()),
-        **phase_counts(art),
+        **phase,
+        "unserved": unserved,
         "context_overflow": overflow,
         "overflow_rate_pct": 100 * overflow / max(len(ok) + errors + skipped, 1),
         "warmup_requests": int((df["phase"] == "warmup").sum()),
         "lanes_seen": int(ok["root"].nunique()),
-        **client_columns(ok, int(errors), num_gpus, cost, slo),
+        # Errors and unserved requests (no first token by the end) are SLO misses; the
+        # unserved were all sent near the end, so they also count in the steady state.
+        **client_columns(ok, int(errors) + unserved, num_gpus, cost, slo),
         "skip_minutes": skip_minutes,
-        **client_columns(ok_ss, errors_ss, num_gpus, cost, slo, prefix="ss_"),
+        **client_columns(ok_ss, errors_ss + unserved, num_gpus, cost, slo, prefix="ss_"),
         "isl_median": ok["isl"].median(),
         "osl_median": ok["osl"].median(),
         "effective_conc_requests": ok["lat_s"].sum() / duration,
@@ -570,7 +619,9 @@ def checks(r: pd.Series) -> list[str]:
     if r.get("overflow_rate_pct", 0) > 1:
         out.append(f"context overflow {r['overflow_rate_pct']:.2f}% > 1%")
     if r.get("cancelled", 0) > 0:
-        out.append(f"{r['cancelled']} requests cancelled when the grace period ended (not in the exports)")
+        out.append(f"{r['cancelled']} requests cancelled when the grace period ended (not in the exports)"
+                   + (f", {r['unserved']:.0f} of them without a first token (counted as SLO misses)"
+                      if pd.notna(r.get("unserved")) and r.get("unserved", 0) > 0 else ""))
     th, hit = r.get("theoretical_hit_pct"), r.get("overall_hit_pct")
     if pd.notna(th) and pd.notna(hit) and th - hit > 10:
         out.append(f"server hit {hit:.1f}% is {th - hit:.1f} points below theoretical {th:.1f}%")

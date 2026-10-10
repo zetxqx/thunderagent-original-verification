@@ -1,6 +1,6 @@
 # Step 24: thunder-agent PR3 gate vs no router, one vLLM replica per lane, AgentX workload
 
-Status: runs done (2026-10-09), all 20 points valid; results and takeaways not written yet. Four-arm report and figures: [results/compare-all/report/](results/compare-all/report/). Offload-thunder c=128, 64, 32 were rerun after fixes (failed first runs in `results/offload-thunder-60m-invalid/`); offload-thunder c=32 and offload-baseline c=192 were fetched from the PVC after kubectl lost its GKE credentials at 20:06 UTC (both jobs had completed; offload-baseline c=192 has no end-of-run pod check or vLLM log, see its `meta/finish.json`).
+Status: runs done (2026-10-09 and 10), all 27 points valid; results and takeaways not written yet. `run-extra.sh` added c=4 and 8 without offload (both arms) and c=16 (both arms) and 256 (thunder) with offload for complete Pareto curves. Interactive view: repo `dashboard/` (`step24-thunder-pr3-lanes.json`). Four-arm report and figures: [results/compare-all/report/](results/compare-all/report/). Offload-thunder c=128, 64, 32 were rerun after fixes (failed first runs in `results/offload-thunder-60m-invalid/`); offload-thunder c=32 and offload-baseline c=192 were fetched from the PVC after kubectl lost its GKE credentials at 20:06 UTC (both jobs had completed; offload-baseline c=192 has no end-of-run pod check or vLLM log, see its `meta/finish.json`).
 
 ## Takeaways
 

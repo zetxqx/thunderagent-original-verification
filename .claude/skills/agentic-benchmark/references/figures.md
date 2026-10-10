@@ -6,6 +6,7 @@ Every figure is a report figure: one style, PNG only, and everything goes into t
 |---|---|---|
 | Per point and per sweep | `scripts/analyze.py` calls `scripts/point_figures.py` | `results/<label>/report/` (or the `--out` of a multi-arm analysis) |
 | Across arms (replicates, ratios) | `scripts/make_figures.py` | `results/compare/report/` |
+| Interactive, any arm and point (toggle arms, one metric per chart, configs) | `scripts/export_bundle.py` + repo `dashboard/` | `dashboard/data/<step>.json` |
 
 ## Style
 

@@ -273,6 +273,17 @@ data:
           original_dst_lb_config:
             use_http_header: true
             http_header_name: x-gateway-destination-endpoint
+          # vLLM (uvicorn) closes idle keep-alive connections after 5 s; envoy reusing
+          # one at that moment returns 503 "reset before headers: connection
+          # termination" (step 24, offload thunder c=128: one root warmup request
+          # failed and aborted the point). Close idle upstream connections first.
+          typed_extension_protocol_options:
+            envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+              "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+              common_http_protocol_options:
+                idle_timeout: 4s
+              explicit_http_config:
+                http_protocol_options: {}
         - name: ext_proc
           type: STATIC
           connect_timeout: 86400s
@@ -445,7 +456,7 @@ spec:
         llm-d-router-standalone: agentx-epp-a-epp
         llm-d.ai/igw-mode: llm-d-router-standalone
       annotations:
-        checksum/config: 671082eae760512efb5206fb809501935cf97cf06fc94c15c65c1fbe0e4fb70c
+        checksum/config: cee0c6bceabc295e6af3e7eea4e3e59b9c850cb687f1c2b6bada8f77b1552712
     spec:
 
       serviceAccountName: agentx-epp-a-epp
