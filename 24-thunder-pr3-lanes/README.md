@@ -1,6 +1,6 @@
 # Step 24: thunder-agent PR3 gate vs no router, one vLLM replica per lane, AgentX workload
 
-Status: runs done (2026-10-09 to 11), 48 valid points in six arms; results of the gate-setting variants below, the main sweep's takeaways not written yet. Interactive view: repo `dashboard/` (`step24-thunder-pr3-lanes.json`); report and figures: [results/compare-all/report/](results/compare-all/report/). Failed first runs are kept in `results/*-invalid/` (claim bug, envoy 503, connection reset, and three vLLM crashes, "CUDA error: an illegal memory access", all on node gke-bobbm-bobbm-spoth100-ef0c964e-czgg, which was then cordoned and later left the cluster). The 300 s c128 and c192 points were stopped in warmup after 75 min (`results/offload-thunder-fa300-60m-stopped/`). Offload-thunder c=32 and offload-baseline c=192 were fetched from the PVC after kubectl lost its GKE credentials (offload-baseline c=192 has no end-of-run pod check or vLLM log, see its `meta/finish.json`).
+Status: runs done (2026-10-09 to 11), 48 valid points in six arms; results of the gate-setting variants below, the main sweep's takeaways not written yet. Interactive view: repo `dashboard/` (`step24-thunder-pr3-lanes.json`); report and figures: [results/compare-all/report/](results/compare-all/report/). Failed and stopped runs were rerun or dropped and their data deleted; what went wrong is in "Failed runs and lessons" below. Offload-thunder c=32 and offload-baseline c=192 were fetched from the PVC after kubectl lost its GKE credentials (offload-baseline c=192 has no end-of-run pod check or vLLM log, see its `meta/finish.json`).
 
 ## Takeaways
 
@@ -28,6 +28,21 @@ The idle lease does not change this (10 s and 30 s give the same picture), so th
 
 1. **Age-aware ordering:** weigh waiting time when ordering held sessions, so a large session does not starve behind a stream of smaller ones until the backstop. For example, add aging to the footprint key, or switch to oldest-first once a wait passes a fraction of `headWaitStarvationMs`. Then a large session is admitted when room appears, instead of starving to the backstop.
 2. **Gradual forced admission:** force in at most one session per pod at a time (or per interval). Make room for it by pausing idle sessions the same way a normal admission does (`reclaimLocked` with `fitTokens`), instead of releasing every starving head in back-to-back dispatch cycles without pausing anyone.
+
+## Failed runs and lessons (data deleted)
+
+Every point below was rerun with the fix, except the two stopped 300 s points. The data of the failed attempts was deleted; the lessons are in the agentic-benchmark skill's gotchas.
+
+| point (first attempt) | what failed | cause | fix or lesson |
+|---|---|---|---|
+| thunder + offload c32, c64 | "no fresh vLLM pod could be claimed" | `run-point.sh` claim bug: lanes restarting together stole each other's new pods | any unclaimed pod is fresh (fixed in `run-point.sh`) |
+| thunder + offload c128 | one root warmup request got envoy 503 "connection termination" | envoy reused an upstream connection vLLM had closed at its 5 s keep-alive | envoy upstream `idle_timeout: 4s` in the lane values |
+| thunder + offload c32 (rerun), no router + offload c192 | data not copied back | kubectl lost its GKE credentials for about 5 minutes; with `set -e` the script stopped while the jobs ran | data fetched from the PVC; `run-point.sh` now waits up to 30 min for the API |
+| no router + offload c80 | warmup aborted, "Connection reset by peer" | aiperf reused a connection vLLM had just closed (direct mode, no envoy) | rerun |
+| thunder lease 10 s + offload c32 and c64, no router + offload c20 | vLLM crashed: "CUDA error: an illegal memory access"; the container could not restart ("Insufficient space in /dev/shm"); aiperf stopped at 10% failed requests | all three on one spot node (gke-bobbm-bobbm-spoth100-ef0c964e-czgg); no other node crashed | node cordoned (it later left the cluster); reruns on other nodes |
+| thunder lease 10 s + offload c64, no router + offload c20 (second try) | "job ... already exists" | the failed attempts' Jobs were still in the cluster | delete a failed point's Job before rerunning it |
+| thunder FA 300 s + offload c128, c192 | stopped by hand after 75 min of warmup | warmup under constant forced admissions recomputes prefixes; it would have taken until about 16:00 | dropped: c96 already answered the question |
+| lane EPP deploy for the lease 10 s run | half the objects missing | API server throttling, "ENHANCE_YOUR_CALM" | re-applied; later scripts retry `kubectl apply` |
 
 ## Question
 
