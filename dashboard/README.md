@@ -4,6 +4,10 @@ An interactive view of benchmark results: every arm and point of a step, one met
 
 ## Open it
 
+Online: https://zetxqx.github.io/thunderagent-original-verification/ (GitHub Pages, published from `main` by `.github/workflows/pages.yml` whenever `dashboard/` changes).
+
+Locally:
+
 ```bash
 python3 -m http.server -d dashboard 8000
 # open http://localhost:8000
