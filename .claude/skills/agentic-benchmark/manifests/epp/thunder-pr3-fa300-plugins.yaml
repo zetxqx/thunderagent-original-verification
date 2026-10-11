@@ -1,0 +1,36 @@
+# thunder-agent gate as in thunder-pr3-plugins.yaml with the forced admission
+# (headWaitStarvationMs) cut from 1800 s to 300 s (step 24, 400 GiB CPU offload).
+# With 1800 s, sessions held since the start were forced in together around minute
+# 30 and the pod's GPU prefix hit fell to about 0 for the rest of the run. 300 s
+# releases them earlier and spread out. evictionTtlSeconds (3600 s) must stay above
+# it; flow control TTL 0 and the 2400 s envoy timeout are unchanged.
+apiVersion: llm-d.ai/v1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- type: agent-identity
+  parameters:
+    additionalSessionHeaders:
+    - x-session-id
+- type: thunder-agent
+  name: thunder
+  parameters:
+    capacityTokens: 2237040
+    utilThreshold: 1.0
+    idleLeaseSeconds: 30
+    headWaitStarvationMs: 300000
+    evictionTtlSeconds: 3600
+- type: max-score-picker
+- type: single-profile-handler
+flowControl:
+  defaultRequestTTL: "0s"
+  saturationDetector:
+    pluginRef: thunder
+  defaultPriorityBand:
+    fairnessPolicyRef: thunder
+schedulingProfiles:
+- name: default
+  plugins:
+  - pluginRef: thunder
+  - pluginRef: max-score-picker

@@ -63,14 +63,12 @@ data:
       - pluginRef: session-affinity-scorer
         weight: 1
   thunder-plugins.yaml: |
-    # thunder-agent gate as in PR3 (llm-d/llm-d-router#3076, image
-    # llm-d-router-endpoint-picker:thunder-agent-pr3-a025437b). Same pipeline as
-    # deploy/config/thunderagent-config.yaml in that branch, with capacityTokens set
-    # to this pool's real KV size (the fallback when cache_config_info is absent).
-    # Timeouts: the 1800 s backstop needs defaultRequestTTL 0 (no queue eviction),
-    # envoy ext_proc message_timeout above 1800 s (2400 s in the lane values), and a
-    # client that waits longer than that. PR3's own default backstop is 30 s, below
-    # the 60 s default TTL; if you use it, drop defaultRequestTTL and say so.
+    # thunder-agent gate as in thunder-pr3-plugins.yaml with the forced admission
+    # (headWaitStarvationMs) cut from 1800 s to 300 s (step 24, 400 GiB CPU offload).
+    # With 1800 s, sessions held since the start were forced in together around minute
+    # 30 and the pod's GPU prefix hit fell to about 0 for the rest of the run. 300 s
+    # releases them earlier and spread out. evictionTtlSeconds (3600 s) must stay above
+    # it; flow control TTL 0 and the 2400 s envoy timeout are unchanged.
     apiVersion: llm-d.ai/v1
     kind: EndpointPickerConfig
     featureGates:
@@ -86,7 +84,7 @@ data:
         capacityTokens: 2237040
         utilThreshold: 1.0
         idleLeaseSeconds: 30
-        headWaitStarvationMs: 1800000
+        headWaitStarvationMs: 300000
         evictionTtlSeconds: 3600
     - type: max-score-picker
     - type: single-profile-handler
@@ -456,7 +454,7 @@ spec:
         llm-d-router-standalone: agentx-epp-a-epp
         llm-d.ai/igw-mode: llm-d-router-standalone
       annotations:
-        checksum/config: cee0c6bceabc295e6af3e7eea4e3e59b9c850cb687f1c2b6bada8f77b1552712
+        checksum/config: 24906f6f58ee6d9b327b3c5e2d661b58750c894ffaa1fb9246c8ff3a49e3c571
     spec:
 
       serviceAccountName: agentx-epp-a-epp
@@ -515,7 +513,7 @@ spec:
               name: config
               readOnly: true
         - name: epp
-          image: us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker:thunder-agent-pr3-a025437b-produces
+          image: us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker:thunder-agent-pr3-a025437b-forced-7ae26276
           imagePullPolicy: IfNotPresent
           args:
               - --endpoint-selector

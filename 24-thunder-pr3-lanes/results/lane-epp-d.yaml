@@ -63,14 +63,12 @@ data:
       - pluginRef: session-affinity-scorer
         weight: 1
   thunder-plugins.yaml: |
-    # thunder-agent gate as in PR3 (llm-d/llm-d-router#3076, image
-    # llm-d-router-endpoint-picker:thunder-agent-pr3-a025437b). Same pipeline as
-    # deploy/config/thunderagent-config.yaml in that branch, with capacityTokens set
-    # to this pool's real KV size (the fallback when cache_config_info is absent).
-    # Timeouts: the 1800 s backstop needs defaultRequestTTL 0 (no queue eviction),
-    # envoy ext_proc message_timeout above 1800 s (2400 s in the lane values), and a
-    # client that waits longer than that. PR3's own default backstop is 30 s, below
-    # the 60 s default TTL; if you use it, drop defaultRequestTTL and say so.
+    # thunder-agent gate as in thunder-pr3-plugins.yaml with the idle lease cut from
+    # 30 s to 10 s (step 24, 400 GiB CPU offload): a session idle 10 s after its last
+    # response can be paused for another session; with offloading its prefix is likely
+    # still in the CPU tier when it returns. The AgentX trace's gaps between turns:
+    # median about 1.7 s, p90 9 to 19 s, 7 to 9 percent over 30 s. Everything else,
+    # including the 1800 s forced admission, is unchanged.
     apiVersion: llm-d.ai/v1
     kind: EndpointPickerConfig
     featureGates:
@@ -85,7 +83,7 @@ data:
       parameters:
         capacityTokens: 2237040
         utilThreshold: 1.0
-        idleLeaseSeconds: 30
+        idleLeaseSeconds: 10
         headWaitStarvationMs: 1800000
         evictionTtlSeconds: 3600
     - type: max-score-picker
@@ -456,7 +454,7 @@ spec:
         llm-d-router-standalone: agentx-epp-d-epp
         llm-d.ai/igw-mode: llm-d-router-standalone
       annotations:
-        checksum/config: 57b6c870dfc83296b3684f0b86a3e84a2e6091eddd4be26446397c0bfa0a24af
+        checksum/config: 1b7596bff75b1749b8e56ac5ad3b514f44f38fba920313593d6122b7528f7018
     spec:
 
       serviceAccountName: agentx-epp-d-epp

@@ -264,17 +264,22 @@ def load_epp(path: Path) -> pd.DataFrame:
     Only the metrics in EPP_KEEP are kept: a snapshot can have 200k series, mostly
     llm_d_epp_request_* histogram buckets per model name, which this report does not use."""
     rows, ts, url = [], None, None
-    with gzip.open(path, "rt") as f:
-        for line in f:
-            if line.startswith("# ts="):
-                head = dict(kv.split("=", 1) for kv in line[2:].split())
-                ts, url = float(head["ts"]), head.get("url", "")
-                continue
-            if line.startswith("#") or ts is None or not line.startswith(EPP_KEEP):
-                continue
-            m = SAMPLE.match(line)
-            if m:
-                rows.append((ts, url, m.group(1), m.group(2) or "", float(m.group(3))))
+    try:
+        with gzip.open(path, "rt") as f:
+            for line in f:
+                if line.startswith("# ts="):
+                    head = dict(kv.split("=", 1) for kv in line[2:].split())
+                    ts, url = float(head["ts"]), head.get("url", "")
+                    continue
+                if line.startswith("#") or ts is None or not line.startswith(EPP_KEEP):
+                    continue
+                m = SAMPLE.match(line)
+                if m:
+                    rows.append((ts, url, m.group(1), m.group(2) or "", float(m.group(3))))
+    except EOFError:
+        # A copy cut short (run-point.sh warns "did not copy completely") ends mid-stream;
+        # keep the snapshots read so far instead of failing the whole report.
+        print(f"WARNING: {path} is truncated; using the snapshots before the cut")
     return pd.DataFrame(rows, columns=["ts", "url", "metric", "labels", "value"])
 
 
