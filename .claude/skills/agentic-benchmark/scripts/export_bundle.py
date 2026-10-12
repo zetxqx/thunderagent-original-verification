@@ -256,7 +256,20 @@ def point_config(point: Path) -> dict:
     return cfg
 
 
-def export_point(point: Path, slo: float, skip_minutes: float, replicate_suffix: str) -> dict:
+def cpu_tier_tokens(config: dict, kv_bytes_per_token: int | None) -> int | None:
+    """Tokens the CPU offload tier holds: --kv-offloading-size (GiB, summed over TP ranks)
+    over the KV bytes per token. vLLM's offloading connector copies every computed block to
+    CPU, so this is also about the most KV a pod can keep (not GPU plus CPU)."""
+    size = (config.get("model_server", {}).get("kv_cache") or {}).get("kv_offloading_size")
+    try:
+        gib = float(size)
+    except (TypeError, ValueError):
+        return None
+    return int(gib * 2**30 / kv_bytes_per_token) if kv_bytes_per_token and gib > 0 else None
+
+
+def export_point(point: Path, slo: float, skip_minutes: float, replicate_suffix: str,
+                 kv_bytes_per_token: int | None = None) -> dict:
     row = a23.analyze_point(point, point, None, slo, skip_minutes)
     checks = a23.checks(pd.Series(row))
     d = pf.load(point)
@@ -286,6 +299,7 @@ def export_point(point: Path, slo: float, skip_minutes: float, replicate_suffix:
     m = re.search(replicate_suffix, label)
     arm = re.sub(replicate_suffix, "", label)
     summary = {k: (num(v, 6) if not isinstance(v, str) else v) for k, v in row.items()}
+    config = point_config(point)
     return {
         "id": f"{label}/c{row['conc']}",
         "arm": arm,
@@ -293,9 +307,10 @@ def export_point(point: Path, slo: float, skip_minutes: float, replicate_suffix:
         "replicate": int(re.sub(r"\D", "", m.group(0))) if m and re.sub(r"\D", "", m.group(0)) else None,
         "duration_min": num(d["duration"] / 60),
         "kv_pool_tokens": d["pool"],
+        "cpu_tier_tokens": cpu_tier_tokens(config, kv_bytes_per_token),
         "summary": summary,
         "checks": checks,
-        "config": point_config(point),
+        "config": config,
         "series": {k: v for k, v in series.items() if v},
         "dists": {"whole": whole, "steady": steady},
         "slo_curve": {"whole": slo_whole, "steady": slo_steady},
@@ -321,6 +336,10 @@ def main() -> None:
     ap.add_argument("--ttft-slo", type=float, default=60.0)
     ap.add_argument("--skip-minutes", type=float, default=5.0, help="steady state start, as in analyze.py")
     ap.add_argument("--replicate-suffix", default=r"-r\d+$", help="regex stripped from labels to group replicates")
+    ap.add_argument("--kv-bytes-per-token", type=int, default=None,
+                    help="KV cache bytes per token over all TP ranks, for the CPU tier size of offload points; "
+                         "layers x 2 (K, V) x KV heads x head dim x dtype bytes, e.g. 49152 for "
+                         "Qwen3-Coder-30B-A3B with an FP8 KV cache (48 x 2 x 4 x 128 x 1)")
     args = ap.parse_args()
 
     names = dict(n.split("=", 1) for n in args.name)
@@ -330,7 +349,7 @@ def main() -> None:
             print(f"skip {p}: no profile_export_aiperf.json")
             continue
         print(f"exporting {p}", flush=True)
-        points.append(export_point(p, args.ttft_slo, args.skip_minutes, args.replicate_suffix))
+        points.append(export_point(p, args.ttft_slo, args.skip_minutes, args.replicate_suffix, args.kv_bytes_per_token))
     if not points:
         raise SystemExit("no exportable points")
 
@@ -344,7 +363,8 @@ def main() -> None:
         "title": args.title,
         "description": args.description,
         "created_utc": created,
-        "settings": {"ttft_slo_s": args.ttft_slo, "skip_minutes": args.skip_minutes},
+        "settings": {"ttft_slo_s": args.ttft_slo, "skip_minutes": args.skip_minutes,
+                     "kv_bytes_per_token": args.kv_bytes_per_token},
         "arms": [{"id": a, "name": names.get(a, a), "baseline": a == args.baseline} for a in arm_ids],
         "points": sorted(points, key=lambda p: (arm_ids.index(p["arm"]), p["conc"], p["replicate"] or 0)),
     }

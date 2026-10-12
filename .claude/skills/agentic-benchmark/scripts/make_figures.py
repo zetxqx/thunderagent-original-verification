@@ -5,13 +5,16 @@
 """Across-arm report figures and baseline ratios from one or more analyze.py summary.csv files.
 
 Usage: uv run make_figures.py --out DIR [--baseline LABEL] [--name LABEL=TEXT ...] [--window steady|whole]
-                              SUMMARY_CSV [...]
+                              [--frontier] SUMMARY_CSV [...]
 
 Labels that differ only by a replicate suffix (default "-r<N>", see
 --replicate-suffix) are one arm: figures show the mean with min-max bars.
 --window steady (default) uses the ss_* columns (requests started after
 analyze.py's --skip-minutes), like the sweep figures; --window whole uses the
 whole profiling window (AgentX's definition, to compare with InferenceX).
+--frontier draws only each arm's Pareto frontier as a line in fig1: points
+another point of the same arm and percentile beats on both axes stay as faint
+unlabeled markers.
 Figures whose columns are missing are skipped. Writes fig1..fig5 as png and
 ratios.md (each arm against --baseline at the same concurrency).
 See ../references/figures.md for what each figure is for and the style rules.
@@ -113,7 +116,15 @@ def arm_legend(fig, arms: Arms) -> None:
                    loc="lower center", ncol=len(arms.order), bbox_to_anchor=(0.5, -0.08))
 
 
-def fig_pareto(df, arms, out):
+def pareto_frontier(g: pd.DataFrame, x_higher_better: bool) -> pd.DataFrame:
+    """Points of g (mean_x, mean_y) that no other point beats on both axes, sorted by x."""
+    sx = 1 if x_higher_better else -1
+    keep = [not ((sx * g["mean_x"] >= sx * r.mean_x) & (g["mean_y"] >= r.mean_y)
+                 & ((g["mean_x"] != r.mean_x) | (g["mean_y"] != r.mean_y))).any() for r in g.itertuples()]
+    return g[keep].sort_values("mean_x")
+
+
+def fig_pareto(df, arms, out, frontier=False):
     charts = [("intvty", "total_tput_per_gpu", "interactivity (tok/s/user)", "Total tok/s/GPU"),
               ("intvty", "output_tput_per_gpu", "interactivity (tok/s/user)", "Output tok/s/GPU"),
               ("ttft_s", "input_tput_per_gpu", "TTFT (s)", "Input tok/s/GPU"),
@@ -129,9 +140,14 @@ def fig_pareto(df, arms, out):
             if not has(df, pct):
                 continue
             m = agg(df, pct).merge(my, on=["arm", "conc"], suffixes=("_x", "_y"))
-            xs += list(m["mean_x"])
             for arm in arms.order:
                 g = m[m["arm"] == arm].sort_values("conc")
+                xs += list(g["mean_x"])
+                if frontier:  # dominated points stay as faint unlabeled markers
+                    full, g = g, pareto_frontier(g, x_higher_better="ttft" not in x)
+                    rest = full[~full["conc"].isin(g["conc"])]
+                    ax.plot(rest["mean_x"], rest["mean_y"], ls="none", marker="o", ms=5, alpha=0.3,
+                            color=arms.color[arm], mfc=kind.get("markerfacecolor", arms.color[arm]))
                 ax.plot(g["mean_x"], g["mean_y"], ls=kind["fmt"], marker="o", ms=6, mew=1.6, lw=2,
                         color=arms.color[arm], mfc=kind.get("markerfacecolor", arms.color[arm]))
                 if kind is SOLID:
@@ -296,12 +312,14 @@ def main() -> None:
     ap.add_argument("--replicate-suffix", default=r"-r\d+$", help="regex stripped from labels to group replicates")
     ap.add_argument("--window", choices=["steady", "whole"], default="steady",
                     help="steady: ss_* columns (default, like the sweep figures); whole: AgentX whole window")
+    ap.add_argument("--frontier", action="store_true", help="fig1: draw only each arm's Pareto frontier")
     args = ap.parse_args()
     df = load(args.summaries, args.replicate_suffix, args.window)
     names = dict(n.split("=", 1) for n in args.name)
     arms = Arms(sorted(df["arm"].unique()), args.baseline, names)
     apply_publication_style()
-    for f in (fig_pareto, fig_load, fig_cache, fig_engine, fig_gate):
+    fig_pareto(df, arms, args.out, frontier=args.frontier)
+    for f in (fig_load, fig_cache, fig_engine, fig_gate):
         f(df, arms, args.out)
     if args.baseline:
         ratios(df, arms, args.baseline, args.out, args.window)

@@ -189,8 +189,30 @@ function metricValue(p, m, pct, win) {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
+// The TTFT SLO of the loaded bundles, settings.ttft_slo_s (they normally share one).
+function sloSeconds() {
+  const v = state.bundles.map(b => b.data.settings?.ttft_slo_s).find(x => typeof x === 'number');
+  return v ?? null;
+}
+
+function labelText(label) {
+  const slo = sloSeconds();
+  return label.replace('{slo}', slo === null ? '?' : String(slo));
+}
+
 function metricLabel(m, pct) {
-  return m.pct ? `${m.label}, ${pct}` : m.label;
+  return m.pct ? `${labelText(m.label)}, ${pct}` : labelText(m.label);
+}
+
+// CPU offload tier over the GPU KV pool, one value per distinct ratio among the visible points.
+function tierRatios() {
+  const r = new Set();
+  for (const a of visibleArms()) {
+    for (const p of pointsOf(a)) {
+      if (p.p.cpu_tier_tokens && p.p.kv_pool_tokens) r.add(Math.round((100 * p.p.cpu_tier_tokens) / p.p.kv_pool_tokens) / 100);
+    }
+  }
+  return [...r];
 }
 
 // Mean, min and max over replicates, per concurrency.
@@ -258,6 +280,16 @@ const hline = (y, color = '#888', dash = 'dot') => ({
 const vline = (x, color = '#999', dash = 'dot') => ({
   type: 'line', yref: 'paper', y0: 0, y1: 1, x0: x, x1: x, line: { color, width: 1.2, dash },
 });
+const SLO_COLOR = '#B64342', POOL_COLOR = '#B64342', TIER_COLOR = '#2E7D32';
+// Labels for reference lines. Plotly places annotations on a log axis by log10 of the value.
+const hnote = (y, text, color, o = {}) => ({
+  xref: o.xref || 'paper', x: 1, xanchor: 'right', yref: o.yref || 'y', y: o.log ? Math.log10(y) : y, yanchor: 'bottom',
+  text, showarrow: false, font: { size: 11, color }, bgcolor: 'rgba(255,255,255,0.8)',
+});
+const vnote = (x, text, color, o = {}) => ({
+  xref: o.xref || 'x', x: o.log ? Math.log10(x) : x, xanchor: 'left', yref: 'paper', y: 1, yanchor: 'top',
+  text: ' ' + text, showarrow: false, font: { size: 11, color }, bgcolor: 'rgba(255,255,255,0.8)',
+});
 
 function draw(div, traces, lay) {
   Plotly.react(div, traces, lay, PLOT_CONFIG);
@@ -270,7 +302,7 @@ function metricSelect(value, catalog, otherKeys, onChange) {
   const groups = [...new Set(catalog.map(m => m.group))];
   for (const g of groups) {
     const og = el('optgroup', { label: g });
-    for (const m of catalog.filter(m => m.group === g)) og.append(el('option', { value: m.key, text: m.label, selected: m.key === value }));
+    for (const m of catalog.filter(m => m.group === g)) og.append(el('option', { value: m.key, text: labelText(m.label), selected: m.key === value }));
     sel.append(og);
   }
   if (otherKeys && otherKeys.length) {
@@ -368,9 +400,25 @@ function concCard(list, card) {
     }
     const log = card.log ?? m.log;
     const yTitle = metricLabel(m, pct) + (card.ratio ? ' / baseline' : '');
+    const shapes = [], annotations = [];
+    const slo = sloSeconds();
+    if (card.ratio) shapes.push(hline(1, '#B64342', 'dash'));
+    if (m.sloLine && slo && !card.ratio) {
+      shapes.push(hline(slo, SLO_COLOR, 'dash'));
+      annotations.push(hnote(slo, `TTFT SLO ${slo} s`, SLO_COLOR, { log }));
+      allY.push(slo);
+    }
+    if (m.tierLine && !card.ratio) {
+      shapes.push(hline(1, POOL_COLOR, 'dot'));
+      annotations.push(hnote(1, 'GPU KV pool', POOL_COLOR, { log }));
+      for (const r of tierRatios()) {
+        shapes.push(hline(r, TIER_COLOR, 'dash'));
+        annotations.push(hnote(r, `CPU offload tier (${r}x GPU KV, offload arms)`, TIER_COLOR, { log }));
+      }
+    }
     draw(shell.plotDiv, traces, layout('concurrency', yTitle, {
       legend: state.ui.legend, x: concAxis(concs), y: log ? logAxis(card.ratio ? [] : allY) : { rangemode: 'tozero' },
-      shapes: card.ratio ? [hline(1, '#B64342', 'dash')] : [],
+      shapes, annotations,
     }));
     const notes = [];
     if (m.better) notes.push(`${m.better} is better`);
@@ -415,8 +463,12 @@ function paretoCard(list, card) {
       });
     }
     const logx = card.logx ?? xm.log;
+    const slo = sloSeconds();
+    const withSlo = xm.sloLine && slo;
     draw(shell.plotDiv, traces, layout(metricLabel(xm, xpct), metricLabel(ym, ypct), {
-      legend: state.ui.legend, x: logx ? logAxis(allX) : { rangemode: 'tozero' }, y: { rangemode: 'tozero' },
+      legend: state.ui.legend, x: logx ? logAxis(withSlo ? [...allX, slo] : allX) : { rangemode: 'tozero' }, y: { rangemode: 'tozero' },
+      shapes: withSlo ? [vline(slo, SLO_COLOR, 'dash')] : [],
+      annotations: withSlo ? [vnote(slo, `TTFT SLO ${slo} s`, SLO_COLOR, { log: logx })] : [],
     }));
     const notes = ['one line per arm, points ordered by concurrency (hover for c)'];
     if (xm.better && ym.better) notes.push(`better: ${xm.better} x, ${ym.better} y`);
@@ -515,16 +567,21 @@ function cacheCard(list, card) {
     const lay = layout('concurrency', '% of prompt tokens', { legend: true, x: { ...src.x, domain: [0, 0.6] }, y: { range: [0, 103] } });
     lay.xaxis2 = axis('concurrency', { ...concAxis(concs), domain: [0.7, 1], anchor: 'y2' });
     lay.yaxis2 = axis('working set / GPU KV pool', { anchor: 'x2', rangemode: 'tozero' });
-    lay.shapes = [{ type: 'line', xref: 'x2 domain', x0: 0, x1: 1, yref: 'y2', y0: 1, y1: 1, line: { color: '#B64342', width: 1.5, dash: 'dot' } }];
+    lay.shapes = [{ type: 'line', xref: 'x2 domain', x0: 0, x1: 1, yref: 'y2', y0: 1, y1: 1, line: { color: POOL_COLOR, width: 1.5, dash: 'dot' } }];
     lay.annotations = [
       { text: '<b>(a) Prompt token source (%)</b>', xref: 'paper', yref: 'paper', x: 0, y: 1, xanchor: 'left', yanchor: 'bottom', showarrow: false },
       { text: '<b>(b) Working set / GPU KV pool</b>', xref: 'paper', yref: 'paper', x: 0.7, y: 1, xanchor: 'left', yanchor: 'bottom', showarrow: false },
+      hnote(1, 'GPU KV pool', POOL_COLOR, { xref: 'x2 domain', yref: 'y2' }),
     ];
+    for (const r of tierRatios()) {
+      lay.shapes.push({ type: 'line', xref: 'x2 domain', x0: 0, x1: 1, yref: 'y2', y0: r, y1: r, line: { color: TIER_COLOR, width: 1.5, dash: 'dash' } });
+      lay.annotations.push(hnote(r, `CPU offload tier (${r}x)`, TIER_COLOR, { xref: 'x2 domain', yref: 'y2' }));
+    }
     lay.margin.t = 62;
     lay.legend = { orientation: 'h', x: 0, y: 1.1, yanchor: 'bottom', font: { size: 11 } };
     draw(shell.plotDiv, traces, lay);
     const win = state.ui.window === 'steady' ? 'token source: steady state; ' : '';
-    shell.note.textContent = `one bar or line per arm, in sidebar order and color; ${win}working set: whole run; dotted red: the working set equals the GPU KV pool`;
+    shell.note.textContent = `one bar or line per arm, in sidebar order and color; ${win}working set: whole run; dotted red: GPU KV pool; dashed green: CPU offload tier of the offload arms (it holds a copy of the GPU KV, so it is the most a pod keeps)`;
   };
   return shell;
 }
@@ -624,7 +681,8 @@ function tsCard(list, card) {
     const sel = selectedPoints();
     const traces = [], shapes = [], missing = [], allY = [];
     const scale = m.scale || 1;
-    const refs = new Set();
+    const refs = new Map((m.refs || []).map(([key, label]) => [key, { label, values: new Set() }]));
+    const slo = sloSeconds();
     for (const p of sel) {
       const s = (p.p.series || {})[m.key];
       if (!s) { missing.push(pointName(p)); continue; }
@@ -635,17 +693,33 @@ function tsCard(list, card) {
         line: { color: st.color, width: 2.2, dash: st.dash },
         hovertemplate: `<b>${esc(st.name)}</b><br>minute %{x:.1f}<br>%{y:.4~g}<extra></extra>`,
       });
-      if (m.ref && p.p[m.ref]) refs.add(p.p[m.ref] * scale);
+      for (const [key, ref] of refs) if (p.p[key]) ref.values.add(p.p[key] * scale);
     }
-    for (const r of refs) shapes.push(hline(r, '#B64342', 'dash'));
+    const log = card.log ?? m.log;
+    const annotations = [];
+    for (const [key, ref] of refs) {
+      const color = key === 'cpu_tier_tokens' ? TIER_COLOR : POOL_COLOR;
+      for (const v of ref.values) {
+        shapes.push(hline(v, color, 'dash'));
+        annotations.push(hnote(v, ref.label, color, { log }));
+        allY.push(v);
+      }
+    }
+    if (m.sloLine && slo) {
+      shapes.push(hline(slo, SLO_COLOR, 'dash'));
+      annotations.push(hnote(slo, `TTFT SLO ${slo} s`, SLO_COLOR, { log }));
+      allY.push(slo);
+    }
     const skip = sel.length ? sel[0].bundle.data.settings?.skip_minutes : null;
     if (skip) shapes.push(vline(skip));
     draw(shell.plotDiv, traces, layout('minutes since the first profiled request', m.label, {
-      legend: true, shapes, y: (card.log ?? m.log) ? logAxis(allY) : { rangemode: 'tozero' },
+      legend: true, shapes, annotations, y: log ? logAxis(allY) : { rangemode: 'tozero' },
     }));
     const notes = [];
     if (skip) notes.push(`dotted line: steady state starts (minute ${skip})`);
-    if (refs.size) notes.push(`dashed red: ${m.refLabel || m.ref}`);
+    if ([...refs.values()].some(r => r.label === 'CPU offload tier' && r.values.size)) {
+      notes.push('the CPU offload tier holds a copy of the GPU KV, so it is the most KV a pod keeps with offload');
+    }
     if (missing.length) notes.push(`not recorded for ${missing.join(', ')}`);
     if (!sel.length) notes.push('pick points above');
     shell.note.textContent = notes.join(' · ');
@@ -676,9 +750,13 @@ function distCard(list, card) {
         hovertemplate: `<b>${esc(st.name)}</b><br>p%{y:.1f}: %{x:.4~g}<extra></extra>`,
       });
     }
-    draw(shell.plotDiv, traces, layout(m.label + ((card.log ?? m.log) ? ' (log scale)' : ''), '% at or below', {
-      legend: true, x: (card.log ?? m.log) ? logAxis(allX) : {}, y: { range: [0, 101] },
-      shapes: [hline(50, '#ccc'), hline(90, '#ccc')],
+    const logx = card.log ?? m.log;
+    const slo = sloSeconds();
+    const withSlo = m.sloLine && slo;
+    draw(shell.plotDiv, traces, layout(m.label + (logx ? ' (log scale)' : ''), '% at or below', {
+      legend: true, x: logx ? logAxis(withSlo ? [...allX, slo] : allX) : {}, y: { range: [0, 101] },
+      shapes: [hline(50, '#ccc'), hline(90, '#ccc'), ...(withSlo ? [vline(slo, SLO_COLOR, 'dash')] : [])],
+      annotations: withSlo ? [vnote(slo, `TTFT SLO ${slo} s`, SLO_COLOR, { log: logx })] : [],
     }));
     shell.note.textContent = `${win === 'steady' ? 'steady state' : 'whole run'}; gray lines at p50 and p90`;
   };
@@ -709,7 +787,8 @@ function sloCard(list, card) {
     }
     const slo = sel.length ? sel[0].bundle.data.settings?.ttft_slo_s : null;
     draw(shell.plotDiv, traces, layout('TTFT target (s, log scale)', measure === 'turns' ? '% of turns' : '% of output tokens', {
-      legend: true, x: logAxis([0.1, 3600]), y: { range: [0, 101] }, shapes: slo ? [vline(slo, '#B64342', 'dash')] : [],
+      legend: true, x: logAxis([0.1, 3600]), y: { range: [0, 101] }, shapes: slo ? [vline(slo, SLO_COLOR, 'dash')] : [],
+      annotations: slo ? [vnote(slo, `TTFT SLO ${slo} s`, SLO_COLOR, { log: true })] : [],
     }));
     shell.note.textContent = `${win === 'steady' ? 'steady state' : 'whole run'}${slo ? `; dashed red: the report SLO (${slo} s)` : ''}; errors and requests without a first token at the end count as misses`;
   };

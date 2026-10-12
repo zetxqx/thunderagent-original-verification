@@ -14,6 +14,7 @@ Only `schema`, `title`, `arms` and `points[].{id, arm, conc, summary}` are requi
 | `created_utc` | string | ISO 8601 time of the export |
 | `settings.ttft_slo_s` | number | TTFT SLO of the summary's goodput and SLO columns, drawn on the SLO chart |
 | `settings.skip_minutes` | number | steady state starts this many minutes into profiling; `ss_*` columns use it, time series mark it |
+| `settings.kv_bytes_per_token` | int or null | KV cache bytes per token over all TP ranks, used for `cpu_tier_tokens` (layers x 2 x KV heads x head dim x dtype bytes) |
 | `arms` | array | one object per arm, in display order |
 | `points` | array | one object per point |
 
@@ -35,6 +36,7 @@ Only `schema`, `title`, `arms` and `points[].{id, arm, conc, summary}` are requi
 | `replicate` | int or null | replicate number; replicates of one arm and concurrency are shown as mean with min-max bars |
 | `duration_min` | number | profiling window length |
 | `kv_pool_tokens` | int | GPU KV pool of the point's vLLM pods (reference line on token charts) |
+| `cpu_tier_tokens` | int or null | CPU offload tier in tokens (`--kv-offloading-size` / `kv_bytes_per_token`), null without offload. vLLM's offloading connector copies every computed block to CPU, so this is about the most KV a pod keeps, not GPU plus CPU |
 | `summary` | object | flat map of columns, see below |
 | `checks` | string[] | validity warnings (analyze.py `checks()`) |
 | `config` | object | how the point was run, see below |

@@ -60,7 +60,7 @@ Labels that differ only by `-r<N>` are replicates of one arm: the figures show t
 
 | File | Panels | Claim it supports |
 |---|---|---|
-| `fig1-pareto` | (a) total tok/s/GPU vs interactivity (b) output tok/s/GPU vs interactivity (c) input tok/s/GPU vs TTFT (log) (d) total tok/s/GPU vs E2E normalized interactivity; P90 solid, P50 dashed | Throughput at equal user experience. Compare at the same interactivity, not peak against peak |
+| `fig1-pareto` | (a) total tok/s/GPU vs interactivity (b) output tok/s/GPU vs interactivity (c) input tok/s/GPU vs TTFT (log) (d) total tok/s/GPU vs E2E normalized interactivity; P90 solid, P50 dashed; with `--frontier` the lines connect only each arm's Pareto frontier and dominated points are faint markers | Throughput at equal user experience. Compare at the same interactivity, not peak against peak |
 | `fig2-load` | (a) output tok/s/GPU (solid) and goodput per GPU (dashed) (b) TTFT p90 and p50, log scale (c) turns with TTFT <= SLO (%), all vs concurrency | Where each arm saturates, and what users pay for it |
 | `fig3-cache` | (a) prompt token source per arm and concurrency: GPU hit, CPU tier hit (only when non-zero), computed, with the theoretical max (b) working set / KV pool, mean and max, vs concurrency | Why: reuse kept or lost, and whether the working set fits |
 | `fig4-engine` | (a) ms per output token (b) prompt tokens computed (%) (c) wait in the vLLM queue (s) (d) vLLM waiting requests, all vs concurrency | Mechanism in plain terms: prefill work slows every user's output and fills the queue (B, T and the step fit stay in `summary.csv`) |

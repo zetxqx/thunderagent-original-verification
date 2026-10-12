@@ -10,6 +10,10 @@
 //           summary, get(key) reads a column in the selected window
 //   whole   the column covers the whole run even in the steady window
 //   note    shown under the chart
+//   sloLine draw the bundle's TTFT SLO (settings.ttft_slo_s) on the chart
+//   tierLine (working set / GPU KV pool) also draw the CPU offload tier, cpu_tier_tokens /
+//           kv_pool_tokens, for arms whose points have one
+// "{slo}" in a label is replaced by the bundle's TTFT SLO in seconds.
 
 const PCTS = ['p50', 'p75', 'p90', 'p95', 'mean'];
 
@@ -17,28 +21,28 @@ const SUMMARY_METRICS = [
   { group: 'Throughput', key: 'output_tput_per_gpu', label: 'Output tok/s per GPU', better: 'higher' },
   { group: 'Throughput', key: 'total_tput_per_gpu', label: 'Total (input + output) tok/s per GPU', better: 'higher' },
   { group: 'Throughput', key: 'input_tput_per_gpu', label: 'Input tok/s per GPU', better: 'higher' },
-  { group: 'Throughput', key: 'goodput_per_gpu', label: 'Goodput tok/s per GPU (turns within the TTFT SLO)', better: 'higher',
+  { group: 'Throughput', key: 'goodput_per_gpu', label: 'Goodput tok/s per GPU (turns with TTFT <= {slo} s)', better: 'higher',
     derive: (s, get) => get('goodput_output_tput') / s.num_gpus },
   { group: 'Throughput', key: 'completed', label: 'Completed requests', better: 'higher' },
 
-  { group: 'Latency', key: 'ttft_s', pct: true, label: 'TTFT (s)', better: 'lower', log: true },
+  { group: 'Latency', key: 'ttft_s', pct: true, label: 'TTFT (s)', better: 'lower', log: true, sloLine: true },
   { group: 'Latency', key: 'intvty', pct: true, label: 'Interactivity (tok/s per user)', better: 'higher',
     note: 'p90 is the slowest 10% of requests (AgentX convention).' },
   { group: 'Latency', key: 'e2el_s', pct: true, label: 'Request latency (s)', better: 'lower', log: true },
   { group: 'Latency', key: 'e2e_norm_intvty', pct: true, label: 'E2E normalized interactivity', better: 'higher' },
-  { group: 'Latency', key: 'turn_slo_share_pct', label: 'Turns within the TTFT SLO (%)', better: 'higher',
+  { group: 'Latency', key: 'turn_slo_share_pct', label: 'Turns with TTFT <= {slo} s (%)', better: 'higher',
     note: 'Errors and requests without a first token at the end (gate or vLLM queue) count as misses.' },
-  { group: 'Latency', key: 'session_worst_ttft_p90_s', label: 'Worst TTFT per session, p90 (s)', better: 'lower', log: true, whole: true },
-  { group: 'Latency', key: 'sessions_worst_ttft_over_slo_pct', label: 'Sessions with a turn over the SLO (%)', better: 'lower', whole: true },
+  { group: 'Latency', key: 'session_worst_ttft_p90_s', label: 'Worst TTFT per session, p90 (s)', better: 'lower', log: true, whole: true, sloLine: true },
+  { group: 'Latency', key: 'sessions_worst_ttft_over_slo_pct', label: 'Sessions with a turn over {slo} s TTFT (%)', better: 'lower', whole: true },
 
   { group: 'Cache', key: 'overall_hit_pct', label: 'Prefix hit rate, GPU + CPU tier (%)', better: 'higher' },
   { group: 'Cache', key: 'gpu_hit_pct', label: 'GPU prefix hit (%)', better: 'higher' },
   { group: 'Cache', key: 'cpu_hit_pct', label: 'CPU tier hit (%)', better: 'higher' },
   { group: 'Cache', key: 'recompute_pct', label: 'Prompt tokens computed (%)', better: 'lower' },
   { group: 'Cache', key: 'theoretical_hit_pct', label: 'Theoretical max hit (%)', whole: true },
-  { group: 'Cache', key: 'working_set_over_pool_mean', label: 'Working set / GPU KV pool, mean', whole: true,
-    note: 'Above 1 the sessions do not fit in GPU KV.' },
-  { group: 'Cache', key: 'working_set_over_pool_max', label: 'Working set / GPU KV pool, max', whole: true },
+  { group: 'Cache', key: 'working_set_over_pool_mean', label: 'Working set / GPU KV pool, mean', whole: true, tierLine: true,
+    note: 'Above 1 the sessions do not fit in GPU KV; above the CPU tier line they do not fit with offload either.' },
+  { group: 'Cache', key: 'working_set_over_pool_max', label: 'Working set / GPU KV pool, max', whole: true, tierLine: true },
   { group: 'Cache', key: 'kv_usage_avg_pct', label: 'vLLM KV usage, mean (%)' },
   { group: 'Cache', key: 'preemptions', label: 'vLLM preemptions', better: 'lower', whole: true },
 
@@ -83,22 +87,22 @@ const SERIES_METRICS = [
   { group: 'Throughput', key: 'output_tps', label: 'Server output tok/s' },
   { group: 'Throughput', key: 'input_tps', label: 'Server input tok/s' },
   { group: 'Throughput', key: 'prefill_computed_tps', label: 'Prompt tokens computed per s' },
-  { group: 'Latency', key: 'ttft_p50_s', label: 'TTFT p50 per minute (s)', log: true },
-  { group: 'Latency', key: 'ttft_p90_s', label: 'TTFT p90 per minute (s)', log: true },
+  { group: 'Latency', key: 'ttft_p50_s', label: 'TTFT p50 per minute (s)', log: true, sloLine: true },
+  { group: 'Latency', key: 'ttft_p90_s', label: 'TTFT p90 per minute (s)', log: true, sloLine: true },
   { group: 'Latency', key: 'intvty_p50', label: 'tok/s per user, p50 per minute' },
   { group: 'Latency', key: 'intvty_p90', label: 'tok/s per user, p90 (slowest 10%) per minute' },
   { group: 'Latency', key: 'vllm_queue_time_s', label: 'Wait in the vLLM queue, mean per minute (s)' },
   { group: 'Latency', key: 'vllm_prefill_time_s', label: 'vLLM prefill time, mean per minute (s)' },
   { group: 'Latency', key: 'ms_per_output_token', label: 'ms per output token (engine step)' },
   { group: 'Cache', key: 'kv_usage_pct', label: 'vLLM KV cache usage (%)' },
-  { group: 'Cache', key: 'working_set_tokens', label: 'Working set (M tokens)', scale: 1e-6, ref: 'kv_pool_tokens', refLabel: 'GPU KV pool' },
-  { group: 'Cache', key: 'inflight_tokens', label: 'In-flight unique tokens (M)', scale: 1e-6, ref: 'kv_pool_tokens', refLabel: 'GPU KV pool' },
+  { group: 'Cache', key: 'working_set_tokens', label: 'Working set (M tokens)', scale: 1e-6, refs: [['kv_pool_tokens', 'GPU KV pool'], ['cpu_tier_tokens', 'CPU offload tier']] },
+  { group: 'Cache', key: 'inflight_tokens', label: 'In-flight unique tokens (M)', scale: 1e-6, refs: [['kv_pool_tokens', 'GPU KV pool'], ['cpu_tier_tokens', 'CPU offload tier']] },
   { group: 'Cache', key: 'src_gpu_hit_pct', label: 'Prompt tokens from GPU cache (%)' },
   { group: 'Cache', key: 'src_cpu_hit_pct', label: 'Prompt tokens from CPU tier (%)' },
   { group: 'Cache', key: 'src_computed_pct', label: 'Prompt tokens computed (%)' },
   { group: 'Router gate', key: 'epp_queue_size', label: 'Router queue (requests)' },
   { group: 'Router gate', key: 'epp_wait_mean_s', label: 'Wait at the router, mean per minute (s)' },
-  { group: 'Router gate', key: 'gate_working_set_tokens', label: 'Gate working set (M tokens)', scale: 1e-6, ref: 'kv_pool_tokens', refLabel: 'GPU KV pool' },
+  { group: 'Router gate', key: 'gate_working_set_tokens', label: 'Gate working set (M tokens)', scale: 1e-6, refs: [['kv_pool_tokens', 'GPU KV pool'], ['cpu_tier_tokens', 'CPU offload tier']] },
   { group: 'Router gate', key: 'gate_delayed_dispatches_per_min', label: 'Gate delayed dispatches per minute' },
   { group: 'Router gate', key: 'gate_pauses_per_min', label: 'Gate pauses per minute' },
   { group: 'Router gate', key: 'gate_resumes_per_min', label: 'Gate resumes per minute' },
@@ -110,8 +114,8 @@ const SERIES_METRICS = [
 
 // Point distributions: quantiles evenly spaced from 0 to 100 (201 values).
 const DIST_METRICS = [
-  { key: 'ttft_s', label: 'TTFT per turn (s)', log: true },
-  { key: 'worst_ttft_s', label: 'Worst TTFT per session (s)', log: true },
+  { key: 'ttft_s', label: 'TTFT per turn (s)', log: true, sloLine: true },
+  { key: 'worst_ttft_s', label: 'Worst TTFT per session (s)', log: true, sloLine: true },
   { key: 'intvty', label: 'tok/s per user' },
   { key: 'isl', label: 'Input tokens per request' },
   { key: 'osl', label: 'Output tokens per request', log: true },

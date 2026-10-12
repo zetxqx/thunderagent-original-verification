@@ -1,0 +1,95 @@
+apiVersion: v1
+data:
+  default-plugins.yaml: |
+    apiVersion: llm-d.ai/v1
+    kind: EndpointPickerConfig
+    plugins:
+    - type: queue-scorer
+    - type: kv-cache-utilization-scorer
+    - type: prefix-cache-scorer
+    - type: metrics-data-source
+      parameters:
+        scheme: "http"
+        path: "/metrics"
+        insecureSkipVerify: true
+    - type: core-metrics-extractor
+    schedulingProfiles:
+    - name: default
+      plugins:
+      - pluginRef: queue-scorer
+        weight: 2
+      - pluginRef: kv-cache-utilization-scorer
+        weight: 2
+      - pluginRef: prefix-cache-scorer
+        weight: 3
+  payload-agnostic.yaml: |
+    # Request-format agnostic routing. Use this when the request format is
+    # unknown or unsupported, so the EPP cannot rely on scorers that read the
+    # request body (e.g. the prefix-cache scorer). The passthrough parser does
+    # not parse the body, and routing falls back to backend-state scorers:
+    #   - active-request-scorer  : prefers the least busy endpoint
+    #   - session-affinity-scorer: keeps a session pinned to the same endpoint
+    # Select it by setting router.epp.pluginsConfigFile: payload-agnostic.yaml
+    apiVersion: llm-d.ai/v1
+    kind: EndpointPickerConfig
+    plugins:
+    - type: passthrough-parser
+    - type: active-request-scorer
+    - type: session-affinity-scorer
+    requestHandler:
+      parsers:
+      - pluginRef: passthrough-parser
+    schedulingProfiles:
+    - name: default
+      plugins:
+      - pluginRef: active-request-scorer
+        weight: 1
+      - pluginRef: session-affinity-scorer
+        weight: 1
+  thunder-plugins.yaml: |
+    # thunder-agent gate as in thunder-pr3-plugins.yaml with the idle lease cut from
+    # 30 s to 10 s (step 24, 400 GiB CPU offload): a session idle 10 s after its last
+    # response can be paused for another session; with offloading its prefix is likely
+    # still in the CPU tier when it returns. The AgentX trace's gaps between turns:
+    # median about 1.7 s, p90 9 to 19 s, 7 to 9 percent over 30 s. Everything else,
+    # including the 1800 s forced admission, is unchanged.
+    apiVersion: llm-d.ai/v1
+    kind: EndpointPickerConfig
+    featureGates:
+    - flowControl
+    plugins:
+    - type: agent-identity
+      parameters:
+        additionalSessionHeaders:
+        - x-session-id
+    - type: thunder-agent
+      name: thunder
+      parameters:
+        capacityTokens: 2237040
+        utilThreshold: 1.0
+        idleLeaseSeconds: 10
+        headWaitStarvationMs: 1800000
+        evictionTtlSeconds: 3600
+    - type: max-score-picker
+    - type: single-profile-handler
+    flowControl:
+      defaultRequestTTL: "0s"
+      saturationDetector:
+        pluginRef: thunder
+      defaultPriorityBand:
+        fairnessPolicyRef: thunder
+    schedulingProfiles:
+    - name: default
+      plugins:
+      - pluginRef: thunder
+      - pluginRef: max-score-picker
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"default-plugins.yaml":"apiVersion: llm-d.ai/v1\nkind: EndpointPickerConfig\nplugins:\n- type: queue-scorer\n- type: kv-cache-utilization-scorer\n- type: prefix-cache-scorer\n- type: metrics-data-source\n  parameters:\n    scheme: \"http\"\n    path: \"/metrics\"\n    insecureSkipVerify: true\n- type: core-metrics-extractor\nschedulingProfiles:\n- name: default\n  plugins:\n  - pluginRef: queue-scorer\n    weight: 2\n  - pluginRef: kv-cache-utilization-scorer\n    weight: 2\n  - pluginRef: prefix-cache-scorer\n    weight: 3\n","payload-agnostic.yaml":"# Request-format agnostic routing. Use this when the request format is\n# unknown or unsupported, so the EPP cannot rely on scorers that read the\n# request body (e.g. the prefix-cache scorer). The passthrough parser does\n# not parse the body, and routing falls back to backend-state scorers:\n#   - active-request-scorer  : prefers the least busy endpoint\n#   - session-affinity-scorer: keeps a session pinned to the same endpoint\n# Select it by setting router.epp.pluginsConfigFile: payload-agnostic.yaml\napiVersion: llm-d.ai/v1\nkind: EndpointPickerConfig\nplugins:\n- type: passthrough-parser\n- type: active-request-scorer\n- type: session-affinity-scorer\nrequestHandler:\n  parsers:\n  - pluginRef: passthrough-parser\nschedulingProfiles:\n- name: default\n  plugins:\n  - pluginRef: active-request-scorer\n    weight: 1\n  - pluginRef: session-affinity-scorer\n    weight: 1\n","thunder-plugins.yaml":"# thunder-agent gate as in thunder-pr3-plugins.yaml with the idle lease cut from\n# 30 s to 10 s (step 24, 400 GiB CPU offload): a session idle 10 s after its last\n# response can be paused for another session; with offloading its prefix is likely\n# still in the CPU tier when it returns. The AgentX trace's gaps between turns:\n# median about 1.7 s, p90 9 to 19 s, 7 to 9 percent over 30 s. Everything else,\n# including the 1800 s forced admission, is unchanged.\napiVersion: llm-d.ai/v1\nkind: EndpointPickerConfig\nfeatureGates:\n- flowControl\nplugins:\n- type: agent-identity\n  parameters:\n    additionalSessionHeaders:\n    - x-session-id\n- type: thunder-agent\n  name: thunder\n  parameters:\n    capacityTokens: 2237040\n    utilThreshold: 1.0\n    idleLeaseSeconds: 10\n    headWaitStarvationMs: 1800000\n    evictionTtlSeconds: 3600\n- type: max-score-picker\n- type: single-profile-handler\nflowControl:\n  defaultRequestTTL: \"0s\"\n  saturationDetector:\n    pluginRef: thunder\n  defaultPriorityBand:\n    fairnessPolicyRef: thunder\nschedulingProfiles:\n- name: default\n  plugins:\n  - pluginRef: thunder\n  - pluginRef: max-score-picker\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"agentx-epp-b-epp","namespace":"llm-d-program-aware-scheduling"}}
+  creationTimestamp: "2026-10-12T00:52:02Z"
+  name: agentx-epp-b-epp
+  namespace: llm-d-program-aware-scheduling
+  resourceVersion: "1791766322374799008"
+  uid: d554f795-d53f-4090-9e26-3c73110b94fe
