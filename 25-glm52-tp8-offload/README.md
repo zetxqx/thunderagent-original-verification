@@ -37,7 +37,7 @@ Status: done (2026-10-11). Part A: formal runs (fresh server per point, 3600 s),
 | `explore1h-thunder-gpu-l10` | exploration | 3600 s | 12, 16, 20, 24, 32 | thunder, GPU capacity, lease 10 s, backstop 1800 s | `-produces` |
 | `explore-thunder-cputier-aborted` | stopped in warmup | | 24 | capacity 2.27M (stopped on request, no result) | `-produces` |
 
-Dashboard (`python3 -m http.server -d dashboard 8000`): `dashboard/data/step25-glm52-tp8-offload.json` (formal, 9 points) and `dashboard/data/step25-explore.json` (exploration 900 s, 25 points), `dashboard/data/step25-explore1h.json` (exploration 3600 s, 10 points).
+Dashboard (`python3 -m http.server -d dashboard 8000`): `dashboard/data/glm52-nvfp4-8xb200.json`, the one-hour points only (35, built by `dashboard/regroup_by_model.py`; the 900 s exploration points are not on the dashboard).
 
 Benchmark report for the one-hour comparison (B3), no-router vs llm-d-thunder-agent-simplified (lease 10 s) at 12 to 128 sessions: [benchmark-report-1h.md](benchmark-report-1h.md). The 48 to 128 points (2026-10-12) come from `b200/run-1h-highc.sh` and `b200/run-1h-highc-tail.sh`, analyzed in `b200/results/explore1h-highc/report/`.
 

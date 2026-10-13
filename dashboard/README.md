@@ -28,6 +28,10 @@ uv run ../.claude/skills/agentic-benchmark/scripts/export_bundle.py \
 
 It reuses `analyze.py` (same numbers as `summary.csv`) and reads one point at a time. The format is in [SCHEMA.md](SCHEMA.md); other tools can write it too.
 
+## Current bundles
+
+One bundle per model and GPU, one-hour points only, built from the per-step bundles by `regroup_by_model.py` (see its docstring): `glm52-nvfp4-8xb200.json` (step 25) and `qwen3-coder-30b-fp8-2xh100.json` (step 24). Short exploration runs are left out. A point whose run did not use the CPU tier is equivalent with and without offload and appears in both arms, with "(shared)" in its id.
+
 ## Use it
 
 - **Sidebar**: show or hide arms, click an arm name to focus it (the others fade), change colors, pick the baseline, filter concurrencies, switch between the steady state and the whole run.
