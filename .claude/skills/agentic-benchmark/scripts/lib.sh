@@ -14,7 +14,9 @@ REPO_ROOT="$(cd "$SKILL_SCRIPTS/../../../.." && pwd)"
 pin_kube() {
   mkdir -p "$RESULTS"
   local src="${KUBECONFIG_SOURCE:-$HOME/.kube/config}" kcfg="$RESULTS/bobbm.kubeconfig"
-  kubectl --kubeconfig "$src" config view --minify --context="$CTX" --flatten > "$kcfg.tmp" && mv "$kcfg.tmp" "$kcfg"
+  # A per-process temp file: two run-point.sh started together (parallel arms)
+  # must not move each other's file.
+  kubectl --kubeconfig "$src" config view --minify --context="$CTX" --flatten > "$kcfg.tmp.$$" && mv "$kcfg.tmp.$$" "$kcfg"
   chmod 600 "$kcfg"
   export KUBECONFIG="$kcfg"
   [ "$(kubectl config current-context)" = "$CTX" ] || { echo "FATAL: kubeconfig is not pinned to $CTX" >&2; exit 1; }

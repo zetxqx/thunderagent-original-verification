@@ -4,10 +4,13 @@
 #   render-lane-epp.sh b ../manifests/epp/thunder-pr3-plugins.yaml | kubectl apply -f -
 # Usage: render-lane-epp.sh <lane> <plugins.yaml> [epp-image-tag]
 # CHART_DIR: the llm-d-router charts folder matching the image (default: the PR3
-# worktree). The chart is copied to a temp folder for `helm dependency update`, so
-# the worktree is not touched.
+# worktree). EXTRA_VALUES: an optional values file applied last (cluster-specific
+# overrides, e.g. node affinity). The chart is copied to a temp folder for
+# `helm dependency update`, so the worktree is not touched.
 set -euo pipefail
-L=${1:?lane}; PLUGINS=${2:?plugins file}; TAG=${3:-thunder-agent-pr3-a025437b}
+# Default image: PR3 plus the Produces() fix (24-thunder-pr3-lanes/thunder-produces.patch);
+# plain PR3 rejects its own request-attribute write and fails every request.
+L=${1:?lane}; PLUGINS=${2:?plugins file}; TAG=${3:-thunder-agent-pr3-a025437b-produces}
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPTS/lib.sh"
 CHART_DIR=${CHART_DIR:-$REPO_ROOT/../llm-d-router-thunder-lease/config/charts}
@@ -16,7 +19,7 @@ trap 'rm -rf "$TMP"' EXIT
 cp -R "$CHART_DIR/llm-d-router-standalone" "$CHART_DIR/routerlib" "$TMP/"
 helm dependency update "$TMP/llm-d-router-standalone" >/dev/null
 sed -e "s/__LANE__/$L/g" -e "s/__TAG__/$TAG/" "$SCRIPTS/../manifests/lane-epp-values.yaml" > "$TMP/values.yaml"
-helm template "agentx-epp-$L" "$TMP/llm-d-router-standalone" -n "$NS" -f "$TMP/values.yaml" \
+helm template "agentx-epp-$L" "$TMP/llm-d-router-standalone" -n "$NS" -f "$TMP/values.yaml" ${EXTRA_VALUES:+-f "$EXTRA_VALUES"} \
   --set-file "router.epp.pluginsCustomConfig.thunder-plugins\.yaml=$PLUGINS" \
   | python3 -c "
 import sys, re

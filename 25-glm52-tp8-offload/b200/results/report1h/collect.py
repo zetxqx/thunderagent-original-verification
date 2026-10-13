@@ -1,0 +1,98 @@
+"""Collect every number of the 1-hour thunder-vs-passthrough report into metrics.json."""
+import csv, json, gzip, re, collections, statistics as st
+from pathlib import Path
+
+R = Path(__file__).resolve().parent.parent
+C = (12, 16, 20, 24, 32, 48, 64, 96, 128)
+ARMS = {
+    "passthrough": {c: "r1" if c <= 16 else "explore1h-direct" for c in C},
+    "thunder": {c: "explore1h-thunder-gpu-l10" for c in C},
+}
+summ = {}
+for f in ("r1/report/summary.csv", "explore1h/report/summary.csv", "explore1h-highc/report/summary.csv"):
+    for r in csv.DictReader(open(R / f)):
+        summ[(r["label"], int(r["conc"]))] = r
+
+def q(v, p):
+    v = sorted(v); return v[min(len(v) - 1, int(p * len(v)))]
+
+out = {}
+for arm, pts in ARMS.items():
+    for c, lab in pts.items():
+        d = R / lab / f"c{c}"; s = summ[(lab, c)]
+        a = json.load(open(d / "aiperf_artifacts/profile_export_aiperf.json"))
+        isl, osl, zero, turns = [], [], 0, collections.Counter()
+        n = 0
+        for l in open(d / "aiperf_artifacts/profile_export.jsonl"):
+            x = json.loads(l); m = x["metadata"]; mt = x["metrics"]
+            if m.get("benchmark_phase") != "profiling" or m.get("was_cancelled"):
+                continue
+            g = lambda k: (mt.get(k) or {}).get("value")
+            if g("input_sequence_length"): isl.append(g("input_sequence_length"))
+            if g("output_sequence_length"): osl.append(g("output_sequence_length"))
+            n += 1; zero += (g("usage_prompt_cache_read_tokens") or 0) == 0
+            turns[m.get("source_trace_id")] += 1
+        gate = {}
+        epp = d / "epp/raw-epp-metrics.txt.gz"
+        if epp.exists():
+            run, idle, pau, ws, cap = [], [], [], [], []; last = {}
+            for l in gzip.open(epp, "rt"):
+                mm = re.match(r'llm_d_epp_thunder_agent_sessions\{state="(\w+)"\} (\S+)', l)
+                if mm: {"running": run, "idle": idle, "paused": pau}[mm.group(1)].append(float(mm.group(2)))
+                mm = re.match(r'llm_d_epp_thunder_agent_endpoint_working_set_tokens\S* (\S+)', l)
+                if mm: ws.append(float(mm.group(1)))
+                mm = re.match(r'llm_d_epp_thunder_agent_endpoint_capacity_tokens\S* (\S+)', l)
+                if mm: cap.append(float(mm.group(1)))
+                mm = re.match(r'llm_d_epp_thunder_agent_(starvation_promotions_total|pauses_total) (\S+)', l)
+                if mm: last[mm.group(1)] = int(float(mm.group(2)))
+            k = len(run) // 12  # skip the first 5 of about 65 minutes
+            gate = {"admitted_mean": st.mean([r + i for r, i in zip(run[k:], idle[k:])]),
+                    "ws_over_cap_mean": st.mean(ws[k:]) / cap[-1], "paused_peak": max(pau),
+                    "forced": last.get("starvation_promotions_total", 0), "pauses": last.get("pauses_total", 0),
+                    "capacity": cap[-1]}
+        load, src = None, {}
+        for row in csv.reader(l for l in open(d / "aiperf_artifacts/server_metrics_export.csv") if not l.startswith("#")):
+            if len(row) > 4 and row[1] == "counter" and row[2] == "vllm:kv_offload_load_bytes" and load is None:
+                load = float(row[4])
+            if len(row) > 4 and row[1] == "counter" and row[2] == "vllm:prompt_tokens_by_source":
+                k = next((x for x in row if x in ("external_kv_transfer", "local_cache_hit", "local_compute")), None)
+                if k: src.setdefault(k, float(row[4]))
+        src_total = sum(src.values()) or 1
+        dur = float(s["duration_s"])
+        out[f"{arm}/{c}"] = {
+            "arm": arm, "conc": c, "label": lab, "mode": "formal" if lab == "r1" else "exploration",
+            "completed": int(s["completed"]), "errors": int(float(s["errors"] or 0)), "cancelled": int(float(s["cancelled"] or 0)),
+            "duration_s": dur, "req_per_s": int(s["completed"]) / dur,
+            "out_tok_s": float(s["output_tput"]), "out_tok_s_gpu": float(s["output_tput_per_gpu"]),
+            "ttft_p50": float(s["p50_ttft_s"]), "ttft_p90": float(s["p90_ttft_s"]),
+            "ttft_p99": a["time_to_first_token"]["p99"] / 1000, "ttft_max": a["time_to_first_token"]["max"] / 1000,
+            "itl_p50": a["inter_token_latency"]["p50"], "itl_p99": a["inter_token_latency"]["p99"],
+            "intvty_p50": float(s["p50_intvty"]), "intvty_p90": float(s["p90_intvty"]),
+            "gpu_hit": float(s["gpu_hit_pct"]), "cpu_hit": float(s["cpu_hit_pct"]), "overall_hit": float(s["overall_hit_pct"]),
+            "ss_gpu_hit": float(s.get("ss_gpu_hit_pct") or "nan"), "ss_overall_hit": float(s.get("ss_overall_hit_pct") or "nan"),
+            "kv_peak": float(s["kv_usage_max_pct"]), "running_mean": float(s["running_avg_sum"]), "waiting_mean": float(s["waiting_avg_sum"]),
+            "zero_hit_pct": 100 * zero / n, "turns_over_60s_pct": None, "sessions_over_60s_pct": float(s["sessions_worst_ttft_over_slo_pct"]),
+            "isl_p50": q(isl, .5), "isl_p90": q(isl, .9), "isl_max": max(isl), "osl_p50": q(osl, .5), "osl_mean": st.mean(osl),
+            "turns_by_trace": dict(turns), "cpu_to_gpu_tb": (load or 0) / 1e12,
+            "prompt_from_cpu_pct": 100 * src.get("external_kv_transfer", 0) / src_total,
+            "prompt_from_gpu_pct": 100 * src.get("local_cache_hit", 0) / src_total,
+            "prompt_computed_pct": 100 * src.get("local_compute", 0) / src_total,
+            "working_set_mean": float(s["working_set_mean"]), "working_set_max": float(s["working_set_max"]), **{f"gate_{k}": v for k, v in gate.items()},
+        }
+        long_ = sum(1 for l in open(d / "aiperf_artifacts/profile_export.jsonl")
+                    if (lambda x: x["metadata"].get("benchmark_phase") == "profiling" and not x["metadata"].get("was_cancelled")
+                        and ((x["metrics"].get("time_to_first_token") or {}).get("value") or 0) > 60000)(json.loads(l)))
+        out[f"{arm}/{c}"]["turns_over_60s_pct"] = 100 * long_ / n
+# per-session progress on traces both arms worked on
+for c in C:
+    p, t = out[f"passthrough/{c}"]["turns_by_trace"], out[f"thunder/{c}"]["turns_by_trace"]
+    shared = [k for k in p if k in t and p[k] and t[k]]
+    ratios = [t[k] / p[k] for k in shared]
+    out[f"thunder/{c}"]["shared_traces"] = len(shared)
+    out[f"thunder/{c}"]["progress_ratio_mean"] = st.mean(ratios) if ratios else None
+    out[f"thunder/{c}"]["progress_ratio_turns"] = sum(t[k] for k in shared) / max(1, sum(p[k] for k in shared))
+for v in out.values():
+    v.pop("turns_by_trace")
+json.dump(out, open(Path(__file__).parent / "metrics.json", "w"), indent=1)
+for k, v in out.items():
+    print(k, {kk: (round(vv, 3) if isinstance(vv, float) else vv) for kk, vv in v.items() if kk not in ("arm", "conc", "label")})

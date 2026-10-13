@@ -122,6 +122,10 @@ Open item, resolved in step 10: the extra errors were 600 s client timeouts on t
 
 `16-thunder-minimal-pool/` runs the same build through step 13's pool protocol at c=128, three cells per configuration, against step 13's three origin-only cells. **At upstream's settings (half-life 1 s, sweep 5 s) the minimal build reproduces origin-only on every main metric (1770 vs 1693 tok/s, steady-state hit rate 0.71 vs 0.68, strict session attainment 0.68 vs 0.70) with under a third of the pauses, and a 90-minute cell shows no drift against origin-only's. Half-life 10 s trades the tail for efficiency (1846 tok/s, attainment 0.55). Adding a 1 s pause sweep keeps the pods under the line and gives the best c=128 result so far: 1945 tok/s, hit rate 0.80, goodput within SLO 1.77 turns/s (1.15x and 1.16x origin-only), with attainment back to 0.64.** Details: `16-thunder-minimal-pool/README.md`.
 
+### 25. vLLM TP=8 with CPU KV offload against InferenceX GLM-5.2, and the thunder gate past saturation (done)
+
+`25-glm52-tp8-offload/` runs `nvidia/GLM-5.2-NVFP4` on vLLM v0.31.0, TP=8 on 8x B200 (cluster `a4-pr`) with 820 GiB native CPU KV offload, matched to the InferenceX B200 Dynamo + SGLang + HiCache recipe, AgentX client. **Formal runs: throughput ties InferenceX (51.3 against 51.2 output tok/s per GPU at c=8), but vLLM's TTFT p50 is 2.4x to 2.9x higher. No KV thrashing up to c=32: the CPU tier serves nearly all GPU misses, but from c=24 no router queues (only 6 to 7 of the ~250k-token requests fit on the GPU) and the CPU-to-GPU churn slows every step. Exploration runs (caches emptied, 900 s): the thunder gate (GPU capacity, lease 10 s) raises output throughput 6% to 10% at c=24 and 24% to 27% at c=32 with TTFT p90 2 to 3 s, at the cost of 0.6% to 1.6% of turns waiting 3 to 4 minutes; forced-admission backstops and the reclaim fix (zetxqx/llm-d-router#14) do not help.**
+
 ## Proposals (not part of the numbered steps)
 
 `proposal/PROPOSAL.md` - eight ThunderAgent proposals; Part 3 and its Option B were run in step 13, the rest are unrun. Kept outside the numbered sequence.

@@ -1,0 +1,114 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"batch/v1","kind":"Job","metadata":{"annotations":{},"labels":{"agentx-conc":"1","agentx-label":"smoke1","app":"agentx-bench"},"name":"agentx-c1-smoke1","namespace":"bobzetian-llmd"},"spec":{"activeDeadlineSeconds":21600,"backoffLimit":0,"template":{"metadata":{"labels":{"app":"agentx-bench"}},"spec":{"containers":[{"args":["aiperf profile --scenario agentx \\\n  --url http://glm52-tp8:8000 --model nvidia/GLM-5.2-NVFP4 --tokenizer nvidia/GLM-5.2-NVFP4 \\\n  --tokenizer-trust-remote-code \\\n  --concurrency 1 --public-dataset semianalysis_cc_traces_weka_062126 --benchmark-duration 120 \\\n  --server-metrics http://glm52-tp8:8000/metrics \\\n  --server-metrics-formats json csv parquet \\\n  --output-artifact-dir /data/results/smoke1/c1/aiperf_artifacts \\\n  --unsafe-override --num-dataset-entries 8 --warmup-requests-per-lane 1\nrc=$?\naiperf analyze swim-lane /data/results/smoke1/c1/aiperf_artifacts -c 1 --html \\\n  || echo \"swim-lane render failed\"\nexit $rc\n"],"env":[{"name":"HF_HOME","value":"/data/hf"},{"name":"AIPERF_DATASET_MMAP_CACHE_DIR","value":"/data/mmap"},{"name":"AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID","value":"false"},{"name":"AIPERF_HTTP_TCP_USER_TIMEOUT","value":"900000"},{"name":"AIPERF_SERVER_METRICS_COLLECTION_INTERVAL","value":"1.0"},{"name":"PYTHONUNBUFFERED","value":"1"}],"image":"us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/agentx-harness:agentx-v1.0.6","name":"aiperf","resources":{"limits":{"memory":"32Gi"},"requests":{"cpu":"8","memory":"32Gi"}},"volumeMounts":[{"mountPath":"/data","name":"data"}]}],"nodeSelector":{"cloud.google.com/gke-nodepool":"pool-1"},"restartPolicy":"Never","securityContext":{"fsGroup":1000,"runAsGroup":1000,"runAsUser":1000},"volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"agentx-data"}}]}},"ttlSecondsAfterFinished":86400}}
+  creationTimestamp: "2026-10-10T03:37:46Z"
+  generation: 1
+  labels:
+    agentx-conc: "1"
+    agentx-label: smoke1
+    app: agentx-bench
+  name: agentx-c1-smoke1
+  namespace: bobzetian-llmd
+  resourceVersion: "1791603792507215021"
+  uid: 88a8a33b-1ebd-4df3-a11d-d646b9265286
+spec:
+  activeDeadlineSeconds: 21600
+  backoffLimit: 0
+  completionMode: NonIndexed
+  completions: 1
+  manualSelector: false
+  parallelism: 1
+  podReplacementPolicy: TerminatingOrFailed
+  selector:
+    matchLabels:
+      batch.kubernetes.io/controller-uid: 88a8a33b-1ebd-4df3-a11d-d646b9265286
+  suspend: false
+  template:
+    metadata:
+      labels:
+        app: agentx-bench
+        batch.kubernetes.io/controller-uid: 88a8a33b-1ebd-4df3-a11d-d646b9265286
+        batch.kubernetes.io/job-name: agentx-c1-smoke1
+        controller-uid: 88a8a33b-1ebd-4df3-a11d-d646b9265286
+        job-name: agentx-c1-smoke1
+    spec:
+      containers:
+      - args:
+        - |
+          aiperf profile --scenario agentx \
+            --url http://glm52-tp8:8000 --model nvidia/GLM-5.2-NVFP4 --tokenizer nvidia/GLM-5.2-NVFP4 \
+            --tokenizer-trust-remote-code \
+            --concurrency 1 --public-dataset semianalysis_cc_traces_weka_062126 --benchmark-duration 120 \
+            --server-metrics http://glm52-tp8:8000/metrics \
+            --server-metrics-formats json csv parquet \
+            --output-artifact-dir /data/results/smoke1/c1/aiperf_artifacts \
+            --unsafe-override --num-dataset-entries 8 --warmup-requests-per-lane 1
+          rc=$?
+          aiperf analyze swim-lane /data/results/smoke1/c1/aiperf_artifacts -c 1 --html \
+            || echo "swim-lane render failed"
+          exit $rc
+        env:
+        - name: HF_HOME
+          value: /data/hf
+        - name: AIPERF_DATASET_MMAP_CACHE_DIR
+          value: /data/mmap
+        - name: AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID
+          value: "false"
+        - name: AIPERF_HTTP_TCP_USER_TIMEOUT
+          value: "900000"
+        - name: AIPERF_SERVER_METRICS_COLLECTION_INTERVAL
+          value: "1.0"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        image: us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/agentx-harness:agentx-v1.0.6
+        imagePullPolicy: IfNotPresent
+        name: aiperf
+        resources:
+          limits:
+            memory: 32Gi
+          requests:
+            cpu: "8"
+            memory: 32Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /data
+          name: data
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        cloud.google.com/gke-nodepool: pool-1
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsUser: 1000
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: agentx-data
+  ttlSecondsAfterFinished: 86400
+status:
+  completionTime: "2026-10-10T03:43:12Z"
+  conditions:
+  - lastProbeTime: "2026-10-10T03:43:12Z"
+    lastTransitionTime: "2026-10-10T03:43:12Z"
+    message: Reached expected number of succeeded pods
+    reason: CompletionsReached
+    status: "True"
+    type: SuccessCriteriaMet
+  - lastProbeTime: "2026-10-10T03:43:12Z"
+    lastTransitionTime: "2026-10-10T03:43:12Z"
+    message: Reached expected number of succeeded pods
+    reason: CompletionsReached
+    status: "True"
+    type: Complete
+  ready: 0
+  startTime: "2026-10-10T03:37:46Z"
+  succeeded: 1
+  terminating: 0
+  uncountedTerminatedPods: {}

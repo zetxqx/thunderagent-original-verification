@@ -1,0 +1,108 @@
+# vLLM equivalent of InferenceX glm5.2-fp4-gb200-dynamo-sglang-agentic-agg
+# (recipes/glm5.2/sglang/gb200-fp4/agentx/agg.yaml): one TP=8 server on two
+# A4X nodes (4x GB200 each), NVLink across nodes through the ComputeDomain.
+# Pod 0 (leader) is node rank 0 and serves the API; pod 1 is a headless rank.
+#
+# CPU KV offload: SGLang HiCache 135 GB per rank x 8 ranks = 1080e9 B = 1006 GiB.
+# vLLM's --kv-offloading-size is GiB summed over all TP ranks, so 1006 GiB,
+# 503 GiB per node, kept in /dev/shm.
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: glm52-tp8
+  namespace: bobzetiana4x
+spec:
+  replicas: 1
+  leaderWorkerTemplate:
+    size: 2
+    restartPolicy: RecreateGroupOnPodRestart
+    workerTemplate:
+      metadata:
+        labels: {app: glm52-tp8}
+        annotations:
+          cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+      spec:
+        nodeSelector:
+          cloud.google.com/gke-accelerator: nvidia-gb200
+        tolerations:
+        - {key: kubernetes.io/arch, operator: Equal, value: arm64, effect: NoSchedule}
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        resourceClaims:
+        - name: compute-domain-channel
+          resourceClaimTemplateName: glm52-tp8-channel
+        terminationGracePeriodSeconds: 60
+        containers:
+        - name: modelserver
+          image: vllm/vllm-openai:v0.31.0
+          command: [bash, -c]
+          args:
+          - |
+            HEADLESS=""
+            [ "$LWS_WORKER_INDEX" = 0 ] || HEADLESS=--headless
+            exec vllm serve nvidia/GLM-5.2-NVFP4 \
+              --revision aec724e8c7b8ee9db3b48c01c320f63f9cdaf8aa \
+              --served-model-name nvidia/GLM-5.2-NVFP4 \
+              --host 0.0.0.0 --port 8000 \
+              --tensor-parallel-size 8 \
+              --nnodes "$LWS_GROUP_SIZE" --node-rank "$LWS_WORKER_INDEX" \
+              --master-addr "$LWS_LEADER_ADDRESS" $HEADLESS \
+              --trust-remote-code \
+              --kv-cache-dtype fp8_e4m3 \
+              --max-model-len 1048576 \
+              --max-num-seqs 10 \
+              --max-num-batched-tokens 8192 \
+              --gpu-memory-utilization 0.83 \
+              --speculative-config '{"method":"mtp","num_speculative_tokens":3}' \
+              --kv-offloading-size 1006 --kv-offloading-backend native \
+              --enable-auto-tool-choice --tool-call-parser glm47 \
+              --enable-prompt-tokens-details
+          env:
+          - name: VLLM_HOST_IP
+            valueFrom: {fieldRef: {fieldPath: status.podIP}}
+          - {name: GLOO_SOCKET_IFNAME, value: eth0}
+          - {name: NCCL_SOCKET_IFNAME, value: eth0}
+          - {name: NCCL_MNNVL_ENABLE, value: "1"}
+          - {name: NCCL_CUMEM_ENABLE, value: "1"}
+          - {name: NCCL_DEBUG, value: INFO}
+          - {name: VLLM_SERVER_DEV_MODE, value: "1"}
+          ports:
+          - {name: http, containerPort: 8000}
+          # Only the leader serves HTTP; the headless rank reports ready at once.
+          readinessProbe:
+            exec:
+              command:
+              - bash
+              - -c
+              - '[ "$LWS_WORKER_INDEX" != 0 ] || python3 -c "import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\", timeout=5)"'
+            periodSeconds: 10
+            timeoutSeconds: 10
+          resources:
+            requests: {cpu: "100", memory: 700Gi, nvidia.com/gpu: "4"}
+            limits: {memory: 800Gi, nvidia.com/gpu: "4"}
+            claims:
+            - name: compute-domain-channel
+          volumeMounts:
+          - {name: dshm, mountPath: /dev/shm}
+          - {name: hf-cache, mountPath: /root/.cache/huggingface}
+        volumes:
+        - name: dshm
+          emptyDir: {medium: Memory, sizeLimit: 560Gi}
+        # Node-local SSD cache, as other jobs on this cluster use, so a fresh
+        # server per concurrency point does not download 465 GB again.
+        - name: hf-cache
+          hostPath:
+            path: /mnt/stateful_partition/kube-ephemeral-ssd/huggingface
+            type: DirectoryOrCreate
+---
+# LWS owns the headless Service named glm52-tp8 (pod DNS); this one is the API.
+apiVersion: v1
+kind: Service
+metadata:
+  name: glm52-tp8-api
+  namespace: bobzetiana4x
+spec:
+  selector:
+    leaderworkerset.sigs.k8s.io/name: glm52-tp8
+    leaderworkerset.sigs.k8s.io/worker-index: "0"
+  ports:
+  - {name: http, port: 8000, targetPort: 8000}

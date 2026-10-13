@@ -125,3 +125,22 @@ Revisions 70 and 71 (`epp-thunder-origin-w8-c128-r3`, `-r4`). The release still 
 ## 2026-09-22: step 14 lanes removed
 
 `teardown-lanes.sh` removed `thunder-lane-a/b/c` (deployments, services, configmaps, service accounts, roles), the `thunder-lane` pod labels and the `thunder-lane-auth-delegator` cluster role binding. Note: the first attempt ran against another cluster because the laptop's current kubectl context had changed; it deleted nothing there. The main release, the four vLLM pods and `thunderagent-original` are unchanged.
+
+## 2026-10-10: registry read for cluster a4-pr (step 25)
+
+**Change**: `roles/artifactregistry.reader` on repo `bobinference` (project `bobzetian-gke-dev`, us-central1) for `455207029971-compute@developer.gserviceaccount.com`, the default compute service account of project `supercomputer-testing`. Node pool `pool-1` of cluster `a4-pr` runs as this account, and the AgentX client Job runs there.
+
+**Effect**: any VM in `supercomputer-testing` that uses the default compute account can pull images from `bobinference` (read only, this repo only).
+
+**Revert**:
+
+```
+gcloud artifacts repositories remove-iam-policy-binding bobinference --location us-central1 --project bobzetian-gke-dev \
+  --member="serviceAccount:455207029971-compute@developer.gserviceaccount.com" --role="roles/artifactregistry.reader"
+```
+
+Also on `a4-pr`: namespace `bobzetian-llmd` created; it holds the step 25 B200 vLLM Deployment, Service, ResourceClaimTemplate and PVC `agentx-data`.
+
+## 2026-10-10 afternoon: thunder EPP on a4-pr (step 25)
+
+In namespace `bobzetian-llmd` on `a4-pr`: Deployment, Service, ServiceAccount and two ConfigMaps `agentx-epp-a-epp*` (`25-glm52-tp8-offload/b200/lane-epp-a.yaml`, no RBAC objects), ServiceAccount `thunderagent-metrics-reader` (no roles). The vLLM Deployment `glm52-tp8` got `progressDeadlineSeconds: 3600`. Skill script changes: `run-point.sh` `MODE=direct` and `SERVER_ENV` (also in pool mode), `render-lane-epp.sh` `EXTRA_VALUES` and the `-produces` default image.

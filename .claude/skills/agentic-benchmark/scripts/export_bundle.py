@@ -269,7 +269,7 @@ def cpu_tier_tokens(config: dict, kv_bytes_per_token: int | None) -> int | None:
 
 
 def export_point(point: Path, slo: float, skip_minutes: float, replicate_suffix: str,
-                 kv_bytes_per_token: int | None = None) -> dict:
+                 kv_bytes_per_token: int | None = None, arm_map: dict | None = None) -> dict:
     row = a23.analyze_point(point, point, None, slo, skip_minutes)
     checks = a23.checks(pd.Series(row))
     d = pf.load(point)
@@ -298,6 +298,7 @@ def export_point(point: Path, slo: float, skip_minutes: float, replicate_suffix:
     label = str(row["label"])
     m = re.search(replicate_suffix, label)
     arm = re.sub(replicate_suffix, "", label)
+    arm = (arm_map or {}).get(arm, arm)
     summary = {k: (num(v, 6) if not isinstance(v, str) else v) for k, v in row.items()}
     config = point_config(point)
     return {
@@ -333,6 +334,9 @@ def main() -> None:
     ap.add_argument("--description", default="")
     ap.add_argument("--baseline", help="arm drawn in red and used for ratios")
     ap.add_argument("--name", action="append", default=[], help="ARM=TEXT display name")
+    ap.add_argument("--arm", action="append", default=[],
+                    help="LABEL=ARM: put a label's points into another arm, e.g. to join points of one setup "
+                         "that ran under two labels into one curve (say why in --description)")
     ap.add_argument("--ttft-slo", type=float, default=60.0)
     ap.add_argument("--skip-minutes", type=float, default=5.0, help="steady state start, as in analyze.py")
     ap.add_argument("--replicate-suffix", default=r"-r\d+$", help="regex stripped from labels to group replicates")
@@ -343,13 +347,15 @@ def main() -> None:
     args = ap.parse_args()
 
     names = dict(n.split("=", 1) for n in args.name)
+    arm_map = dict(a.split("=", 1) for a in args.arm)
     points = []
     for p in args.points:
         if not (p / "aiperf_artifacts" / "profile_export_aiperf.json").exists():
             print(f"skip {p}: no profile_export_aiperf.json")
             continue
         print(f"exporting {p}", flush=True)
-        points.append(export_point(p, args.ttft_slo, args.skip_minutes, args.replicate_suffix, args.kv_bytes_per_token))
+        points.append(export_point(p, args.ttft_slo, args.skip_minutes, args.replicate_suffix, args.kv_bytes_per_token,
+                                   arm_map))
     if not points:
         raise SystemExit("no exportable points")
 

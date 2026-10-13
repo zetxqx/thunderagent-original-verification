@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: agentx-c64-explore1h-direct
+  namespace: bobzetian-llmd
+  labels: {app: agentx-bench, agentx-label: "explore1h-direct", agentx-conc: "64"}
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 21600
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app: agentx-bench}
+    spec:
+      restartPolicy: Never
+      
+      nodeSelector: {cloud.google.com/gke-nodepool: pool-1}
+      securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
+      
+      containers:
+      - name: aiperf
+        image: us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/agentx-harness:agentx-v1.0.6
+        # The image is distroless: bash and the aiperf venv only, no coreutils.
+        args:
+        - |
+          aiperf profile --scenario agentx \
+            --url http://glm52-tp8-d:8000 --model nvidia/GLM-5.2-NVFP4 --tokenizer nvidia/GLM-5.2-NVFP4 \
+            --concurrency 64 --public-dataset semianalysis_cc_traces_weka_062126 --benchmark-duration 3600 \
+            --server-metrics http://10.4.54.116:8000/metrics \
+            --server-metrics-formats json csv parquet \
+            --output-artifact-dir /data/results/explore1h-direct/c64/aiperf_artifacts --tokenizer-trust-remote-code
+          rc=$?
+          aiperf analyze swim-lane /data/results/explore1h-direct/c64/aiperf_artifacts -c 64 --html \
+            || echo "swim-lane render failed"
+          exit $rc
+        env:
+        - {name: HF_HOME, value: /data/hf}
+        - {name: AIPERF_DATASET_MMAP_CACHE_DIR, value: /data/mmap}
+        - {name: AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID, value: "false"}
+        - {name: AIPERF_SERVER_METRICS_COLLECTION_INTERVAL, value: "1.0"}
+        - {name: PYTHONUNBUFFERED, value: "1"}
+        resources:
+          requests: {cpu: "4", memory: 24Gi}
+          limits: {memory: 48Gi}
+        volumeMounts:
+        - {name: data, mountPath: /data}
+      volumes:
+      - name: data
+        persistentVolumeClaim: {claimName: agentx-data-d}
+      

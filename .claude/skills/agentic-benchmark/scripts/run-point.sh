@@ -16,6 +16,17 @@
 # MODE=pool: the vLLM pods matching DECODE_SELECTOR through an EPP (URL,
 #   EPP_DEPLOY); the vLLM deployment and the EPP are restarted before the point.
 #   A native sidecar scrapes the EPP metrics port every 10 s (EPP_SCRAPE=0 to skip).
+# MODE=direct: the vLLM pods of deploy/$DEPLOY (DECODE_SELECTOR), reached at URL
+#   with no EPP, on any cluster (set CTX, KUBECONFIG_SOURCE, NS, CLIENT_POOL). The
+#   deployment is restarted before the point; SERVER_ENV ("K=V K2=V2", e.g. the
+#   point's MAX_NUM_SEQS) is set on container VLLM_CONTAINER in the same rollout
+#   (also in MODE=pool).
+#   GPUS_PER_POD overrides the count read from nvidia.com/gpu (empty under DRA).
+# RESET=1 with RESTART=0 (MODE=direct or pool): instead of a fresh server, empty
+#   both KV tiers of each vLLM pod (POST /reset_prefix_cache?reset_external=true,
+#   needs VLLM_SERVER_DEV_MODE=1) and, in pool mode, restart the EPP. Faster, but
+#   not AgentX's rule (one fresh server per point): for exploration, not for
+#   InferenceX comparisons.
 #
 # The EPP's plugin config (the arm) is set by the caller before the point;
 # this script only records it in meta/.
@@ -39,10 +50,12 @@ DECODE_SELECTOR=${DECODE_SELECTOR:-llm-d.ai/guide=program-aware-scheduling,llm-d
 EPP_DEPLOY=${EPP_DEPLOY:-program-aware-scheduling-epp}
 EPP_METRICS_PORT=${EPP_METRICS_PORT:-9090}
 RESTART=${RESTART:-1}
+RESET=${RESET:-0}
 if [ "$LANE" = a ]; then PVC=${PVC:-agentx-data}; else PVC=${PVC:-agentx-data-$LANE}; fi
 CLIENT_POOL=${CLIENT_POOL:-default-pool}
 CLIENT_CPU=${CLIENT_CPU:-8}
 CLIENT_MEM=${CLIENT_MEM:-32Gi}
+CLIENT_MEM_REQUEST=${CLIENT_MEM_REQUEST:-$CLIENT_MEM}  # below CLIENT_MEM to pack more clients on a node
 DEADLINE_SECONDS=${DEADLINE_SECONDS:-21600}
 DURATION=${DURATION:-}       # empty keeps the agentx preset (3600 s)
 EXTRA_ARGS=${EXTRA_ARGS:-}   # e.g. "--unsafe-override --num-dataset-entries 8"
@@ -55,7 +68,8 @@ case "$MODE" in
       URL=${URL:-http://agentx-lane-$LANE:8000}; SESSION_ID_HEADER=${SESSION_ID_HEADER:-false}; EPP_SCRAPE=0
     fi ;;
   pool) URL=${URL:-http://program-aware-scheduling-epp:80}; SESSION_ID_HEADER=${SESSION_ID_HEADER:-true}; EPP_SCRAPE=${EPP_SCRAPE:-1} ;;
-  *) echo "MODE must be lane or pool" >&2; exit 1 ;;
+  direct) URL=${URL:?MODE=direct needs URL}; SESSION_ID_HEADER=${SESSION_ID_HEADER:-false}; EPP_SCRAPE=0 ;;
+  *) echo "MODE must be lane, pool or direct" >&2; exit 1 ;;
 esac
 
 OUT="$RESULTS/$LABEL/c$CONC"
@@ -88,6 +102,32 @@ unclaimed_pods() {
 unclaimed_ready_pods() {
   kc get pods -l "$DECODE_SELECTOR,!agentx-lane" \
     -o jsonpath='{range .items[?(@.status.containerStatuses[0].ready==true)]}{.metadata.name}{"\n"}{end}'
+}
+# restart_deploy: a fresh vLLM server. With SERVER_ENV the env change and the restart
+# are one rollout (a strategic merge keyed by env name).
+restart_deploy() {
+  if [ -n "${SERVER_ENV:-}" ]; then
+    local kv env_json=""
+    for kv in $SERVER_ENV; do
+      env_json="$env_json{\"name\":\"${kv%%=*}\",\"value\":\"${kv#*=}\"},"
+    done
+    kc patch "deploy/$DEPLOY" --type=strategic -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}},\"spec\":{\"containers\":[{\"name\":\"${VLLM_CONTAINER:-modelserver}\",\"env\":[${env_json%,}]}]}}}}"
+  else
+    kc rollout restart "deploy/$DEPLOY"
+  fi
+  kc rollout status "deploy/$DEPLOY" --timeout="${ROLLOUT_TIMEOUT:-60m}"
+}
+# reset_caches: empty the GPU prefix cache and the CPU offload tier of every vLLM pod.
+reset_caches() {
+  local p
+  for p in $(decode_pods); do
+    kc exec "$p" -c modelserver -- python3 -c "
+import urllib.request
+r = urllib.request.urlopen(urllib.request.Request(
+    'http://localhost:8000/reset_prefix_cache?reset_external=true', method='POST'), timeout=120)
+assert r.status == 200, r.status" || { echo "cache reset failed on $p" >&2; exit 1; }
+    log "emptied both KV tiers on $p"
+  done
 }
 epp_pods() {
   kc get pods -l "$(deploy_selector "$EPP_DEPLOY")" --field-selector=status.phase=Running \
@@ -171,11 +211,23 @@ if [ "$MODE" = lane ]; then
     [ -n "$EPPS" ] || { echo "no running pod for deploy/$EPP_DEPLOY" >&2; exit 1; }
   fi
   TARGETS=$POD
+elif [ "$MODE" = direct ]; then
+  if [ "$RESTART" = 1 ]; then
+    log "restarting deploy/$DEPLOY${SERVER_ENV:+ with $SERVER_ENV}"
+    restart_deploy
+  elif [ "$RESET" = 1 ]; then
+    reset_caches
+  fi
+  TARGETS=$(decode_pods)
 else
   if [ "$RESTART" = 1 ]; then
-    log "restarting deploy/$DEPLOY and deploy/$EPP_DEPLOY"
-    kc rollout restart "deploy/$DEPLOY"
-    kc rollout status "deploy/$DEPLOY" --timeout=45m
+    log "restarting deploy/$DEPLOY${SERVER_ENV:+ with $SERVER_ENV} and deploy/$EPP_DEPLOY"
+    ROLLOUT_TIMEOUT=${ROLLOUT_TIMEOUT:-45m} restart_deploy
+    kc rollout restart "deploy/$EPP_DEPLOY"
+    kc rollout status "deploy/$EPP_DEPLOY" --timeout=15m
+  elif [ "$RESET" = 1 ]; then
+    reset_caches
+    log "restarting deploy/$EPP_DEPLOY (fresh gate ledger)"
     kc rollout restart "deploy/$EPP_DEPLOY"
     kc rollout status "deploy/$EPP_DEPLOY" --timeout=15m
   fi
@@ -217,7 +269,7 @@ for p in $EPPS; do
   EPP_METRICS_URLS="$EPP_METRICS_URLS http://$(kc get pod "$p" -o jsonpath='{.status.podIP}'):$EPP_METRICS_PORT/metrics"
 done
 EPP_METRICS_URLS=${EPP_METRICS_URLS# }
-GPUS_PER_POD=$(kc get "deploy/$DEPLOY" -o jsonpath='{.spec.template.spec.containers[0].resources.limits.nvidia\.com/gpu}')
+GPUS_PER_POD=${GPUS_PER_POD:-$(kc get "deploy/$DEPLOY" -o jsonpath='{.spec.template.spec.containers[0].resources.limits.nvidia\.com/gpu}')}
 NUM_PODS=$(echo "$TARGETS" | wc -l | tr -d ' ')
 NUM_GPUS=$((GPUS_PER_POD * NUM_PODS))
 
@@ -236,7 +288,8 @@ for p in $TARGETS; do
     > "$OUT/meta/node-$node-pods.txt"
   vllm_get "$p" /metrics | grep -E '^vllm:cache_config_info' > "$OUT/meta/cache-config-$p.txt" || true
 done
-"$REPO_ROOT/model-server/collect.sh" > "$OUT/meta/model-server.txt" 2>&1 || true
+# collect.sh reads the bobbm program-aware deployment; other clusters set MODEL_SERVER_COLLECT=0.
+[ "${MODEL_SERVER_COLLECT:-1}" = 1 ] && { "$REPO_ROOT/model-server/collect.sh" > "$OUT/meta/model-server.txt" 2>&1 || true; }
 
 DURATION_ARG=""
 [ -n "$DURATION" ] && DURATION_ARG="--benchmark-duration $DURATION"
@@ -309,7 +362,7 @@ spec:
         - {name: AIPERF_SERVER_METRICS_COLLECTION_INTERVAL, value: "1.0"}
         - {name: PYTHONUNBUFFERED, value: "1"}
         resources:
-          requests: {cpu: "$CLIENT_CPU", memory: $CLIENT_MEM}
+          requests: {cpu: "$CLIENT_CPU", memory: $CLIENT_MEM_REQUEST}
           limits: {memory: $CLIENT_MEM}
         volumeMounts:
         - {name: data, mountPath: /data}
@@ -337,6 +390,7 @@ cat > "$OUT/meta/point.json" <<EOF
   "epp_metrics_urls": "$EPP_METRICS_URLS",
   "session_id_header": "$SESSION_ID_HEADER",
   "restart": $RESTART,
+  "reset": $RESET,
   "extra_args": "$EXTRA_ARGS",
   "job": "$JOB",
   "started_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -394,7 +448,8 @@ done
 
 # kubectl cp needs tar, which the distroless image lacks, so read the PVC from busybox.
 wait_api || true
-FETCH="agentx-fetch-$(date +%s)"
+# The pid keeps names apart when two points (parallel arms) finish in the same second.
+FETCH="agentx-fetch-$(date +%s)-$$"
 kc run "$FETCH" --image=busybox:1.36 --restart=Never \
   --overrides="{\"spec\":{\"nodeSelector\":{\"cloud.google.com/gke-nodepool\":\"$CLIENT_POOL\"},\"volumes\":[{\"name\":\"data\",\"persistentVolumeClaim\":{\"claimName\":\"$PVC\",\"readOnly\":true}}],\"containers\":[{\"name\":\"fetch\",\"image\":\"busybox:1.36\",\"command\":[\"sleep\",\"3600\"],\"volumeMounts\":[{\"name\":\"data\",\"mountPath\":\"/data\",\"readOnly\":true}]}]}}"
 kc wait --for=condition=Ready "pod/$FETCH" --timeout=10m

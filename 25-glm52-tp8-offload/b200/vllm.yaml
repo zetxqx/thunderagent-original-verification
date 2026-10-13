@@ -1,0 +1,126 @@
+# vLLM equivalent of InferenceX glm5.2-fp4-b200-dynamo-sglang-agentic-agg
+# (recipes/glm5.2/sglang/b200-fp4/agentx/agg-variants.yaml): one TP=8 server
+# on one a4-highgpu-8g node (8x B200), cluster a4-pr. GPUs come from DRA.
+#
+# CPU KV offload: SGLang HiCache 110 GB per rank x 8 ranks = 880e9 B = 820 GiB.
+# vLLM's --kv-offloading-size is GiB summed over all TP ranks, kept in /dev/shm.
+# --max-num-seqs follows the recipe's max-running-requests, 2x concurrency
+# (c1: 2, c4: 8, c8: 16); set MAX_NUM_SEQS per point.
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: glm52-tp8-gpu
+  namespace: bobzetian-llmd
+spec:
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly:
+          deviceClassName: gpu.nvidia.com
+          allocationMode: ExactCount
+          count: 8
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glm52-tp8
+  namespace: bobzetian-llmd
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  # A fresh server needs about 25 min (load, then filling the 820 GiB offload
+  # region); the 600 s default made `rollout status` fail.
+  progressDeadlineSeconds: 3600
+  selector:
+    matchLabels: {app: glm52-tp8}
+  template:
+    metadata:
+      labels: {app: glm52-tp8}
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    spec:
+      # Pinned: every fresh server per point reuses this node's HF cache and all
+      # points run on the same hardware.
+      nodeSelector:
+        node.kubernetes.io/instance-type: a4-highgpu-8g
+        kubernetes.io/hostname: gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-5qjv
+      tolerations:
+      - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: glm52-tp8-gpu
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: modelserver
+        image: vllm/vllm-openai:v0.31.0
+        command: [bash, -c]
+        args:
+        - |
+          exec vllm serve nvidia/GLM-5.2-NVFP4 \
+            --revision aec724e8c7b8ee9db3b48c01c320f63f9cdaf8aa \
+            --served-model-name nvidia/GLM-5.2-NVFP4 \
+            --host 0.0.0.0 --port 8000 \
+            --tensor-parallel-size 8 \
+            --trust-remote-code \
+            --kv-cache-dtype fp8_e4m3 \
+            --max-model-len 1048576 \
+            --max-num-seqs "$MAX_NUM_SEQS" \
+            --max-num-batched-tokens 8192 \
+            --gpu-memory-utilization 0.8 \
+            --speculative-config '{"method":"mtp","num_speculative_tokens":3}' \
+            --kv-offloading-size 820 --kv-offloading-backend native \
+            --enable-auto-tool-choice --tool-call-parser glm47 \
+            --enable-prompt-tokens-details
+        env:
+        - {name: MAX_NUM_SEQS, value: "2"}
+        - {name: NCCL_CUMEM_ENABLE, value: "1"}
+        # The node's NCCL net/tuner plugins need RDMA devices this pod does not
+        # claim; TP=8 stays inside the node on NVLink.
+        - {name: NCCL_NET_PLUGIN, value: none}
+        - {name: NCCL_TUNER_PLUGIN, value: none}
+        - {name: NCCL_SOCKET_IFNAME, value: eth0}
+        - {name: NCCL_DEBUG, value: INFO}
+        - {name: VLLM_SERVER_DEV_MODE, value: "1"}
+        ports:
+        - {name: http, containerPort: 8000}
+        startupProbe:
+          httpGet: {path: /health, port: 8000}
+          periodSeconds: 10
+          failureThreshold: 540
+        readinessProbe:
+          httpGet: {path: /health, port: 8000}
+          periodSeconds: 10
+        # Page cache from reading the 433 GiB checkpoint counts against the
+        # limit next to the 820 GiB /dev/shm tier; at 1200Gi vLLM's preflight
+        # warned (839679 MiB required, 747643 MiB available).
+        resources:
+          requests: {cpu: "100", memory: 1300Gi}
+          limits: {memory: 1600Gi}
+          claims:
+          - name: gpu
+        volumeMounts:
+        - {name: dshm, mountPath: /dev/shm}
+        - {name: hf-cache, mountPath: /root/.cache/huggingface}
+        - {name: nvidia-install-dir, mountPath: /usr/local/nvidia/lib64}
+      volumes:
+      - name: dshm
+        emptyDir: {medium: Memory, sizeLimit: 900Gi}
+      # Node-local SSD, so a fresh server per concurrency point does not
+      # download 465 GB again.
+      - name: hf-cache
+        hostPath:
+          path: /mnt/stateful_partition/kube-ephemeral-ssd/shared_disk/bobzetian-hf-cache
+          type: DirectoryOrCreate
+      - name: nvidia-install-dir
+        hostPath: {path: /home/kubernetes/bin/nvidia/lib64}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: glm52-tp8
+  namespace: bobzetian-llmd
+spec:
+  selector: {app: glm52-tp8}
+  ports:
+  - {name: http, port: 8000, targetPort: 8000}

@@ -1,0 +1,23 @@
+# Extra Helm values for the lane EPP on cluster a4-pr (render-lane-epp.sh
+# EXTRA_VALUES). The EPP image is in bobzetian-gke-dev/bobinference, which only
+# node pool pool-1 (default compute service account) can pull. The thunder
+# plugin config has no tokenizer, so the HF_TOKEN env (secret llm-d-hf-token,
+# absent here) is dropped.
+router:
+  epp:
+    env: []
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - {key: cloud.google.com/gke-nodepool, operator: In, values: [pool-1]}
+    # The endpoints file for file-discovery, mounted next to the plugin config.
+    # 10.0.44.102 is the ClusterIP of Service glm52-tp8-d (server D).
+    pluginsCustomConfig:
+      endpoints.yaml: |
+        endpoints:
+        - name: glm52-tp8-d
+          namespace: bobzetian-llmd
+          address: "10.0.44.102"
+          port: "8000"
