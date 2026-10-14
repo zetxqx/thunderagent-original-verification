@@ -8,6 +8,8 @@
 //   log     log y axis by default
 //   derive  (s, get) => value, for metrics computed from other columns; s is the raw
 //           summary, get(key) reads a column in the selected window
+//   pair    (p, b) => value, for metrics of a point against the baseline point at the same
+//           concurrency; p and b are bundle points (mean over baseline replicates)
 //   whole   the column covers the whole run even in the steady window
 //   note    shown under the chart
 //   sloLine draw the bundle's TTFT SLO (settings.ttft_slo_s) on the chart
@@ -15,7 +17,7 @@
 //           kv_pool_tokens, for arms whose points have one
 // "{slo}" in a label is replaced by the bundle's TTFT SLO in seconds.
 
-const PCTS = ['p50', 'p75', 'p90', 'p95', 'mean'];
+const PCTS = ['p50', 'p75', 'p90', 'p95', 'p99', 'mean'];
 
 const SUMMARY_METRICS = [
   { group: 'Throughput', key: 'output_tput_per_gpu', label: 'Output tok/s per GPU', better: 'higher' },
@@ -28,12 +30,23 @@ const SUMMARY_METRICS = [
   { group: 'Latency', key: 'ttft_s', pct: true, label: 'TTFT (s)', better: 'lower', log: true, sloLine: true },
   { group: 'Latency', key: 'intvty', pct: true, label: 'Interactivity (tok/s per user)', better: 'higher',
     note: 'p90 is the slowest 10% of requests (AgentX convention).' },
-  { group: 'Latency', key: 'e2el_s', pct: true, label: 'Request latency (s)', better: 'lower', log: true },
-  { group: 'Latency', key: 'e2e_norm_intvty', pct: true, label: 'E2E normalized interactivity', better: 'higher' },
+  { group: 'Latency', key: 'e2el_s', pct: true, label: 'Request latency (s)', better: 'lower', log: true,
+    note: 'Wait at the router and in vLLM + prefill + decode, per turn.' },
+  { group: 'Latency', key: 'e2e_norm_intvty', pct: true, label: 'E2E normalized interactivity (tok/s per user)', better: 'higher',
+    note: 'Output tokens / request latency, so the wait counts; p90 is the slowest 10%.' },
   { group: 'Latency', key: 'turn_slo_share_pct', label: 'Turns with TTFT <= {slo} s (%)', better: 'higher',
     note: 'Errors and requests without a first token at the end (gate or vLLM queue) count as misses.' },
   { group: 'Latency', key: 'session_worst_ttft_p90_s', label: 'Worst TTFT per session, p90 (s)', better: 'lower', log: true, whole: true, sloLine: true },
   { group: 'Latency', key: 'sessions_worst_ttft_over_slo_pct', label: 'Sessions with a turn over {slo} s TTFT (%)', better: 'lower', whole: true },
+  { group: 'Latency', key: 'session_progress', label: 'Session progress (turns / baseline)', better: 'higher', whole: true,
+    pair: (p, b) => {
+      const t = p.turns_by_trace, u = b.turns_by_trace;
+      if (!t || !u) return null;
+      let mine = 0, base = 0;
+      for (const [k, n] of Object.entries(t)) if (u[k]) { mine += n; base += u[k]; }
+      return base ? mine / base : null;
+    },
+    note: 'Turns completed on the traces both this point and the baseline at the same concurrency ran, over the baseline\'s turns on them. 1 = the same progress per session.' },
 
   { group: 'Cache', key: 'overall_hit_pct', label: 'Prefix hit rate, GPU + CPU tier (%)', better: 'higher' },
   { group: 'Cache', key: 'gpu_hit_pct', label: 'GPU prefix hit (%)', better: 'higher' },
@@ -126,14 +139,19 @@ const PALETTE = {
   arms: ['#0F4D92', '#42949E', '#9A4D8E', '#8BCF8B', '#3775BA', '#E0A33A', '#5B5B5B', '#C76B98'],
 };
 
+// The first four are the agent view: throughput, speed per user with the wait included,
+// the latency tail and how far each session gets.
 const DEFAULT_COMPARE_CARDS = [
   { type: 'conc', metric: 'output_tput_per_gpu' },
+  { type: 'conc', metric: 'e2e_norm_intvty', pct: 'p90', second: 'p50' },
+  { type: 'conc', metric: 'e2el_s', pct: 'p99', second: 'p90' },
+  { type: 'conc', metric: 'session_progress' },
   { type: 'conc', metric: 'ttft_s', pct: 'p90' },
   { type: 'conc', metric: 'turn_slo_share_pct' },
   { type: 'conc', metric: 'overall_hit_pct' },
   { type: 'conc', metric: 'working_set_over_pool_mean' },
   { type: 'conc', metric: 'gate_starvation_promotions_per_h' },
-  { type: 'pareto', x: 'intvty', xpct: 'p90', y: 'output_tput_per_gpu' },
+  { type: 'pareto', x: 'e2e_norm_intvty', xpct: 'p90', y: 'output_tput_per_gpu' },
   { type: 'cache', wide: true },
 ];
 

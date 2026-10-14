@@ -292,6 +292,7 @@ def export_point(point: Path, slo: float, skip_minutes: float, replicate_suffix:
     ss_from = t0 + int(skip_minutes * 60e9)
     errors_ss = int((prof["err_type"].notna() & (prof["start_ns"] >= ss_from)).sum())
     unserved = int(row.get("unserved") or 0)  # no first token by the end: SLO misses, as in analyze.py
+    done = prof[prof["err_type"].isna() & ~prof["cancelled"] & prof["lat_s"].notna() & prof["trace"].notna()]
     whole, slo_whole = distributions(ok, d["errors"] + unserved)
     steady, slo_steady = distributions(ok[ok["start_ns"] >= ss_from], errors_ss + unserved)
 
@@ -310,6 +311,7 @@ def export_point(point: Path, slo: float, skip_minutes: float, replicate_suffix:
         "kv_pool_tokens": d["pool"],
         "cpu_tier_tokens": cpu_tier_tokens(config, kv_bytes_per_token),
         "summary": summary,
+        "turns_by_trace": {str(k): int(v) for k, v in done["trace"].value_counts().items()},
         "checks": checks,
         "config": config,
         "series": {k: v for k, v in series.items() if v},

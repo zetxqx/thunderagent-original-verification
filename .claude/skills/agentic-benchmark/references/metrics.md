@@ -49,12 +49,16 @@ Why: after warmup each lane waits out its recorded first-request gap, and nothin
 
 | Column | Formula |
 |---|---|
-| `{mean,p50,p75,p90,p95}_ttft_s` | TTFT distribution |
+| `{mean,p50,p75,p90,p95,p99}_ttft_s` | TTFT distribution |
 | `{...}_intvty` | interactivity = 1 / pXX(full ITL), full ITL = (latency - TTFT) / (OSL - 1). `p90_intvty` is the slow 10% |
 | `{...}_e2el_s` | end-to-end latency |
 | `{...}_e2e_norm_intvty` | 1 / pXX(latency / OSL): includes the prefill wait, which interactivity does not |
 
-Interactivity alone hides TTFT. Always show TTFT or E2E normalized interactivity next to it.
+Interactivity alone hides TTFT, and with a router that holds sessions, all of the router's cost is in TTFT. For agent workloads, report these three together, in the reports and on the dashboard (its default view):
+
+1. `p50_e2e_norm_intvty` and `p90_e2e_norm_intvty`: speed per user with the wait included, not biased by output length.
+2. `p99_e2el_s` (next to `p90_e2el_s`): the tail. A router can make p90 better and p99 much worse (GLM-5.2 c=32, step 25: p90 49 to 25 s, p99 94 to 213 s).
+3. Session progress: turns completed on the traces that both arms ran, over the baseline's turns at the same concurrency (bundle field `turns_by_trace`, see section 4).
 
 ## 4. SLO and sessions
 
@@ -67,6 +71,7 @@ A session is an AgentX session tree (main agent plus subagents, `root_correlatio
 | `unserved` | requests cancelled at the end without a first token (held at the router gate or waiting in the vLLM queue): cancelled minus those running in vLLM at the cancel; SLO misses in every arm |
 | `session_worst_ttft_p90_s`, `sessions_worst_ttft_over_slo_pct` | per-session worst turn. Turn percentiles hide sessions held for a long time |
 | `turns_per_session_p10/p50/p90` | progress per session in the window |
+| `turns_by_trace` (bundle only, `export_bundle.py`) | completed turns per AgentX trace (`source_trace_id`). Session progress of an arm = sum of its turns over the traces the baseline also ran / the baseline's turns on those traces; the dashboard computes it against the baseline point at the same concurrency. Unlike `turns_per_session_*`, it does not depend on how many sessions each arm started |
 | `lanes_seen`, `effective_conc_requests`, `effective_sessions_inflight` | how much of the configured concurrency was really on the server. Sessions sit in tool gaps, so this is well below `conc` |
 
 Throughput can be equal across arms while goodput differs a lot. Capacity at SLO = the largest tested concurrency where the target holds there and at every smaller point.

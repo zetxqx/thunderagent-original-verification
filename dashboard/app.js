@@ -2,7 +2,8 @@
 // Benchmark dashboard: loads bundles (SCHEMA.md) and draws them with Plotly.
 // Plain script, no build step and no modules, so index.html also works from file://.
 
-const STORE_KEY = 'agentic-bench-dashboard/1';
+// Bump the version when the default cards change: a saved layout replaces the defaults.
+const STORE_KEY = 'agentic-bench-dashboard/2';
 const DASHES = ['solid', 'dash', 'dot', 'dashdot', 'longdash'];
 const PLOT_CONFIG = {
   displaylogo: false, responsive: true,
@@ -183,10 +184,16 @@ function getter(p, win) {
   };
 }
 
+const finite = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
 function metricValue(p, m, pct, win) {
+  if (m.pair) {
+    const base = baselineArm();
+    const vs = base ? state.points.filter(b => b.armUid === base.uid && b.conc === p.conc).map(b => finite(m.pair(p.p, b.p))).filter(v => v !== null) : [];
+    return vs.length ? vs.reduce((s, v) => s + v, 0) / vs.length : null;
+  }
   const get = getter(p, win);
-  const v = m.derive ? m.derive(p.p.summary || {}, get) : get(m.pct ? `${pct}_${m.key}` : m.key);
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  return finite(m.derive ? m.derive(p.p.summary || {}, get) : get(m.pct ? `${pct}_${m.key}` : m.key));
 }
 
 // The TTFT SLO of the loaded bundles, settings.ttft_slo_s (they normally share one).
@@ -414,7 +421,7 @@ function concCard(list, card) {
     const yTitle = metricLabel(m, pct) + (card.ratio ? ' / baseline' : '');
     const shapes = [], annotations = [];
     const slo = sloSeconds();
-    if (card.ratio) shapes.push(hline(1, '#B64342', 'dash'));
+    if (card.ratio || m.pair) shapes.push(hline(1, '#B64342', 'dash'));
     if (m.sloLine && slo && !card.ratio) {
       shapes.push(hline(slo, SLO_COLOR, 'dash'));
       annotations.push(hnote(slo, `TTFT SLO ${slo} s`, SLO_COLOR, { log }));
@@ -848,7 +855,8 @@ function sloCard(list, card) {
 
 function tableGroups() {
   const groups = { Key: [
-    ['output_tput_per_gpu'], ['ttft_s', 'p50'], ['ttft_s', 'p90'], ['intvty', 'p90'], ['turn_slo_share_pct'],
+    ['output_tput_per_gpu'], ['e2e_norm_intvty', 'p50'], ['e2e_norm_intvty', 'p90'], ['e2el_s', 'p90'], ['e2el_s', 'p99'],
+    ['session_progress'], ['ttft_s', 'p50'], ['ttft_s', 'p90'], ['intvty', 'p90'], ['turn_slo_share_pct'],
     ['overall_hit_pct'], ['working_set_over_pool_mean'], ['gate_starvation_promotions_per_h'],
   ] };
   for (const m of SUMMARY_METRICS) {

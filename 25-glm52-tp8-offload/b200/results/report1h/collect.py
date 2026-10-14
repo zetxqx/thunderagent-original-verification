@@ -68,6 +68,8 @@ for arm, pts in ARMS.items():
             "ttft_p99": a["time_to_first_token"]["p99"] / 1000, "ttft_max": a["time_to_first_token"]["max"] / 1000,
             "itl_p50": a["inter_token_latency"]["p50"], "itl_p99": a["inter_token_latency"]["p99"],
             "intvty_p50": float(s["p50_intvty"]), "intvty_p90": float(s["p90_intvty"]),
+            "e2e_norm_intvty_p50": float(s["p50_e2e_norm_intvty"]), "e2e_norm_intvty_p90": float(s["p90_e2e_norm_intvty"]),
+            "e2el_p50": float(s["p50_e2el_s"]), "e2el_p90": float(s["p90_e2el_s"]), "e2el_p99": a["request_latency"]["p99"] / 1000,
             "gpu_hit": float(s["gpu_hit_pct"]), "cpu_hit": float(s["cpu_hit_pct"]), "overall_hit": float(s["overall_hit_pct"]),
             "ss_gpu_hit": float(s.get("ss_gpu_hit_pct") or "nan"), "ss_overall_hit": float(s.get("ss_overall_hit_pct") or "nan"),
             "kv_peak": float(s["kv_usage_max_pct"]), "running_mean": float(s["running_avg_sum"]), "waiting_mean": float(s["waiting_avg_sum"]),

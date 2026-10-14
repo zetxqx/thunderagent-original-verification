@@ -11,6 +11,7 @@ Key Finding:
 - Up to 64 sessions the working set fits the CPU KV tier (about 18.2M tokens) and nothing beyond the new tokens of each turn is recomputed in either arm; llm-d-thunder-agent-simplified's gain comes from keeping the running sessions on the GPU (steady GPU hit 0.68 to 0.82 against 0.01 to 0.12 for no-router from 24 sessions up) instead of reloading them from CPU memory. From 96 sessions the working set reaches the CPU tier and no-router starts to recompute (11% of prompt tokens at 96, 79% at 128 in the steady state: KV thrashing); llm-d-thunder-agent-simplified computes 12% to 18%.
 - The cost is the tail: p99 TTFT is 3.6x to 8.1x worse from 20 to 96 sessions (193 s vs 50 s at 32, 2054 s vs 458 s at 96), and requests that waited the full 1800 s before being forced in grow from 2 and 4 (24 and 32 sessions) to 14, 34, 66 and 131 (48 to 128 sessions). no-router has the worse middle: from 64 sessions 57% to 78% of its turns wait over 60 s, against 5% to 8% for llm-d-thunder-agent-simplified.
 - On sessions both arms worked on, llm-d-thunder-agent-simplified completes 1.14x the turns per session at 24 sessions, 1.23x at 32, 1.3x to 1.9x at 48 to 96 and 3.4x at 128.
+- Agent metrics (section 5, first table): E2E normalized interactivity p90 (output tokens / request latency, wait included) is 1.2x to 2.0x higher at 12 to 20 sessions and 4.3x to 76x higher from 24 sessions up. Request latency p99 is 1.2x to 7.4x higher from 16 to 96 sessions (213 s vs 94 s at 32, 1331 s vs 180 s at 64).
 
 ## 2. Setup & Environment
 
@@ -50,7 +51,32 @@ Dataset `semianalysisai/cc-traces-weka-062126` (AgentX loader `semianalysis_cc_t
 
 ## 5. Results (raw data: `b200/results/explore1h-*/`, `b200/results/r1/c12`, `r1/c16`; collected in `b200/results/report1h/metrics.json`)
 
-One run per point, whole profiling window (3600 s). TTFT in seconds, ITL in ms. Concurrency: configured sessions / mean requests running in vLLM. Hit rate: steady-state GPU prefix-cache hit rate.
+One run per point, whole profiling window (3600 s).
+
+Agent metrics. For an agent, a turn takes the wait, the prefill and the decode together; interactivity measures only the decode. E2E normalized interactivity = output tokens / request latency per turn (p90 = the slowest 10%). Request latency in seconds; p99 shows the sessions llm-d-thunder-agent-simplified holds, p90 does not. Session progress = turns llm-d-thunder-agent-simplified completes on the traces both arms ran / no-router's turns on the same traces (the per-session mean of this ratio is in "Other measured facts").
+
+| conc | arm | E2E norm. interactivity p50 | E2E norm. interactivity p90 | request latency p90 (s) | request latency p99 (s) | session progress |
+|---|---|---|---|---|---|---|
+| 12 | no-router | 145.5 | 67.6 | 14.7 | 52.5 | - |
+| 12 | llm-d-thunder-agent-simplified | 156.9 | 79.7 | 13.1 | 48.0 | 0.99 |
+| 16 | no-router | 101.8 | 33.7 | 18.4 | 58.9 | - |
+| 16 | llm-d-thunder-agent-simplified | 123.0 | 50.5 | 16.8 | 73.0 | 1.01 |
+| 20 | no-router | 84.0 | 22.0 | 25.3 | 71.6 | - |
+| 20 | llm-d-thunder-agent-simplified | 112.6 | 43.8 | 21.4 | 97.6 | 1.03 |
+| 24 | no-router | 47.8 | 9.7 | 32.4 | 79.2 | - |
+| 24 | llm-d-thunder-agent-simplified | 108.4 | 41.4 | 22.9 | 130.2 | 1.05 |
+| 32 | no-router | 22.5 | 4.2 | 49.4 | 94.2 | - |
+| 32 | llm-d-thunder-agent-simplified | 109.0 | 33.5 | 24.6 | 213.3 | 1.19 |
+| 48 | no-router | 10.9 | 2.2 | 76.1 | 163.0 | - |
+| 48 | llm-d-thunder-agent-simplified | 95.0 | 21.2 | 31.1 | 710.8 | 1.18 |
+| 64 | no-router | 6.9 | 1.4 | 122.8 | 179.9 | - |
+| 64 | llm-d-thunder-agent-simplified | 82.0 | 18.2 | 39.6 | 1331 | 1.21 |
+| 96 | no-router | 3.7 | 0.6 | 323.8 | 470.5 | - |
+| 96 | llm-d-thunder-agent-simplified | 73.7 | 11.4 | 59.5 | 2092 | 1.56 |
+| 128 | no-router | 2.9 | 0.2 | 1755 | 1926 | - |
+| 128 | llm-d-thunder-agent-simplified | 66.3 | 14.5 | 48.4 | 2149 | 3.61 |
+
+All metrics. TTFT in seconds, ITL in ms. Concurrency: configured sessions / mean requests running in vLLM. Hit rate: steady-state GPU prefix-cache hit rate.
 
 | Arm | Concurrency (configured / running in vLLM) | p50 TTFT (s) | p90 TTFT (s) | p99 TTFT (s) | p50 ITL (ms) | p99 ITL (ms) | Output Tokens/s | Requests/s | Steady GPU hit rate | Peak KV |
 |---|---|---|---|---|---|---|---|---|---|---|

@@ -30,7 +30,7 @@ It reuses `analyze.py` (same numbers as `summary.csv`) and reads one point at a 
 
 ## Current bundles
 
-One bundle per model and GPU, built from the per-step bundles by `regroup_by_model.py` (see its docstring): `glm52-nvfp4-8xb200.json` (step 25) and `qwen3-coder-30b-fp8-2xh100.json` (step 24). Points are one hour; short exploration runs and a few variant arms (listed in the script's docstring) are left out. A point whose run did not use the CPU tier is equivalent with and without offload and appears in both arms, with "(shared)" in its id.
+One bundle per model and GPU, built from the per-step bundles by `regroup_by_model.py` (see its docstring): `glm52-nvfp4-8xb200.json` (step 25) and `qwen3-coder-30b-fp8-2xh100.json` (step 24). Points are one hour; short exploration runs and a few variant arms (listed in the script's docstring) are left out. A point whose run did not use the CPU tier is equivalent with and without offload and appears in both arms, with "(shared)" in its id. `backfill_summary.py` then recomputed every summary with the current analyze.py (p99 columns) and added `turns_by_trace` from the raw results.
 
 ## Use it
 
@@ -40,7 +40,7 @@ One bundle per model and GPU, built from the per-step bundles by `regroup_by_mod
 - **Table**: all points with selectable column groups, sortable; click a row to open the point over time. Validity checks below.
 - **Configuration**: settings that differ between the visible arms (lines that differ are highlighted), settings shared by all, settings that change per point, and the full configuration of one point.
 
-The layout (cards, hidden arms, colors) is saved in the browser; "reset layout" restores the defaults. Labels for known metrics are in `metrics.js`.
+The layout (cards, hidden arms, colors) is saved in the browser; "reset layout" restores the defaults. The default compare view starts with the agent metrics: output throughput, E2E normalized interactivity p90 and p50, request latency p99 and p90, and session progress against the baseline. Labels for known metrics are in `metrics.js`.
 
 ## Files
 

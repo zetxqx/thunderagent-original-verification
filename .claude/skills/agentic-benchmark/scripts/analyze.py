@@ -31,7 +31,7 @@ from urllib.parse import urlparse
 import numpy as np
 import pandas as pd
 
-PCTS = {"mean": None, "p50": 50, "p75": 75, "p90": 90, "p95": 95}
+PCTS = {"mean": None, "p50": 50, "p75": 75, "p90": 90, "p95": 95, "p99": 99}
 # vLLM v0.28 default for this server (../model-server/README.md): a step cannot
 # carry more prefill than this, so a bin above it is a metrics artifact.
 MAX_BATCHED_TOKENS = 8192
@@ -73,6 +73,7 @@ def load_records(path: Path) -> pd.DataFrame:
                 "end_ns": m.get("request_end_ns"),
                 "conv": m.get("conversation_id"),
                 "root": m.get("root_correlation_id"),
+                "trace": m.get("source_trace_id"),
                 "depth": m.get("agent_depth"),
                 "cancelled": bool(m.get("was_cancelled")),
                 "overflow_skip": bool(m.get("context_overflow_skip")),
@@ -687,7 +688,7 @@ def main() -> None:
     figures.concurrency(df, args.out)
 
     cols = ["label", "conc", "completed", "errors", "total_tput_per_gpu", "output_tput_per_gpu",
-            "p90_intvty", "p90_ttft_s", "p90_e2el_s", "p90_e2e_norm_intvty", "overall_hit_pct",
+            "p90_intvty", "p90_ttft_s", "p90_e2el_s", "p99_e2el_s", "p90_e2e_norm_intvty", "overall_hit_pct",
             "theoretical_hit_pct", "kv_usage_avg_pct", "waiting_avg_sum", "preemptions",
             "goodput_output_tput", "working_set_over_pool_mean", "batch_B", "step_time_T_ms",
             "gate_delayed_dispatches", "gate_pauses", "gate_starvation_promotions", "epp_queue_wait_p90_s"]
@@ -695,7 +696,8 @@ def main() -> None:
     lines = ["# AgentX sweep report", "", "## Whole profiling window (AgentX)", "",
              df[cols].to_markdown(index=False, floatfmt=".3g"), ""]
     ss_cols = ["label", "conc", "ss_completed", "ss_total_tput_per_gpu", "ss_output_tput_per_gpu", "ss_p50_intvty",
-               "ss_p90_intvty", "ss_p50_ttft_s", "ss_p90_ttft_s", "ss_goodput_output_tput", "ss_overall_hit_pct",
+               "ss_p90_intvty", "ss_p50_e2e_norm_intvty", "ss_p90_e2e_norm_intvty", "ss_p50_ttft_s", "ss_p90_ttft_s",
+               "ss_p90_e2el_s", "ss_p99_e2el_s", "ss_goodput_output_tput", "ss_overall_hit_pct",
                "ss_kv_usage_avg_pct", "ss_waiting_avg_sum"]
     ss_cols = [c for c in ss_cols if c in df]
     if len(ss_cols) > 2:

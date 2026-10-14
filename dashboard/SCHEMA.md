@@ -38,6 +38,7 @@ Only `schema`, `title`, `arms` and `points[].{id, arm, conc, summary}` are requi
 | `kv_pool_tokens` | int | GPU KV pool of the point's vLLM pods (reference line on token charts) |
 | `cpu_tier_tokens` | int or null | CPU offload tier in tokens (`--kv-offloading-size` / `kv_bytes_per_token`), null without offload. vLLM's offloading connector copies every computed block to CPU, so this is about the most KV a pod keeps, not GPU plus CPU |
 | `summary` | object | flat map of columns, see below |
+| `turns_by_trace` | object | completed turns per AgentX trace (`source_trace_id`) in the profiling window; the dashboard's session progress compares it with the baseline point at the same concurrency |
 | `checks` | string[] | validity warnings (analyze.py `checks()`) |
 | `config` | object | how the point was run, see below |
 | `series` | object | time series, see below |
@@ -46,7 +47,7 @@ Only `schema`, `title`, `arms` and `points[].{id, arm, conc, summary}` are requi
 
 ### `summary`
 
-The columns of analyze.py's `summary.csv` for this point (column meanings: the skill's references/metrics.md). Steady-state values have the prefix `ss_`; with the "steady state" window the dashboard uses `ss_<key>` when it exists and `<key>` otherwise. Percentile columns are `<pct>_<metric>` with pct in `mean p50 p75 p90 p95` (e.g. `p90_ttft_s`; for `intvty` p90 is the slowest 10%, the AgentX convention). `dashboard/metrics.js` lists the columns that have labels; other numeric columns appear under "Other".
+The columns of analyze.py's `summary.csv` for this point (column meanings: the skill's references/metrics.md). Steady-state values have the prefix `ss_`; with the "steady state" window the dashboard uses `ss_<key>` when it exists and `<key>` otherwise. Percentile columns are `<pct>_<metric>` with pct in `mean p50 p75 p90 p95 p99` (e.g. `p90_ttft_s`; for `intvty` and `e2e_norm_intvty` p90 is the slowest 10%, the AgentX convention). `dashboard/metrics.js` lists the columns that have labels; other numeric columns appear under "Other".
 
 ### `config`
 
