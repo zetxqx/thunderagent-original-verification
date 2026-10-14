@@ -43,6 +43,8 @@ Benchmark report for the one-hour comparison (B3), no-router vs llm-d-thunder-ag
 
 Three-arm report (passthrough, thunder lease 10 s, thunder lease 30 s, one hour each) with the effect of CPU offload (same arms without the CPU tier): [benchmark-report-3arm.md](benchmark-report-3arm.md). Runners: `b200/run-1h-l30-nooff.sh`, `b200/run-1h-nooff-tail.sh`.
 
+Parameter report for llm-d-thunder-agent-simplified (gate capacity 1.57M / 3.15M / 6.29M / 3.91M, idle lease 10 s / 30 s, plus a check of the upstream main image): [benchmark-report-thunder-params.md](benchmark-report-thunder-params.md). Runner `b200/run-1h-cap.sh`; collected in `b200/results/report-params/`.
+
 ## Question
 
 How does vLLM with native CPU KV offload compare with the InferenceX SGLang + HiCache result for GLM-5.2 on the AgentX workload, with the same model, GPUs, parallelism, offload size and client? And where the server overloads, does the thunder gate help?

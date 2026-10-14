@@ -1,12 +1,14 @@
 """Regroup step bundles into one bundle per model and GPU, with one-hour points only.
 
-  python3 dashboard/regroup_by_model.py STEP24.json GLM_1H.json GLM_EXTRA.json
+  python3 dashboard/regroup_by_model.py STEP24.json GLM_1H.json GLM_EXTRA.json GLM_PARAMS.json
 
 The inputs are the per-step bundles this replaced (in git history at commit a26515a:
 dashboard/data/step24-thunder-pr3-lanes.json and step25-explore1h.json). STEP24.json is the step 24 bundle (export_bundle.py over 24-thunder-pr3-lanes/results),
 GLM_1H.json the step 25 one-hour bundle (explore1h-*, r1/c12-16, thunder-r1),
-GLM_EXTRA.json r1/c1, c4, c8 and thunder-cpu-l10-r1/c16 exported with --kv-bytes-per-token 48200.
-The 900 s exploration points are left out. A point whose run did not need the CPU tier
+GLM_EXTRA.json r1/c1, c4, c8 and thunder-cpu-l10-r1/c16 exported with --kv-bytes-per-token 48200,
+GLM_PARAMS.json the capacity runs (explore1h-thunder-cap3m-l10-retry, cap6m-l10-retry) and the
+upstream main image check (smoke-main-thunder-gpu-l10/c24, 900 s), same flag.
+The 900 s exploration points are left out, except the main image check (its arm name says 15 min). A point whose run did not need the CPU tier
 (no-offload run with working-set peak <= the GPU KV pool, or offload run with < 1% of
 prompt tokens from the CPU tier) is equivalent with and without offload, so it is put in
 both arms, with "shared" in its id. Writes the two bundles into dashboard/data/ and
@@ -32,11 +34,12 @@ def fits_gpu(pt, offload_run):
 
 
 def build(title, description, settings, arms, sources):
-    """arms: [(id, name, baseline)]; sources: [(bundle, source arm, target arm, offload_run, share_arm or None)]."""
+    """arms: [(id, name, baseline)]; sources: [(bundle, source arm, target arm, offload_run, share_arm or None
+    [, allow_short])]."""
     points = []
-    for bundle, src, dst, offload_run, share in sources:
+    for bundle, src, dst, offload_run, share, *short in sources:
         for pt in bundle["points"]:
-            if pt["arm"] != src or pt.get("duration_min", 60) < 50:
+            if pt["arm"] != src or (pt.get("duration_min", 60) < 50 and not short):
                 continue
             p = copy.deepcopy(pt)
             p["arm"] = dst
@@ -58,7 +61,7 @@ def build(title, description, settings, arms, sources):
 
 
 def main():
-    s24, g1h, gx = (load(p) for p in sys.argv[1:4])
+    s24, g1h, gx, gp = (load(p) for p in sys.argv[1:5])
     qwen = build(
         "Qwen3-Coder-30B-A3B-FP8 on 2x H100 (TP=2), vLLM v0.28: no-router vs " + T + ", with and without 400 GiB CPU offload",
         "Step 24. One vLLM pod (2 H100, GPU KV 2.24M tokens), AgentX replay of the Weka Claude Code trace, 60 min per point, "
@@ -87,21 +90,29 @@ def main():
         + T + " lease 30 s c=12, 16 ran on a fresh vLLM pod per point (max-num-seqs 2x concurrency); all other points "
         "reset the KV cache on a running pod (max-num-seqs 64). Shared points: no-router c=1 and 4 took < 1% of prompt "
         "tokens from the CPU tier, so they also appear in the no-offload arm. From c=48 the " + T + " runs collapse after "
-        "the 1800 s forced admissions at minute 30 to 35.",
+        "the 1800 s forced admissions at minute 30 to 35. Capacity variants: the gate admits 2x or 4x the GPU pool "
+        "(capacityTokens with vLLM cache info disabled). The upstream main image arm is one 900 s point (ghcr.io/llm-d/"
+        "llm-d-router-endpoint-picker:main, commit 907c5fe8 with the merged #3076).",
         {"ttft_slo_s": 60.0, "skip_minutes": 5.0, "kv_bytes_per_token": 48200},
         [("no-router", "no-router + offload", True),
          ("thunder-l10", T + " lease 10 s + offload", False),
          ("thunder-l30", T + " lease 30 s + offload", False),
          ("no-router-nooff", "no-router, no offload", False),
          ("thunder-l10-nooff", T + " lease 10 s, no offload", False),
-         ("thunder-l10-cap391", T + " lease 10 s, capacity 3.91M + offload", False)],
+         ("thunder-l10-cap3m", T + " lease 10 s, capacity 3.15M (2x GPU) + offload", False),
+         ("thunder-l10-cap6m", T + " lease 10 s, capacity 6.29M (4x GPU) + offload", False),
+         ("thunder-l10-cap391", T + " lease 10 s, capacity 3.91M + offload", False),
+         ("thunder-l10-main", T + " lease 10 s + offload, upstream main image 907c5fe8 (15 min)", False)],
         [(gx, "r1", "no-router", True, "no-router-nooff"),
          (g1h, "explore1h-direct", "no-router", True, None),
          (g1h, "explore1h-direct-nooff", "no-router-nooff", False, None),
          (g1h, "explore1h-thunder-gpu-l10", "thunder-l10", True, None),
          (g1h, "explore1h-thunder-gpu-l10-nooff", "thunder-l10-nooff", False, None),
          (g1h, "explore1h-thunder-gpu-l30", "thunder-l30", True, None),
-         (gx, "thunder-cpu-l10", "thunder-l10-cap391", True, None)])
+         (gp, "explore1h-thunder-cap3m-l10-retry", "thunder-l10-cap3m", True, None),
+         (gp, "explore1h-thunder-cap6m-l10-retry", "thunder-l10-cap6m", True, None),
+         (gx, "thunder-cpu-l10", "thunder-l10-cap391", True, None),
+         (gp, "smoke-main-thunder-gpu-l10", "thunder-l10-main", True, None, True)])
     index = []
     for name, b in (("glm52-nvfp4-8xb200.json", glm), ("qwen3-coder-30b-fp8-2xh100.json", qwen)):
         json.dump(b, open(DATA / name, "w"), separators=(",", ":"))

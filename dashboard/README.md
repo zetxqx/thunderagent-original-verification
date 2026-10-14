@@ -30,7 +30,7 @@ It reuses `analyze.py` (same numbers as `summary.csv`) and reads one point at a 
 
 ## Current bundles
 
-One bundle per model and GPU, one-hour points only, built from the per-step bundles by `regroup_by_model.py` (see its docstring): `glm52-nvfp4-8xb200.json` (step 25) and `qwen3-coder-30b-fp8-2xh100.json` (step 24). Short exploration runs are left out. A point whose run did not use the CPU tier is equivalent with and without offload and appears in both arms, with "(shared)" in its id.
+One bundle per model and GPU, built from the per-step bundles by `regroup_by_model.py` (see its docstring): `glm52-nvfp4-8xb200.json` (step 25) and `qwen3-coder-30b-fp8-2xh100.json` (step 24). Points are one hour; short exploration runs are left out, except one 900 s check of the upstream main EPP image, whose arm name says "15 min". A point whose run did not use the CPU tier is equivalent with and without offload and appears in both arms, with "(shared)" in its id.
 
 ## Use it
 
