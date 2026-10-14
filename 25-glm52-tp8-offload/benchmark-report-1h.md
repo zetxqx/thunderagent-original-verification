@@ -8,7 +8,7 @@ Key Finding:
 
 - llm-d-thunder-agent-simplified gives 1.14x the output-token throughput at 32 sessions (872 vs 764 tokens/s), 1.10x to 1.11x at 48 and 64, 1.31x at 96 and 3.2x at 128 (872 vs 270); 1.02x at 20 and 24 sessions, a tie at 12 and 16. no-router stays at 760 to 820 tokens/s from 24 to 64 sessions, then collapses (618 at 96, 270 at 128); llm-d-thunder-agent-simplified stays at 807 to 899 from 32 to 128.
 - llm-d-thunder-agent-simplified keeps the median time to first token at 0.56 to 0.73 s at every concurrency; no-router's median is 6.2 s at 24 sessions, 19 s at 32, 43 to 74 s at 48 to 64 and 110 to 180 s at 96 to 128. p90 TTFT is 4.9x to 11x lower from 24 to 96 sessions and 99x lower at 128.
-- Up to 64 sessions the working set fits the CPU KV tier (about 18.2M tokens) and nothing beyond the new tokens of each turn is recomputed in either arm; llm-d-thunder-agent-simplified's gain comes from keeping the running sessions on the GPU (steady GPU hit 0.68 to 0.82 against 0.01 to 0.12 for no-router from 24 sessions up) instead of reloading them from CPU memory. From 96 sessions the working set reaches the CPU tier and no-router starts to recompute (18% of prompt tokens at 96, 87% at 128: KV thrashing); llm-d-thunder-agent-simplified computes 16% to 21%.
+- Up to 64 sessions the working set fits the CPU KV tier (about 18.2M tokens) and nothing beyond the new tokens of each turn is recomputed in either arm; llm-d-thunder-agent-simplified's gain comes from keeping the running sessions on the GPU (steady GPU hit 0.68 to 0.82 against 0.01 to 0.12 for no-router from 24 sessions up) instead of reloading them from CPU memory. From 96 sessions the working set reaches the CPU tier and no-router starts to recompute (11% of prompt tokens at 96, 79% at 128 in the steady state: KV thrashing); llm-d-thunder-agent-simplified computes 12% to 18%.
 - The cost is the tail: p99 TTFT is 3.6x to 8.1x worse from 20 to 96 sessions (193 s vs 50 s at 32, 2054 s vs 458 s at 96), and requests that waited the full 1800 s before being forced in grow from 2 and 4 (24 and 32 sessions) to 14, 34, 66 and 131 (48 to 128 sessions). no-router has the worse middle: from 64 sessions 57% to 78% of its turns wait over 60 s, against 5% to 8% for llm-d-thunder-agent-simplified.
 - On sessions both arms worked on, llm-d-thunder-agent-simplified completes 1.14x the turns per session at 24 sessions, 1.23x at 32, 1.3x to 1.9x at 48 to 96 and 3.4x at 128.
 
@@ -84,7 +84,7 @@ One run per point, whole profiling window (3600 s). TTFT in seconds, ITL in ms. 
 
 Per point:
 
-| conc | arm | requests ok | client errors | cancelled at the end | out tok/s | p50 TTFT (s) | p99 TTFT (s) | max TTFT (s) | p50 ITL (ms) | turns over 60 s | sessions with a turn over 60 s | overall hit (GPU + CPU tier) |
+| conc | arm | requests ok | client errors | cancelled at the end | out tok/s | p50 TTFT (s) | p99 TTFT (s) | max TTFT (s) | p50 ITL (ms) | turns over 60 s | sessions with a turn over 60 s | overall hit (GPU + CPU tier, whole window) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 12 | no-router | 1653 | 0 | 0 | 501 | 0.62 | 6.2 | 14 | 4.8 | 0% | 0% | 0.970 |
 | 12 | llm-d-thunder-agent-simplified | 1643 | 0 | 0 | 497 | 0.56 | 9.1 | 27 | 4.6 | 0% | 0% | 0.970 |
@@ -121,7 +121,7 @@ Other measured facts:
 | | conc 48 | conc 64 | conc 96 | conc 128 |
 |---|---|---|---|---|
 | requests with zero cache hit, no-router / llm-d-thunder-agent-simplified | 7.3% / 8.6% | 10.5% / 13.1% | 16.4% / 14.3% | 45.9% / 21.1% |
-| prompt tokens computed (not in any cache), no-router / llm-d-thunder-agent-simplified | 5.3% / 7.5% | 6.6% / 10.3% | 18.3% / 16.0% | 86.6% / 20.5% |
+| prompt tokens computed (not in any cache, steady state), no-router / llm-d-thunder-agent-simplified | 2.8% / 5.6% | 3.8% / 9.0% | 11.3% / 11.8% | 79.1% / 18.3% |
 | working set mean / peak (no-router), against an 18.2M CPU tier | 9.2M / 11.2M | 11.8M / 13.6M | 16.9M / 20.6M | 18.1M / 27.6M |
 | vLLM waiting queue mean, no-router / llm-d-thunder-agent-simplified | 31.0 / 3.2 | 53.9 / 6.7 | 104.8 / 17.4 | 226.9 / 34.9 |
 | sessions admitted at once by llm-d-thunder-agent-simplified (mean) | 13.0 | 16.8 | 21.3 | 33.0 |
@@ -156,11 +156,11 @@ Working set and the KV cache (GPU pool and CPU tier)
 - llm-d-thunder-agent-simplified's working set is a little smaller at 96 and 128 sessions (15.3M to 15.5M mean), because it serves smaller sessions first.
 - llm-d-thunder-agent-simplified keeps its admitted set just under the GPU pool up to 32 sessions (1.42M to 1.54M, 0.90x to 0.98x). From 48 sessions the forced admissions (requests let in after 1800 s whether they fit or not) push it over the pool: 1.32x at 48, 1.78x at 64, 2.68x at 96, 4.17x at 128.
 
-(b) Share of all prompt tokens served from the GPU prefix cache (dark), loaded from the CPU tier (light) and computed (grey, labeled from 5%), from vLLM's `prompt_tokens_by_source` counter, including the warmup. Left bar no-router, right bar llm-d-thunder-agent-simplified.
+(b) Share of all prompt tokens served from the GPU prefix cache (dark), loaded from the CPU tier (light) and computed (grey, labeled from 5%), measured by vLLM's `prompt_tokens_by_source` counter over the steady state (from minute 5 of profiling, no warmup). Left bar no-router, right bar llm-d-thunder-agent-simplified.
 
-- Up to 32 sessions the computed share is 4% to 5% in both arms: the new tokens of each turn. At 48 and 64 sessions it is 5% to 7% (no-router) and 7% to 10% (llm-d-thunder-agent-simplified).
-- no-router moves from the GPU to the CPU tier as concurrency grows (GPU 74% to 7%, CPU tier 22% to 88% from 12 to 64 sessions), then to recompute once the working set reaches the tier: 18% computed at 96 sessions, 87% at 128.
-- llm-d-thunder-agent-simplified stays on the GPU: 67% to 83% from the GPU cache at every concurrency. Its CPU share (12% to 19%) is mostly paused sessions coming back; its computed share grows to 16% at 96 and 21% at 128, because at that size the CPU tier no longer keeps every paused session's prefix.
+- Up to 32 sessions the computed share is 2.6% to 3.1% in both arms: the new tokens of each turn. At 48 and 64 sessions it is 2.8% to 3.8% (no-router) and 5.6% to 9.0% (llm-d-thunder-agent-simplified).
+- no-router moves from the GPU to the CPU tier as concurrency grows (GPU 82% to 1%, CPU tier 15% to 95% from 12 to 64 sessions), then to recompute once the working set reaches the tier: 11% computed at 96 sessions, 79% at 128.
+- llm-d-thunder-agent-simplified stays on the GPU: 68% to 84% from the GPU cache at every concurrency. Its CPU share (13% to 23%) is mostly paused sessions coming back; its computed share grows to 12% at 96 and 18% at 128, because at that size the CPU tier no longer keeps every paused session's prefix.
 
 Errors
 
@@ -174,8 +174,8 @@ Primary Bottleneck: GPU KV capacity for the running requests up to 64 sessions; 
 
 - Contexts are long (median prompt about 100k tokens up to 32 sessions), and a running request needs its whole context on the GPU, so vLLM runs only 2 to 12 requests at a time (5 to 7 from 20 to 32 sessions) against a max_num_seqs of 64, with the KV pool 100% full at every point.
 - Up to 20 sessions the GPU pool fits the active sessions with no-router and the two arms tie on throughput; llm-d-thunder-agent-simplified still lowers p90 TTFT at 16 sessions (2.5 s against 6.1 s) at the cost of a longer tail.
-- From 24 to 64 sessions the 18.2M-token CPU tier keeps every session's prefix (no-router overall hit 0.96 to 0.97, close to an infinite cache). With no-router all sessions take turns on the GPU slots, each turn evicts another session's GPU blocks, the steady GPU hit falls to 0.01 to 0.12, and 80% to 88% of every prompt is reloaded from CPU memory (142 to 176 TB per run, against 26 to 34 TB under llm-d-thunder-agent-simplified). The waiting queue grows (5.7 to 54 requests on average) and the median TTFT is that queue time (6 s to 74 s). With the copy path busy, every engine step is slower (p50 ITL 8.0 to 9.0 ms against 6.2 to 8.7 ms), and output stays at 760 to 820 tok/s. llm-d-thunder-agent-simplified keeps the admitted sessions on the GPU between turns (steady GPU hit 0.68 to 0.82), the vLLM queue short (0.2 to 6.7), and produces 1.02x to 1.14x the tokens.
-- At 96 and 128 sessions the working set reaches the CPU tier. no-router starts to thrash: overall hit 0.89 and 0.36, 18% and 87% of prompt tokens recomputed, 105 and 227 requests waiting, p50 ITL 12 and 33 ms, output 618 and 270 tok/s. llm-d-thunder-agent-simplified keeps 0.68 to 0.69 steady GPU hit and 16% to 21% computed, and gives 807 and 872 tok/s: 1.31x and 3.2x no-router.
+- From 24 to 64 sessions the 18.2M-token CPU tier keeps every session's prefix (no-router overall hit 0.96 to 0.97, close to an infinite cache). With no-router all sessions take turns on the GPU slots, each turn evicts another session's GPU blocks, the steady GPU hit falls to 0.01 to 0.12, and 85% to 96% of every prompt is reloaded from CPU memory in the steady state (142 to 176 TB per run including the warmup, against 26 to 34 TB under llm-d-thunder-agent-simplified). The waiting queue grows (5.7 to 54 requests on average) and the median TTFT is that queue time (6 s to 74 s). With the copy path busy, every engine step is slower (p50 ITL 8.0 to 9.0 ms against 6.2 to 8.7 ms), and output stays at 760 to 820 tok/s. llm-d-thunder-agent-simplified keeps the admitted sessions on the GPU between turns (steady GPU hit 0.68 to 0.82), the vLLM queue short (0.2 to 6.7), and produces 1.02x to 1.14x the tokens.
+- At 96 and 128 sessions the working set reaches the CPU tier. no-router starts to thrash: steady-state overall hit 0.89 and 0.21, 11% and 79% of prompt tokens recomputed, 105 and 227 requests waiting, p50 ITL 12 and 33 ms, output 618 and 270 tok/s. llm-d-thunder-agent-simplified keeps 0.68 to 0.69 steady GPU hit and 12% to 18% computed, and gives 807 and 872 tok/s: 1.31x and 3.2x no-router.
 
 Trade-offs:
 

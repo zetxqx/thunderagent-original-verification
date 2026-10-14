@@ -204,15 +204,27 @@ function metricLabel(m, pct) {
   return m.pct ? `${labelText(m.label)}, ${pct}` : labelText(m.label);
 }
 
-// CPU offload tier over the GPU KV pool, one value per distinct ratio among the visible points.
+// CPU offload tier over the GPU KV pool: one line per bundle, over the GPU pool most of its
+// visible offload points share (points on a fresh vLLM pod can have a slightly larger pool, which
+// would otherwise draw a separate line for the same tier).
 function tierRatios() {
-  const r = new Set();
+  const byBundle = new Map();
   for (const a of visibleArms()) {
     for (const p of pointsOf(a)) {
-      if (p.p.cpu_tier_tokens && p.p.kv_pool_tokens) r.add(Math.round((100 * p.p.cpu_tier_tokens) / p.p.kv_pool_tokens) / 100);
+      if (!p.p.cpu_tier_tokens || !p.p.kv_pool_tokens) continue;
+      const k = `${p.p.kv_pool_tokens}|${p.p.cpu_tier_tokens}`;
+      const counts = byBundle.get(p.bundle.uid) || new Map();
+      counts.set(k, (counts.get(k) || 0) + 1);
+      byBundle.set(p.bundle.uid, counts);
     }
   }
-  return [...r];
+  const lines = new Map();
+  for (const counts of byBundle.values()) {
+    const [pool, tier] = [...counts.entries()].sort((x, y) => y[1] - x[1])[0][0].split('|').map(Number);
+    const ratio = Math.round((10 * tier) / pool) / 10;
+    lines.set(ratio, { ratio, label: `CPU offload tier, ${(tier / 1e6).toFixed(2)}M tokens (${ratio}x the ${(pool / 1e6).toFixed(2)}M GPU KV pool)` });
+  }
+  return [...lines.values()];
 }
 
 // Mean, min and max over replicates, per concurrency.
@@ -411,9 +423,9 @@ function concCard(list, card) {
     if (m.tierLine && !card.ratio) {
       shapes.push(hline(1, POOL_COLOR, 'dot'));
       annotations.push(hnote(1, 'GPU KV pool', POOL_COLOR, { log }));
-      for (const r of tierRatios()) {
-        shapes.push(hline(r, TIER_COLOR, 'dash'));
-        annotations.push(hnote(r, `CPU offload tier (${r}x GPU KV, offload arms)`, TIER_COLOR, { log }));
+      for (const t of tierRatios()) {
+        shapes.push(hline(t.ratio, TIER_COLOR, 'dashdot'));
+        annotations.push(hnote(t.ratio, t.label, TIER_COLOR, { log }));
       }
     }
     draw(shell.plotDiv, traces, layout('concurrency', yTitle, {
@@ -560,7 +572,7 @@ function cacheCard(list, card) {
         });
       }
     }
-    for (const [name, dash, symbol] of [['mean', 'solid', 'circle'], ['max', 'dash', 'circle-open']]) {
+    for (const [name, dash, symbol] of [['working set, mean', 'solid', 'circle'], ['working set, max', 'dash', 'circle-open']]) {
       traces.push({ type: 'scatter', mode: 'lines+markers', x: [null], y: [null], name, xaxis: 'x2', yaxis: 'y2', hoverinfo: 'skip',
         line: { color: '#111', width: 2, dash }, marker: { color: '#111', size: 7, symbol } });
     }
@@ -573,9 +585,9 @@ function cacheCard(list, card) {
       { text: '<b>(b) Working set / GPU KV pool</b>', xref: 'paper', yref: 'paper', x: 0.7, y: 1, xanchor: 'left', yanchor: 'bottom', showarrow: false },
       hnote(1, 'GPU KV pool', POOL_COLOR, { xref: 'x2 domain', yref: 'y2' }),
     ];
-    for (const r of tierRatios()) {
-      lay.shapes.push({ type: 'line', xref: 'x2 domain', x0: 0, x1: 1, yref: 'y2', y0: r, y1: r, line: { color: TIER_COLOR, width: 1.5, dash: 'dash' } });
-      lay.annotations.push(hnote(r, `CPU offload tier (${r}x)`, TIER_COLOR, { xref: 'x2 domain', yref: 'y2' }));
+    for (const t of tierRatios()) {
+      lay.shapes.push({ type: 'line', xref: 'x2 domain', x0: 0, x1: 1, yref: 'y2', y0: t.ratio, y1: t.ratio, line: { color: TIER_COLOR, width: 1.5, dash: 'dashdot' } });
+      lay.annotations.push(hnote(t.ratio, t.label, TIER_COLOR, { xref: 'x2 domain', yref: 'y2' }));
     }
     lay.margin.t = 62;
     lay.legend = { orientation: 'h', x: 0, y: 1.1, yanchor: 'bottom', font: { size: 11 } };

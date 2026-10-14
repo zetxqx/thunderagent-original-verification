@@ -86,14 +86,14 @@ def main():
     glm = build(
         "GLM-5.2-NVFP4 on 8x B200 (TP=8), vLLM v0.31: no-router vs " + T + ", with and without 820 GiB CPU offload",
         "Step 25. One vLLM pod (8 B200, MTP 3, GPU KV 1.57M tokens), AgentX replay of the Weka Claude Code trace, 60 min per "
-        "point. CPU tier 820 GiB = about 18.2M tokens (MLA: one copy shared by the 8 GPUs). no-router c=1 to 16 and "
+        "point. CPU tier 820 GiB = 18.17M tokens (MLA: one copy shared by the 8 GPUs, 48,408 B per token). no-router c=1 to 16 and "
         + T + " lease 30 s c=12, 16 ran on a fresh vLLM pod per point (max-num-seqs 2x concurrency); all other points "
         "reset the KV cache on a running pod (max-num-seqs 64). Shared points: no-router c=1 and 4 took < 1% of prompt "
         "tokens from the CPU tier, so they also appear in the no-offload arm. From c=48 the " + T + " runs collapse after "
         "the 1800 s forced admissions at minute 30 to 35. Capacity variants: the gate admits 2x or 4x the GPU pool "
         "(capacityTokens with vLLM cache info disabled). The upstream main image arm is one 900 s point (ghcr.io/llm-d/"
         "llm-d-router-endpoint-picker:main, commit 907c5fe8 with the merged #3076).",
-        {"ttft_slo_s": 60.0, "skip_minutes": 5.0, "kv_bytes_per_token": 48200},
+        {"ttft_slo_s": 60.0, "skip_minutes": 5.0, "kv_bytes_per_token": 48408},
         [("no-router", "no-router + offload", True),
          ("thunder-l10", T + " lease 10 s + offload", False),
          ("thunder-l30", T + " lease 30 s + offload", False),
@@ -113,6 +113,12 @@ def main():
          (gp, "explore1h-thunder-cap6m-l10-retry", "thunder-l10-cap6m", True, None),
          (gx, "thunder-cpu-l10", "thunder-l10-cap391", True, None),
          (gp, "smoke-main-thunder-gpu-l10", "thunder-l10-main", True, None, True)])
+    # GLM CPU tier, exact: vLLM keeps one copy for the 8 GPUs (MLA replicated layout), 48,408 B per token
+    # per GPU (measured: 387,264 B loaded per CPU-tier token over 8 GPUs), a 64-token block padded to the
+    # 4096 B page: 820 GiB // 3,100,672 B = 283,960 blocks = 18,173,440 tokens.
+    for p in glm["points"]:
+        if p.get("cpu_tier_tokens"):
+            p["cpu_tier_tokens"] = 18_173_440
     index = []
     for name, b in (("glm52-nvfp4-8xb200.json", glm), ("qwen3-coder-30b-fp8-2xh100.json", qwen)):
         json.dump(b, open(DATA / name, "w"), separators=(",", ":"))

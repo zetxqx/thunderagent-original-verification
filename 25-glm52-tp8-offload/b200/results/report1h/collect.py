@@ -74,9 +74,10 @@ for arm, pts in ARMS.items():
             "zero_hit_pct": 100 * zero / n, "turns_over_60s_pct": None, "sessions_over_60s_pct": float(s["sessions_worst_ttft_over_slo_pct"]),
             "isl_p50": q(isl, .5), "isl_p90": q(isl, .9), "isl_max": max(isl), "osl_p50": q(osl, .5), "osl_mean": st.mean(osl),
             "turns_by_trace": dict(turns), "cpu_to_gpu_tb": (load or 0) / 1e12,
-            "prompt_from_cpu_pct": 100 * src.get("external_kv_transfer", 0) / src_total,
-            "prompt_from_gpu_pct": 100 * src.get("local_cache_hit", 0) / src_total,
-            "prompt_computed_pct": 100 * src.get("local_compute", 0) / src_total,
+            # token sources in the steady state (analyze.py ss_*: from minute 5 of profiling, no warmup)
+            "prompt_from_cpu_pct": float(s["ss_cpu_hit_pct"]),
+            "prompt_from_gpu_pct": float(s["ss_gpu_hit_pct"]),
+            "prompt_computed_pct": float(s["ss_recompute_pct"]),
             "working_set_mean": float(s["working_set_mean"]), "working_set_max": float(s["working_set_max"]), **{f"gate_{k}": v for k, v in gate.items()},
         }
         long_ = sum(1 for l in open(d / "aiperf_artifacts/profile_export.jsonl")
