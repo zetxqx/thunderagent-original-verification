@@ -1,14 +1,17 @@
 """Regroup step bundles into one bundle per model and GPU, with one-hour points only.
 
+Left out on purpose: the 900 s runs, Qwen forced admission 300 s (with and without the
+reclaim fix) and GLM capacity 3.91M (set from a wrong CPU tier estimate); their data stays
+in the step folders and reports.
+
   python3 dashboard/regroup_by_model.py STEP24.json GLM_1H.json GLM_EXTRA.json GLM_PARAMS.json
 
 The inputs are the per-step bundles this replaced (in git history at commit a26515a:
 dashboard/data/step24-thunder-pr3-lanes.json and step25-explore1h.json). STEP24.json is the step 24 bundle (export_bundle.py over 24-thunder-pr3-lanes/results),
 GLM_1H.json the step 25 one-hour bundle (explore1h-*, r1/c12-16, thunder-r1),
-GLM_EXTRA.json r1/c1, c4, c8 and thunder-cpu-l10-r1/c16 exported with --kv-bytes-per-token 48200,
-GLM_PARAMS.json the capacity runs (explore1h-thunder-cap3m-l10-retry, cap6m-l10-retry) and the
-upstream main image check (smoke-main-thunder-gpu-l10/c24, 900 s), same flag.
-The 900 s exploration points are left out, except the main image check (its arm name says 15 min). A point whose run did not need the CPU tier
+GLM_EXTRA.json r1/c1, c4, c8 exported with --kv-bytes-per-token 48200,
+GLM_PARAMS.json the capacity runs (explore1h-thunder-cap3m-l10-retry, cap6m-l10-retry), same flag.
+The 900 s exploration points are left out. A point whose run did not need the CPU tier
 (no-offload run with working-set peak <= the GPU KV pool, or offload run with < 1% of
 prompt tokens from the CPU tier) is equivalent with and without offload, so it is put in
 both arms, with "shared" in its id. Writes the two bundles into dashboard/data/ and
@@ -73,16 +76,12 @@ def main():
          ("thunder-l10", T + " lease 10 s + offload", False),
          ("thunder-l30", T + " lease 30 s + offload", False),
          ("no-router-nooff", "no-router, no offload", False),
-         ("thunder-l30-nooff", T + " lease 30 s, no offload", False),
-         ("thunder-l30-fa300", T + " lease 30 s, forced admission 300 s + offload", False),
-         ("thunder-l30-fa300-reclaim", T + " lease 30 s, forced admission 300 s + reclaim fix + offload", False)],
+         ("thunder-l30-nooff", T + " lease 30 s, no offload", False)],
         [(s24, "offload-baseline-60m", "no-router", True, None),
          (s24, "baseline-60m", "no-router-nooff", False, "no-router"),
          (s24, "offload-thunder-lease10-60m", "thunder-l10", True, None),
          (s24, "offload-thunder-60m", "thunder-l30", True, None),
-         (s24, "thunder-60m", "thunder-l30-nooff", False, "thunder-l30"),
-         (s24, "offload-thunder-fa300-60m", "thunder-l30-fa300", True, None),
-         (s24, "offload-thunder-fa300-reclaim-60m", "thunder-l30-fa300-reclaim", True, None)])
+         (s24, "thunder-60m", "thunder-l30-nooff", False, "thunder-l30")])
     glm = build(
         "GLM-5.2-NVFP4 on 8x B200 (TP=8), vLLM v0.31: no-router vs " + T + ", with and without 820 GiB CPU offload",
         "Step 25. One vLLM pod (8 B200, MTP 3, GPU KV 1.57M tokens), AgentX replay of the Weka Claude Code trace, 60 min per "
@@ -91,8 +90,7 @@ def main():
         "reset the KV cache on a running pod (max-num-seqs 64). Shared points: no-router c=1 and 4 took < 1% of prompt "
         "tokens from the CPU tier, so they also appear in the no-offload arm. From c=48 the " + T + " runs collapse after "
         "the 1800 s forced admissions at minute 30 to 35. Capacity variants: the gate admits 2x or 4x the GPU pool "
-        "(capacityTokens with vLLM cache info disabled). The upstream main image arm is one 900 s point (ghcr.io/llm-d/"
-        "llm-d-router-endpoint-picker:main, commit 907c5fe8 with the merged #3076).",
+        "(capacityTokens with vLLM cache info disabled).",
         {"ttft_slo_s": 60.0, "skip_minutes": 5.0, "kv_bytes_per_token": 48408},
         [("no-router", "no-router + offload", True),
          ("thunder-l10", T + " lease 10 s + offload", False),
@@ -100,9 +98,7 @@ def main():
          ("no-router-nooff", "no-router, no offload", False),
          ("thunder-l10-nooff", T + " lease 10 s, no offload", False),
          ("thunder-l10-cap3m", T + " lease 10 s, capacity 3.15M (2x GPU) + offload", False),
-         ("thunder-l10-cap6m", T + " lease 10 s, capacity 6.29M (4x GPU) + offload", False),
-         ("thunder-l10-cap391", T + " lease 10 s, capacity 3.91M + offload", False),
-         ("thunder-l10-main", T + " lease 10 s + offload, upstream main image 907c5fe8 (15 min)", False)],
+         ("thunder-l10-cap6m", T + " lease 10 s, capacity 6.29M (4x GPU) + offload", False)],
         [(gx, "r1", "no-router", True, "no-router-nooff"),
          (g1h, "explore1h-direct", "no-router", True, None),
          (g1h, "explore1h-direct-nooff", "no-router-nooff", False, None),
@@ -110,9 +106,7 @@ def main():
          (g1h, "explore1h-thunder-gpu-l10-nooff", "thunder-l10-nooff", False, None),
          (g1h, "explore1h-thunder-gpu-l30", "thunder-l30", True, None),
          (gp, "explore1h-thunder-cap3m-l10-retry", "thunder-l10-cap3m", True, None),
-         (gp, "explore1h-thunder-cap6m-l10-retry", "thunder-l10-cap6m", True, None),
-         (gx, "thunder-cpu-l10", "thunder-l10-cap391", True, None),
-         (gp, "smoke-main-thunder-gpu-l10", "thunder-l10-main", True, None, True)])
+         (gp, "explore1h-thunder-cap6m-l10-retry", "thunder-l10-cap6m", True, None)])
     # GLM CPU tier, exact: vLLM keeps one copy for the 8 GPUs (MLA replicated layout), 48,408 B per token
     # per GPU (measured: 387,264 B loaded per CPU-tier token over 8 GPUs), a 64-token block padded to the
     # 4096 B page: 820 GiB // 3,100,672 B = 283,960 blocks = 18,173,440 tokens.
