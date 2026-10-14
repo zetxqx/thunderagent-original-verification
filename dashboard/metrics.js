@@ -143,7 +143,7 @@ const DEFAULT_POINT_CARDS = [
   { type: 'ts', metric: 'ttft_p90_s' },
   { type: 'ts', metric: 'src_gpu_hit_pct' },
   { type: 'ts', metric: 'working_set_tokens' },
-  { type: 'ts', metric: 'vllm_waiting' },
+  { type: 'ts', metric: 'vllm_running', metric2: 'vllm_waiting' },
   { type: 'dist', metric: 'ttft_s' },
   { type: 'slo', measure: 'turns' },
 ];

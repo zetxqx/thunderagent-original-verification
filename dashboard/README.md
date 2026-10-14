@@ -36,7 +36,7 @@ One bundle per model and GPU, built from the per-step bundles by `regroup_by_mod
 
 - **Sidebar**: show or hide arms, click an arm name to focus it (the others fade), change colors, pick the baseline, filter concurrencies, switch between the steady state and the whole run.
 - **Compare arms**: one metric against concurrency per card. Each card picks its metric, percentile, an optional second percentile (dashed), log scale and ratio to the baseline. Also x-vs-y (Pareto) cards, the prompt token source bars, and the cache card (token source with the theoretical max hit, and working set / GPU KV pool, as in make_figures.py fig3). Hover for exact values; drag to zoom, double-click to reset; the camera icon saves a PNG.
-- **Points over time**: pick points (chips per arm), then time series, distributions (CDF) and the share of turns meeting a TTFT target.
+- **Points over time**: pick points (chips per arm), then time series, distributions (CDF) and the share of turns meeting a TTFT target. A time-series card can add a second series (for example vLLM running and waiting requests), drawn in the same colors with open markers, on the same axis or on a right axis for other units.
 - **Table**: all points with selectable column groups, sortable; click a row to open the point over time. Validity checks below.
 - **Configuration**: settings that differ between the visible arms (lines that differ are highlighted), settings shared by all, settings that change per point, and the full configuration of one point.
 

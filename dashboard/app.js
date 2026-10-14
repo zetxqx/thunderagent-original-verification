@@ -682,30 +682,62 @@ function availableSeries() {
   return { known, other };
 }
 
+// "vLLM running requests" and "vLLM waiting requests" -> "vLLM running / waiting requests".
+function mergeLabels(a, b) {
+  const x = a.split(' '), y = b.split(' ');
+  let pre = 0, suf = 0;
+  while (pre < Math.min(x.length, y.length) - 1 && x[pre] === y[pre]) pre++;
+  while (suf < Math.min(x.length, y.length) - pre - 1 && x[x.length - 1 - suf] === y[y.length - 1 - suf]) suf++;
+  const mid = w => w.slice(pre, w.length - suf).join(' ');
+  return [...x.slice(0, pre), `${mid(x)} / ${mid(y)}`, ...x.slice(x.length - suf)].join(' ');
+}
+
+// A second series (card.metric2) is drawn in the same colors and dashes with open markers and lighter
+// lines, on the same y axis or, with card.right, on its own axis at the right (other units).
 function tsCard(list, card) {
   const m = findSeries(card.metric);
+  const m2 = card.metric2 ? findSeries(card.metric2) : null;
   const { known, other } = availableSeries();
-  const shell = cardShell(list, card, update => [
-    metricSelect(card.metric, known, other, v => update({ metric: v, log: undefined })),
-    check('log y', card.log ?? m.log, v => update({ log: v })),
-  ]);
+  const shell = cardShell(list, card, update => {
+    const second = metricSelect(card.metric2 || '', known, other, v => update({ metric2: v || undefined }));
+    second.prepend(el('option', { value: '', text: '+ no 2nd series', selected: !card.metric2 }));
+    return [
+      metricSelect(card.metric, known, other, v => update({ metric: v, log: undefined })),
+      check('log y', card.log ?? m.log, v => update({ log: v })),
+      second,
+      m2 ? check('2nd on right axis', card.right, v => update({ right: v })) : null,
+    ];
+  });
   shell.draw = () => {
     const sel = selectedPoints();
-    const traces = [], shapes = [], missing = [], allY = [];
+    const traces = [], shapes = [], missing = [], allY = [], allY2 = [];
     const scale = m.scale || 1;
     const refs = new Map((m.refs || []).map(([key, label]) => [key, { label, values: new Set() }]));
     const slo = sloSeconds();
+    const short = x => labelText(x.label).replace(/ \(.*\)$/, '');
     for (const p of sel) {
       const s = (p.p.series || {})[m.key];
       if (!s) { missing.push(pointName(p)); continue; }
       const st = pointStyle(p, sel);
+      const name = m2 ? `${st.name} · ${short(m)}` : st.name;
       s.v.forEach(v => allY.push(v * scale));
       traces.push({
-        x: s.t, y: s.v.map(v => (v === null ? null : v * scale)), name: st.name, type: 'scatter', mode: 'lines',
+        x: s.t, y: s.v.map(v => (v === null ? null : v * scale)), name, type: 'scatter', mode: 'lines',
         line: { color: st.color, width: 2.2, dash: st.dash },
-        hovertemplate: `<b>${esc(st.name)}</b><br>minute %{x:.1f}<br>%{y:.4~g}<extra></extra>`,
+        hovertemplate: `<b>${esc(name)}</b><br>minute %{x:.1f}<br>%{y:.4~g}<extra></extra>`,
       });
       for (const [key, ref] of refs) if (p.p[key]) ref.values.add(p.p[key] * scale);
+      const s2 = m2 ? (p.p.series || {})[m2.key] : null;
+      if (s2) {
+        const scale2 = m2.scale || 1, name2 = `${st.name} · ${short(m2)}`;
+        s2.v.forEach(v => (card.right ? allY2 : allY).push(v * scale2));
+        traces.push({
+          x: s2.t, y: s2.v.map(v => (v === null ? null : v * scale2)), name: name2, type: 'scatter', mode: 'lines+markers',
+          yaxis: card.right ? 'y2' : 'y', opacity: 0.75,
+          line: { color: st.color, width: 1.6, dash: st.dash }, marker: { color: st.color, size: 5, symbol: 'circle-open' },
+          hovertemplate: `<b>${esc(name2)}</b><br>minute %{x:.1f}<br>%{y:.4~g}<extra></extra>`,
+        });
+      } else if (m2) missing.push(`${pointName(p)} (${short(m2)})`);
     }
     const log = card.log ?? m.log;
     const annotations = [];
@@ -724,9 +756,14 @@ function tsCard(list, card) {
     }
     const skip = sel.length ? sel[0].bundle.data.settings?.skip_minutes : null;
     if (skip) shapes.push(vline(skip));
-    draw(shell.plotDiv, traces, layout('minutes since the first profiled request', m.label, {
+    const lay = layout('minutes since the first profiled request', m2 && !card.right ? mergeLabels(short(m), short(m2)) : m.label, {
       legend: true, shapes, annotations, y: log ? logAxis(allY) : { rangemode: 'tozero' },
-    }));
+    });
+    if (m2 && card.right) {
+      lay.yaxis2 = axis(m2.label, { overlaying: 'y', side: 'right', showgrid: false, ...(m2.log ? logAxis(allY2) : { rangemode: 'tozero' }) });
+      lay.margin.r = 58;
+    }
+    draw(shell.plotDiv, traces, lay);
     const notes = [];
     if (skip) notes.push(`dotted line: steady state starts (minute ${skip})`);
     if ([...refs.values()].some(r => r.label === 'CPU offload tier' && r.values.size)) {
