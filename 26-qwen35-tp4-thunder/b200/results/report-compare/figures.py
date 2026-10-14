@@ -12,6 +12,7 @@ ROOT = HERE.parents[3]
 sys.path.insert(0, str(ROOT / ".claude/skills/agentic-benchmark/scripts"))
 import figstyle as fs  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.ticker import FuncFormatter, NullFormatter  # noqa: E402
 
 G = json.load(open(ROOT / "25-glm52-tp8-offload/b200/results/report1h/metrics.json"))
 Q = json.load(open(HERE / "metrics-qwen.json"))
@@ -169,4 +170,48 @@ fig.suptitle("Qwen3.5-397B-A17B-FP8 on 4x B200 (TP4), 48 sessions: llm-d-thunder
              y=1.01, fontsize=17, fontweight="bold")
 fig.tight_layout()
 fs.finalize_figure(fig, HERE, "fig4-qwen35-utilthreshold")
+
+# fig5: Pareto, output tok/s per GPU against speed per user, one file per model. Left: interactivity
+# (decode only), right: E2E normalized interactivity (wait included). GLM-5.2 uses all step 25
+# concurrencies (12 to 128); Qwen3.5 adds the utilThreshold points at 48 sessions.
+GC = sorted({int(k.split("/")[1]) for k in G})
+# label offsets (points) where the default ones collide: (model, panel, arm, c) -> (dx, dy)
+OFF5 = {("glm52", 0, "passthrough", 24): (6, 2), ("glm52", 0, "passthrough", 32): (-30, -4),
+        ("glm52", 0, "passthrough", 48): (-4, -16), ("glm52", 0, "passthrough", 64): (-30, 4),
+        ("glm52", 0, "thunder", 96): (-32, -12),
+        ("glm52", 1, "thunder", 128): (-38, 0), ("glm52", 1, "thunder", 96): (6, -16), ("glm52", 1, "passthrough", 24): (-28, -14),
+        ("glm52", 1, "thunder", 64): (-22, 7), ("glm52", 1, "thunder", 48): (6, 0),
+        ("qwen35", 0, "thunder", 64): (-4, -15), ("qwen35", 0, "passthrough", 64): (6, 2),
+        ("qwen35", 1, "passthrough", 48): (-10, -16), ("qwen35", 1, "thunder", 32): (-30, 4),
+        ("qwen35", 1, "util", "0.8"): (8, -10)}
+PANELS5 = [("intvty_p90", "interactivity p90 (tok/s per user, decode only)", "(a) speed per user without the wait"),
+           ("e2e_norm_intvty_p90", "E2E normalized interactivity p90 (tok/s per user)", "(b) speed per user with the wait")]
+for tag, (title, m), concs in (("glm52", MODELS[0], GC), ("qwen35", MODELS[1], C)):
+    fig, ax = plt.subplots(1, 2, figsize=(15, 6))
+    for k, (key, xlabel, ptitle) in enumerate(PANELS5):
+        a = ax[k]
+        for name, akey, col in ARMS:
+            pts = [m[f"{akey}/{c}"] for c in concs]
+            xs_, ys_ = [x[key] for x in pts], [x["out_tok_s_gpu"] for x in pts]
+            a.plot(xs_, ys_, "-o", color=col, lw=2.2, ms=7, label=name)
+            for c, x, y in zip(concs, xs_, ys_):
+                a.annotate(f"c{c}", (x, y), textcoords="offset points", fontsize=9, color=col,
+                           xytext=OFF5.get((tag, k, akey, c), (6, 4 if akey == "thunder" else -12)))
+        if tag == "qwen35":
+            for n, mk in (("0.8", "s"), ("0.6", "D")):
+                a.plot(U[n][key], U[n]["out_tok_s_gpu"], mk, color=fs.PALETTE["teal"], ms=9,
+                       label=f"llm-d-thunder-agent-simplified, utilThreshold {n} (c48)")
+                a.annotate(f"util {n}", (U[n][key], U[n]["out_tok_s_gpu"]), textcoords="offset points",
+                           xytext=OFF5.get((tag, k, "util", n), (6, -12)), fontsize=9, color=fs.PALETTE["teal"])
+        a.set_ylim(0, None); a.set_ylabel("output tok/s per GPU")
+        if tag == "glm52":  # 0.2 to 160 tok/s per user
+            a.set_xscale("log"); xlabel += ", log"
+            a.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}")); a.xaxis.set_minor_formatter(NullFormatter())
+        a.set_xlabel(xlabel)
+        a.grid(color=fs.GRID_COLOR); a.set_axisbelow(True)
+        fs.panel_title(a, ptitle)
+    ax[0].legend(loc="lower left", fontsize=10)
+    fig.suptitle(f"{title}: throughput against speed per user (up and right is better)", y=1.02, fontsize=16, fontweight="bold")
+    fig.tight_layout()
+    fs.finalize_figure(fig, HERE, f"fig5-{tag}-pareto")
 print("ok")

@@ -144,6 +144,13 @@ Requests in vLLM, GPU cache share and CPU-to-GPU traffic
 
 ![](b200/results/report-compare/fig2-glm52-mechanism.png)
 
+Pareto: throughput against speed per user, all step 25 concurrencies (12 to 128 sessions)
+
+![](b200/results/report-compare/fig5-glm52-pareto.png)
+
+- (a) Without the wait: from 16 sessions, the llm-d-thunder-agent-simplified curve is above and to the right of the no-router curve.
+- (b) With the wait: the gap is larger. From 24 sessions, no-router moves far to the left (E2E normalized interactivity p90 9.7 down to 0.2), because requests wait in the vLLM queue. llm-d-thunder-agent-simplified stays between 11 and 80.
+
 ### Qwen3.5-397B-A17B-FP8 on 4x B200 (TP4)
 
 Throughput, E2E normalized interactivity, request latency and TTFT
@@ -153,6 +160,14 @@ Throughput, E2E normalized interactivity, request latency and TTFT
 Requests in vLLM, GPU cache share and CPU-to-GPU traffic
 
 ![](b200/results/report-compare/fig2-qwen35-mechanism.png)
+
+Pareto: throughput against speed per user, with the utilThreshold points at 48 sessions
+
+![](b200/results/report-compare/fig5-qwen35-pareto.png)
+
+- The two arms are on the same curve.
+- (a) Without the wait: utilThreshold 0.6 is to the right of the curve. On this metric, it looks better.
+- (b) With the wait: utilThreshold 0.8 and 0.6 are below the 48-session point of utilThreshold 1.0. They give less throughput at approximately the same speed per user (26 to 27). Thus the metric that includes the wait gives the opposite result.
 
 The two "Requests in vLLM" figures use the same y axes. Thus the bar heights compare directly between the models.
 
