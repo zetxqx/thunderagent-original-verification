@@ -136,7 +136,7 @@ const DIST_METRICS = [
 
 const PALETTE = {
   baseline: '#B64342',
-  arms: ['#0F4D92', '#42949E', '#9A4D8E', '#8BCF8B', '#3775BA', '#E0A33A', '#5B5B5B', '#C76B98'],
+  arms: ['#0F4D92', '#42949E', '#9A4D8E', '#8BCF8B', '#3775BA', '#E0A33A', '#5B5B5B', '#C76B98', '#E8590C', '#17BECF'],
 };
 
 // The first four are the agent view: throughput, speed per user with the wait included,

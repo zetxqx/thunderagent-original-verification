@@ -27,6 +27,9 @@
 #   needs VLLM_SERVER_DEV_MODE=1) and, in pool mode, restart the EPP. Faster, but
 #   not AgentX's rule (one fresh server per point): for exploration, not for
 #   InferenceX comparisons.
+# VLLM_PORTS (default 8000): the API server ports of each vLLM pod, e.g. "8000 8001 ... 8007"
+#   for vLLM data parallel with one API server per rank (--data-parallel-multi-port-external-lb).
+#   Server metrics are read from, and the KV tiers emptied on, every port.
 #
 # The EPP's plugin config (the arm) is set by the caller before the point;
 # this script only records it in meta/.
@@ -51,6 +54,7 @@ EPP_DEPLOY=${EPP_DEPLOY:-program-aware-scheduling-epp}
 EPP_METRICS_PORT=${EPP_METRICS_PORT:-9090}
 RESTART=${RESTART:-1}
 RESET=${RESET:-0}
+VLLM_PORTS=${VLLM_PORTS:-8000}
 if [ "$LANE" = a ]; then PVC=${PVC:-agentx-data}; else PVC=${PVC:-agentx-data-$LANE}; fi
 CLIENT_POOL=${CLIENT_POOL:-default-pool}
 CLIENT_CPU=${CLIENT_CPU:-8}
@@ -119,14 +123,16 @@ restart_deploy() {
 }
 # reset_caches: empty the GPU prefix cache and the CPU offload tier of every vLLM pod.
 reset_caches() {
-  local p
+  local p port
   for p in $(decode_pods); do
-    kc exec "$p" -c modelserver -- python3 -c "
+    for port in $VLLM_PORTS; do
+      kc exec "$p" -c modelserver -- python3 -c "
 import urllib.request
 r = urllib.request.urlopen(urllib.request.Request(
-    'http://localhost:8000/reset_prefix_cache?reset_external=true', method='POST'), timeout=120)
-assert r.status == 200, r.status" || { echo "cache reset failed on $p" >&2; exit 1; }
-    log "emptied both KV tiers on $p"
+    'http://localhost:$port/reset_prefix_cache?reset_external=true', method='POST'), timeout=120)
+assert r.status == 200, r.status" || { echo "cache reset failed on $p:$port" >&2; exit 1; }
+      log "emptied both KV tiers on $p:$port"
+    done
   done
 }
 epp_pods() {
@@ -261,7 +267,8 @@ done
 
 METRICS_URLS=""
 for p in $TARGETS; do
-  METRICS_URLS="$METRICS_URLS http://$(kc get pod "$p" -o jsonpath='{.status.podIP}'):8000/metrics"
+  ip=$(kc get pod "$p" -o jsonpath='{.status.podIP}')
+  for port in $VLLM_PORTS; do METRICS_URLS="$METRICS_URLS http://$ip:$port/metrics"; done
 done
 METRICS_URLS=${METRICS_URLS# }
 EPP_METRICS_URLS=""

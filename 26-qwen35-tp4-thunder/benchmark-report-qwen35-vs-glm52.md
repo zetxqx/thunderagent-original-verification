@@ -13,6 +13,7 @@ Key Finding:
 - The cost is the same on the two models: a longer tail. At 64 sessions on Qwen3.5, p99 TTFT is 99 s (no-router: 26 s).
 - Qwen3.5 does not collapse after the 1800 s forced admissions. GLM-5.2 collapses at 48 and 64 sessions.
 - With free space (`utilThreshold` 0.6, section 5.3), llm-d-thunder-agent-simplified keeps idle sessions on the GPU on Qwen3.5. The GPU hit is 75%, not 29%. But throughput decreases by 14%, and the agent metrics do not improve. The cause: a CPU-tier hit is cheap on this model.
+- When llm-d-thunder-agent-simplified helps (section 8): it can only recover the compute that no-router loses on cache misses. On three models, the gain is 1.75x to 3.89x when a miss is a full prefill. It is 1.03x to 1.15x when a miss is an expensive load, and 1.00x on Qwen3.5.
 - Agent metrics (section 5.1): on GLM-5.2, llm-d-thunder-agent-simplified increases the E2E normalized interactivity p90 by 8x to 14x. It increases the session progress by 18% to 21%. It also increases the request latency p99 by 2.3x to 7.4x. On Qwen3.5, the three metrics do not change up to 48 sessions.
 
 ## 2. Setup & Environment
@@ -223,7 +224,7 @@ The tail:
 
 Conclusion:
 
-- The value of llm-d-thunder-agent-simplified increases with the KV size for each token.
+- The value of llm-d-thunder-agent-simplified increases with the cost of a cache miss compared with compute (section 8).
 - If only a small number of long sessions fit on the GPU, llm-d-thunder-agent-simplified increases throughput and decreases the median TTFT very much.
 - If the KV size is small, no-router is satisfactory. llm-d-thunder-agent-simplified only decreases the median and increases the tail. A lower `utilThreshold` does not change this.
 
@@ -234,3 +235,87 @@ Caveats:
 - The effective capacity is an estimate.
 - The results are not comparable with InferenceX (SGLang). At 32 sessions, InferenceX gives 336 tok/s per GPU and interactivity p90 74. vLLM gives 303 and 46.
 - The utilThreshold test (section 5.3) is at 48 sessions only.
+
+## 8. When llm-d-thunder-agent-simplified helps
+
+### 8.1 The rule
+
+llm-d-thunder-agent-simplified does not add compute. It can only recover the compute that no-router loses on cache misses. Thus it increases throughput only when two conditions are true:
+
+1. The sessions do not fit: the working set is clearly larger than the GPU KV pool.
+2. A miss is expensive, compared with the compute that the GPU must do for each token in all conditions.
+
+If condition 2 is false, llm-d-thunder-agent-simplified only changes which sessions wait. The median TTFT decreases and the tail increases (Qwen3.5 at 64 sessions, section 5).
+
+Evidence from three models, with and without CPU KV offload. All values are for the steady state. Sources: dashboard bundles (steps 24 and 25) and step 26.
+
+| model, hardware | active parameters | CPU offload | what no-router does on a miss | working set / GPU pool | output tok/s per GPU, no-router to thunder | thunder / no-router |
+|---|---|---|---|---|---|---|
+| GLM-5.2, 8x B200 | 39B | off | computes the prompt again (95% to 97% of prompt tokens) | 2.5 / 3.4 (c24 / c32) | 16 to 61 / 13 to 49 | **3.80x / 3.89x** |
+| Qwen3-Coder-30B-A3B, 2x H100 | 3B | off | computes the prompt again (87% to 89%) | 1.2 / 1.7 (c24 / c32) | 60 to 141 / 61 to 107 | **2.33x / 1.75x** |
+| GLM-5.2, 8x B200 | 39B | on | loads 387 KB for each token from the CPU tier | 3.1 / 4.1 (c24 / c32) | 102 to 105 / 94 to 108 | 1.03x / 1.15x |
+| Qwen3-Coder-30B-A3B, 2x H100 | 3B | on | loads 49 KB for each token | 1.4 / 1.9 (c24 / c32) | 178 to 190 / 167 to 192 | 1.07x / 1.15x |
+| Qwen3.5-397B-A17B, 4x B200 | 17B | on | loads 31 to 35 KB for each token | 1.4 / 1.8 (c48 / c64) | 407 to 407 / 421 to 406 | **1.00x / 0.97x** |
+
+The idle lease is 10 s, except Qwen3-Coder without offload: 30 s (no 10 s run exists).
+
+- Without offload, each miss is a full prefill. The gain is 1.75x to 3.89x.
+- With offload, a miss is a load. The gain decreases when the load cost decreases.
+- Qwen3-Coder at 24 sessions and Qwen3.5 at 48 sessions have the same working set / pool (1.4). Qwen3-Coder gains 7%. Qwen3.5 gains 0%.
+- The probable cause: compute for each token. Qwen3-Coder has 3B active parameters, so a load is large compared with its compute. Qwen3.5 has 17B active parameters. The GPU types are also different (H100 and B200).
+- The setups also differ in engine version and settings. Compare the trend, not single values.
+
+### 8.2 Why GLM-5.2 satisfies the two conditions
+
+- Fit: GLM-5.2 uses MLA. Each of the 8 GPUs keeps a full copy of the compressed KV, so tensor parallelism does not divide it. Thus 8 B200 give a pool of only 1.57M tokens. Approximately 8 sessions fit, at approximately 0.2M tokens of working set for each session.
+- Qwen3.5 keeps KV in only 15 of 60 layers, with 2 KV heads. Its pool is 4.8M tokens on 4 GPUs. Approximately 35 sessions fit.
+- Miss cost: a GLM-5.2 load copies 387 KB for each token (8 copies). no-router copies 142 to 176 TB each hour. This traffic makes each engine step slower: 8.3 ms for each output token at 32 sessions, against 6.4 ms with llm-d-thunder-agent-simplified.
+- Lesson: the model size does not decide the result. Two values decide it: the KV bytes for each token on each GPU, and the miss cost compared with compute.
+
+### 8.3 Qwen3.5 at high concurrency: what limits the server
+
+no-router:
+
+| | c32 | c48 | c64 |
+|---|---|---|---|
+| output tok/s per GPU | 303 | 394 (+30%) | 409 (+4%) |
+| requests running in vLLM | 13.2 | 26.6 (+100%) | 35.1 (+32%) |
+| engine step time (ms) | 28.5 | 46.3 | 59.0 |
+| GPU KV used by running requests, mean | 37% | 70% | 90% |
+| requests waiting in vLLM / mean wait | 0.1 / 0.1 s | 1.1 / 0.7 s | 17.7 / 10 s |
+| preemptions (share of requests) | 0 | 18 (0.29%) | 94 (1.47%) |
+| CPU-to-GPU traffic | 0.7 GB/s | 3.4 GB/s | 4.6 GB/s |
+
+- Compute is almost at its limit at 64 sessions. From 48 to 64 sessions, the running requests increase by 32%, but throughput increases by only 4%.
+- The running requests fill the GPU KV (90% mean at 64 sessions). vLLM cannot run more requests. The other requests wait in the vLLM queue.
+- Preemption: vLLM admits a request when its prompt fits now. It does not keep space for the tokens that the request will generate. When no free block remains, vLLM stops the newest running request and puts it back in the queue. When the request starts again, it gets its prefix from the GPU cache or the CPU tier, or computes it again.
+- A preemption makes that request slower. The effect on throughput is probably a few percent: at most 94 x approximately 100k tokens, against 67M prompt tokens computed in the hour. This is an estimate, not a measurement.
+- The CPU-to-GPU link is not a limit (4.6 GB/s at most).
+- No capacity setting of llm-d-thunder-agent-simplified removes the compute limit or the KV limit of the running requests.
+
+### 8.4 Experiments to confirm the rule
+
+Done: the miss cost changed alone (offload on and off) on GLM-5.2 and Qwen3-Coder (section 8.1).
+
+To do on Qwen3.5, with one change for each experiment:
+
+| experiment | the one change | prediction | if the result is different |
+|---|---|---|---|
+| E1: 96 and 128 sessions. Arms: no-router, thunder with capacity = CPU tier, thunder with capacity = GPU pool. All servers `--max-num-seqs 128`. | The working set becomes larger than the CPU tier (12.68M tokens) at approximately 96 sessions. Misses change from loads to recompute. | At 128 sessions, no-router throughput decreases. Thunder with capacity = CPU tier keeps approximately 400 tok/s per GPU. | Recompute costs less than expected on this model. |
+| E2: GPU pool decreased to approximately 1M tokens (`--kv-cache-memory`), so approximately 8 sessions fit. Offload on, 32 sessions. | Only condition 1 becomes like GLM-5.2. A miss stays cheap. | A vLLM queue starts. Thunder decreases the median TTFT. Throughput does not increase. | Condition 1 alone is sufficient. Change the rule. |
+
+A test without GPUs: for each no-router run in section 8.1, calculate the time lost to misses. This time is the bytes loaded / link bandwidth, plus the time for the extra computed tokens. Compare it with the measured thunder gain. If the two agree, one no-router run is sufficient to decide if thunder is useful for a new model.
+
+### 8.5 Settings for each model
+
+| setting | how to select it | GLM-5.2 | Qwen3.5 |
+|---|---|---|---|
+| use thunder | if the no-router run loses much compute on misses | yes | no, while compute is at its limit and misses are cheap |
+| capacity | the tier where a miss becomes expensive | GPU pool, 1.57M tokens (a load is already expensive) | CPU tier, 12,680,752 tokens (only prevents recompute) |
+| capacity unit | tokens that really fit | vLLM `kv_cache_size_tokens` | vLLM `kv_cache_size_tokens`. Block size x blocks is 13% too high. Running requests use approximately 14% more than their token count. |
+| idle lease | the tool-call time and the miss cost | 10 s (30 s is worse, see step 25) | can be short, because a lost room costs little |
+
+- CPU tier of Qwen3.5: 5,959 chunks. The smallest step of `vllm:kv_offload_cpu_cache_usage_perc` is 1/5959. 387 GiB / 69.8 MB for each chunk gives 5,957. Each chunk holds one 2128-token attention block (measured: 2175 to 2201 stored tokens for each chunk). Thus 5,959 x 2,128 = 12,680,752 tokens, 2.68x the GPU pool.
+- The capacity is not GPU plus CPU. The offload connector copies each GPU block to the CPU tier. Thus the CPU tier is the largest set of distinct tokens that the server keeps.
+- Tool-call time (idle time between two turns of a session, Qwen3.5 at 48 sessions): median 1.9 s, p75 4.1 s, p90 26 s. 78% of gaps are 5 s or less. 83% are 10 s or less.
+- Suggestion for llm-d-thunder-agent-simplified: it can calculate these values itself. It can read the GPU pool and the CPU tier from vLLM, and measure the load bytes for each token and the step time. Then it can select the capacity.

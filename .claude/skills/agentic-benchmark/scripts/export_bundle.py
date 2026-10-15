@@ -352,8 +352,8 @@ def main() -> None:
     arm_map = dict(a.split("=", 1) for a in args.arm)
     points = []
     for p in args.points:
-        if not (p / "aiperf_artifacts" / "profile_export_aiperf.json").exists():
-            print(f"skip {p}: no profile_export_aiperf.json")
+        if not (p / "aiperf_artifacts" / "profile_export.jsonl").exists():
+            print(f"skip {p}: no profile_export.jsonl")
             continue
         print(f"exporting {p}", flush=True)
         points.append(export_point(p, args.ttft_slo, args.skip_minutes, args.replicate_suffix, args.kv_bytes_per_token,

@@ -130,6 +130,14 @@ def unserved_requests(art: Path, pods: set[str], cancelled: int) -> int:
     return max(cancelled - int(running), 0)
 
 
+def aiperf_summary(art: Path) -> dict:
+    """profile_export_aiperf.json, or {} when the client was killed after the run (e.g. OOMKilled
+    while exporting server metrics): the per-request records and the server metrics parquet are
+    written before it, so the point can still be analyzed without overflow counts."""
+    path = art / "profile_export_aiperf.json"
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
 def metric(pj: dict, tag: str, stat: str = "avg") -> float | None:
     v = pj.get(tag)
     if isinstance(v, dict):
@@ -165,6 +173,12 @@ def load_server(path: Path, pods: set[str]) -> pd.DataFrame:
     pq = read_server(path)
     pq = pq[pq["endpoint_url"].map(netloc).isin(pods)].copy()
     pq["pod"] = pq["endpoint_url"].map(netloc)
+    # vLLM data parallel behind one API server (internal DP load balancer): one series per engine at one
+    # URL. Count each engine as a pod, so gauges are summed over the engines, not averaged.
+    if "engine" in pq.columns:
+        engines = pq[pq["engine"].notna()].groupby("pod")["engine"].nunique()
+        dp = pq["pod"].isin(engines[engines > 1].index) & pq["engine"].notna()
+        pq.loc[dp, "pod"] = pq.loc[dp, "pod"] + "/engine" + pq.loc[dp, "engine"].astype(str)
     pq["m"] = pq["metric_name"].str.removesuffix("_total")
     return pq
 
@@ -410,7 +424,7 @@ def analyze_point(d: Path, out: Path, cost: float | None, slo: float, skip_minut
     finish_path = d / "meta" / "finish.json"
     finish = json.loads(finish_path.read_text()) if finish_path.exists() else {}
     art = d / "aiperf_artifacts"
-    pj = json.loads((art / "profile_export_aiperf.json").read_text())
+    pj = aiperf_summary(art)
     df = load_records(art / "profile_export.jsonl")
     conc = int(meta.get("concurrency") or d.name.lstrip("c"))
     num_gpus = int(meta.get("num_gpus") or 1)
@@ -445,6 +459,7 @@ def analyze_point(d: Path, out: Path, cost: float | None, slo: float, skip_minut
         "mode": meta.get("mode"),
         "job_status": finish.get("job_status"),
         "pod_changed": finish.get("pod_changed"),
+        "aiperf_summary_missing": not pj,
         "submission_valid": md.get("submission_valid"),
         "invalid_reasons": ";".join(sorted(set(reasons))),
         "errors": int(errors),
@@ -618,6 +633,8 @@ def checks(r: pd.Series) -> list[str]:
         out.append("a vLLM or EPP pod was replaced or restarted during the run: INVALID")
     if r.get("job_status") == "failed":
         out.append("the aiperf job failed (see bench-stdout.log)")
+    if r.get("aiperf_summary_missing") is True:
+        out.append("no profile_export_aiperf.json: no context overflow counts or theoretical hit")
     if r.get("submission_valid") is False:
         out.append(f"submission_valid=false ({r.get('invalid_reasons')})")
     if r.get("errors", 0) > 0:
@@ -666,8 +683,8 @@ def main() -> None:
 
     rows, points = [], []
     for d in args.points:
-        if not (d / "aiperf_artifacts" / "profile_export_aiperf.json").exists():
-            print(f"skip {d}: no profile_export_aiperf.json")
+        if not (d / "aiperf_artifacts" / "profile_export.jsonl").exists():
+            print(f"skip {d}: no profile_export.jsonl")
             continue
         print(f"analyzing {d}")
         rows.append(analyze_point(d, args.out, args.cost_per_gpu_hour, args.ttft_slo, args.skip_minutes))

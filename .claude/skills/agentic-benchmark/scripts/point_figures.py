@@ -85,7 +85,7 @@ def rolling(y, n):
 def load(point: Path) -> dict:
     meta = json.loads((point / "meta" / "point.json").read_text())
     art = point / "aiperf_artifacts"
-    pj = json.loads((art / "profile_export_aiperf.json").read_text())
+    pj = a23.aiperf_summary(art)
     df = a23.load_records(art / "profile_export.jsonl")
     prof = df[df["phase"] == "profiling"]
     ok = prof[prof["err_type"].isna() & ~prof["cancelled"]].dropna(subset=["start_ns", "end_ns", "lat_s", "osl"])
