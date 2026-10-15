@@ -1,0 +1,48 @@
+# Extra Helm values for the lane EPP on cluster a4-pr (render-lane-epp.sh EXTRA_VALUES), as step 26.
+# The plugin config has no tokenizer, so the HF_TOKEN env (secret llm-d-hf-token, absent here) is dropped.
+router:
+  epp:
+    env: []
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - {key: cloud.google.com/gke-nodepool, operator: In, values: [pool-1]}
+    # The endpoints file for file-discovery: one endpoint per DP rank of glm52-dep8-c
+    # (ClusterIP 10.0.34.129 of its Service, rank r on port 8000 + r).
+    pluginsCustomConfig:
+      endpoints.yaml: |
+        endpoints:
+        - name: glm52-dep8-c-rank0
+          namespace: bobzetian-llmd
+          address: "10.0.34.129"
+          port: "8000"
+        - name: glm52-dep8-c-rank1
+          namespace: bobzetian-llmd
+          address: "10.0.34.129"
+          port: "8001"
+        - name: glm52-dep8-c-rank2
+          namespace: bobzetian-llmd
+          address: "10.0.34.129"
+          port: "8002"
+        - name: glm52-dep8-c-rank3
+          namespace: bobzetian-llmd
+          address: "10.0.34.129"
+          port: "8003"
+        - name: glm52-dep8-c-rank4
+          namespace: bobzetian-llmd
+          address: "10.0.34.129"
+          port: "8004"
+        - name: glm52-dep8-c-rank5
+          namespace: bobzetian-llmd
+          address: "10.0.34.129"
+          port: "8005"
+        - name: glm52-dep8-c-rank6
+          namespace: bobzetian-llmd
+          address: "10.0.34.129"
+          port: "8006"
+        - name: glm52-dep8-c-rank7
+          namespace: bobzetian-llmd
+          address: "10.0.34.129"
+          port: "8007"

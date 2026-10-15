@@ -1,0 +1,128 @@
+# GLM-5.2-NVFP4 on one a4-highgpu-8g node (8x B200) with DEP=8: attention data parallel 8,
+# MoE expert parallel 8, TP=1 in each rank. Otherwise as step 25's TP=8 server
+# (25-glm52-tp8-offload/b200/vllm.yaml). GPUs from DRA (ResourceClaimTemplate glm52-tp8-gpu, step 25).
+#
+# Two load-balancing modes (DP_MODE_ARGS):
+#   ""  one API server on port 8000; vLLM's internal DP load balancer picks a rank by load.
+#   "--data-parallel-size-local 8 --data-parallel-multi-port-external-lb"
+#       one API server for each rank on ports 8000 to 8007 (rank = port - 8000), aggregated
+#       health on port 9256; the EPP picks the rank.
+# Each rank is its own engine with its own CPU tier: --kv-offloading-size 102.5 GiB x 8 ranks =
+# 820 GiB, the same total as step 25. --max-num-seqs and --max-num-batched-tokens are per rank.
+# Render: sed -e s/glm52-dep8-a/glm52-dep8-a/ -e s/gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-5qjv/<host>/ -e "s//<args>/" \
+#             -e s/8000/8000/ vllm-dep8.yaml.tmpl   (9256 in multi-port mode)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glm52-dep8-a
+  namespace: bobzetian-llmd
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  progressDeadlineSeconds: 3600
+  selector:
+    matchLabels: {app: glm52-dep8-a}
+  template:
+    metadata:
+      labels: {app: glm52-dep8-a}
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: a4-highgpu-8g
+        kubernetes.io/hostname: gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-5qjv
+      tolerations:
+      - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: glm52-tp8-gpu
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: modelserver
+        image: vllm/vllm-openai:v0.31.0
+        command: [bash, -c]
+        args:
+        - |
+          exec vllm serve nvidia/GLM-5.2-NVFP4 \
+            --revision aec724e8c7b8ee9db3b48c01c320f63f9cdaf8aa \
+            --served-model-name nvidia/GLM-5.2-NVFP4 \
+            --host 0.0.0.0 --port 8000 \
+            --data-parallel-size 8 --enable-expert-parallel $DP_MODE_ARGS \
+            --trust-remote-code \
+            --kv-cache-dtype fp8_e4m3 \
+            --max-model-len "$MAX_MODEL_LEN" \
+            --max-num-seqs "$MAX_NUM_SEQS" \
+            --max-num-batched-tokens 8192 \
+            --gpu-memory-utilization 0.8 \
+            --speculative-config '{"method":"mtp","num_speculative_tokens":3}' \
+            --kv-offloading-size 102.5 --kv-offloading-backend native \
+            --enable-auto-tool-choice --tool-call-parser glm47 \
+            --enable-prompt-tokens-details
+        env:
+        - {name: DP_MODE_ARGS, value: ""}
+        - {name: MAX_NUM_SEQS, value: "32"}
+        # 783872: the most one rank's KV holds at --gpu-memory-utilization 0.8 (35.3 GiB per rank after
+        # 85.8 GiB of weights; vLLM refused 1048576 on 2026-10-15). The trace's longest prompt is 782,546.
+        - {name: MAX_MODEL_LEN, value: "783872"}
+        - {name: NCCL_CUMEM_ENABLE, value: "1"}
+        # The node's NCCL net/tuner plugins need RDMA devices this pod does not claim;
+        # the expert-parallel all-to-all stays inside the node on NVLink.
+        - {name: NCCL_NET_PLUGIN, value: none}
+        - {name: NCCL_TUNER_PLUGIN, value: none}
+        - {name: NCCL_SOCKET_IFNAME, value: eth0}
+        - {name: VLLM_SERVER_DEV_MODE, value: "1"}
+        # As step 26: vLLM's 5 s default closes idle connections that a client without a
+        # router then reuses ("Connection reset by peer").
+        - {name: VLLM_HTTP_TIMEOUT_KEEP_ALIVE, value: "1800"}
+        ports:
+        - {name: http, containerPort: 8000}
+        - {containerPort: 8001}
+        - {containerPort: 8002}
+        - {containerPort: 8003}
+        - {containerPort: 8004}
+        - {containerPort: 8005}
+        - {containerPort: 8006}
+        - {containerPort: 8007}
+        - {containerPort: 9256}
+        startupProbe:
+          httpGet: {path: /health, port: 8000}
+          periodSeconds: 10
+          failureThreshold: 540
+        readinessProbe:
+          httpGet: {path: /health, port: 8000}
+          periodSeconds: 10
+        resources:
+          requests: {cpu: "100", memory: 1300Gi}
+          limits: {memory: 1600Gi}
+          claims:
+          - name: gpu
+        volumeMounts:
+        - {name: dshm, mountPath: /dev/shm}
+        - {name: hf-cache, mountPath: /root/.cache/huggingface}
+        - {name: nvidia-install-dir, mountPath: /usr/local/nvidia/lib64}
+      volumes:
+      - name: dshm
+        emptyDir: {medium: Memory, sizeLimit: 900Gi}
+      - name: hf-cache
+        hostPath:
+          path: /mnt/stateful_partition/kube-ephemeral-ssd/shared_disk/bobzetian-hf-cache
+          type: DirectoryOrCreate
+      - name: nvidia-install-dir
+        hostPath: {path: /home/kubernetes/bin/nvidia/lib64}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: glm52-dep8-a
+  namespace: bobzetian-llmd
+spec:
+  selector: {app: glm52-dep8-a}
+  ports:
+  - {name: http, port: 8000, targetPort: 8000}
+  - {name: rank1, port: 8001, targetPort: 8001}
+  - {name: rank2, port: 8002, targetPort: 8002}
+  - {name: rank3, port: 8003, targetPort: 8003}
+  - {name: rank4, port: 8004, targetPort: 8004}
+  - {name: rank5, port: 8005, targetPort: 8005}
+  - {name: rank6, port: 8006, targetPort: 8006}
+  - {name: rank7, port: 8007, targetPort: 8007}
