@@ -48,6 +48,10 @@ Measured on 2026-10-15: the weights use 85.8 GiB on each rank, so 35.3 GiB to 36
 3. `b200/run-dep8.sh`: the three new arms at the same time, c32, then c64.
 4. Compare with the reused TP=8 points: throughput, the agent metrics (E2E normalized interactivity p50 and p90, request latency p99, session progress), GPU and CPU-tier hit, CPU-to-GPU traffic.
 
+## Experiment C: DEP=8 thunder at 96 and 128 sessions
+
+Done (2026-10-15 22:19 to 00:07 UTC, report section 5.3): `b200/run-dep8-highc.sh`, `dep8-thunder-l10` at c=96 on `glm52-dep8-c` and c=128 on `glm52-dep8-b` at the same time. Server b's EPP uses the thunder config (`lane-epp-gb-thunder.yaml`, capacity 818,175 for each rank). Client memory limit 64 GiB. TP=8 references: step 25 `explore1h-direct` and `explore1h-thunder-gpu-l10` at c=96 and 128. Analysis: `b200/results/report-highc/` (the two new points and the four TP=8 references, same `analyze.py`).
+
 ## Incidents
 
 - dep8-affinity c=32: both tries failed at the cache reset with a transient Kubernetes API error ("the server is currently unable to handle the request", 08:44 UTC). `run-dep8-b32.sh` runs the point again on server b after b's c=64 point, as label `dep8-affinity-r2`.

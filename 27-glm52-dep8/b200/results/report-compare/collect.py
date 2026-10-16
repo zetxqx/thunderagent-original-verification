@@ -1,4 +1,4 @@
-"""Step 27: TP=8 (step 25) against DEP=8 for GLM-5.2, c=24 to 64, into metrics.json. Summary values from
+"""Step 27: TP=8 (step 25) against DEP=8 for GLM-5.2, c=24 to 128 (c=96 and 128: experiment C, thunder only on DEP=8), into metrics.json. Summary values from
 analyze.py (report-tp8/ and report/, the same analyze.py version for both). Session progress: turns
 completed on the traces that the arm and TP=8 no-router at the same concurrency both ran, divided by the
 TP=8 no-router turns on those traces."""
@@ -7,7 +7,7 @@ from pathlib import Path
 
 R = Path(__file__).resolve().parent.parent
 T = R.parents[2] / "25-glm52-tp8-offload/b200/results"
-C = (24, 32, 48, 64)
+C = (24, 32, 48, 64, 96, 128)
 ARMS = {  # arm -> (summary label, point directory for a concurrency)
     "tp8-direct": ("explore1h-direct", lambda c: T / "explore1h-direct" / f"c{c}"),
     "tp8-thunder": ("explore1h-thunder-gpu-l10", lambda c: T / "explore1h-thunder-gpu-l10" / f"c{c}"),
@@ -18,7 +18,7 @@ ARMS = {  # arm -> (summary label, point directory for a concurrency)
     "dep8-thunder": ("dep8-thunder-l10", lambda c: R / "dep8-thunder-l10" / f"c{c}"),
 }
 summ = {}
-for f in ("report-tp8/summary.csv", "report/summary.csv"):
+for f in ("report-tp8/summary.csv", "report/summary.csv", "report-highc/summary.csv"):
     for r in csv.DictReader(open(R / f)):
         if (r["label"], r["conc"]) == ("dep8-affinity", "64"):
             continue  # first try without server metrics; the retry below replaces it

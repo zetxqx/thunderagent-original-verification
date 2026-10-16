@@ -11,7 +11,7 @@ import figstyle as fs  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 
 M = json.load(open(HERE / "metrics.json"))
-C = [24, 32, 48, 64]
+C = [24, 32, 48, 64, 96, 128]
 P = fs.PALETTE
 # TP=8 dashed, DEP=8 solid
 ARMS = [("tp8-direct", "TP=8, no-router", fs.BASELINE_COLOR, "--"),

@@ -11,6 +11,7 @@ Key Finding:
 - DEP=8 with session affinity keeps each session on one rank. It gives 83% of the TP=8 throughput at 24 sessions and 26% at 64 sessions. From 48 sessions, the ranks overflow and 36% to 55% of prompt tokens go through prefill again.
 - DEP=8 with llm-d-thunder-agent-simplified is the best configuration from 48 sessions: 1.07x and 1.12x the throughput of TP=8 with llm-d-thunder-agent-simplified at 48 and 64 sessions. The request latency p99 is 264 s and 503 s (TP=8 with thunder: 711 s and 1331 s). Session progress is 1.23 and 1.29 (TP=8 with thunder: 1.18 and 1.21).
 - The cost of DEP=8 is the speed for each user. The decode interactivity p90 of DEP=8 with thunder is 14 to 45 tok/s, against 64 to 94 for TP=8 with thunder. At 24 and 32 sessions, TP=8 with thunder has a higher throughput and higher E2E normalized interactivity.
+- At 96 and 128 sessions (section 5.3), DEP=8 with thunder still gives 1.19x and 1.12x the TP=8 thunder throughput. But it does not give more than at 64 sessions. From 96 sessions, the forced admissions after 1800 s cause a decrease after minute 30, smaller than on TP=8.
 - The prediction of this step was wrong. DEP=8 gives 4.2x more GPU KV in total, but as 8 separate pools of 818k tokens. One long session can fill a rank. Thus llm-d-thunder-agent-simplified is more necessary on DEP=8, not less.
 
 ## 2. Setup & Environment
@@ -103,9 +104,38 @@ Raw data: `b200/results/dep8-*` and step 25 `b200/results/explore1h-*`. Collecte
 
 Forced admissions after 1800 s at 24 / 32 / 48 / 64 sessions: TP=8 with thunder 2 / 4 / 14 / 34. DEP=8 with thunder 0 / 0 / 2 / 5. Sessions with a turn over 60 s TTFT, TP=8 with thunder: 33% / 64% / 74% / 79%. DEP=8 with thunder: 19% / 29% / 45% / 68%.
 
+### 5.3 Experiment C: DEP=8 with thunder at 96 and 128 sessions
+
+`b200/run-dep8-highc.sh`, 2026-10-15: c=96 on `glm52-dep8-c` and c=128 on `glm52-dep8-b` at the same time. Same thunder config as in section 4. Client memory limit 64 GiB. TP=8 references: step 25 at c=96 and 128. Only the thunder arm ran on DEP=8.
+
+| c | arm | completed | output tok/s per GPU | E2E norm. interactivity p50 / p90 | request latency p90 / p99 (s) | TTFT p50 (s) | session progress | prompt tokens from GPU / CPU / computed | running / waiting in vLLM | interactivity p90 (decode only) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 96 | TP=8, no-router | 2,105 | 77.3 | 3.7 / 0.6 | 324 / 470 | 179.41 | 1.00 | 2% / 87% / 11% | 9.0 / 104.8 | 34 |
+| 96 | TP=8, thunder | 3,292 | 100.9 | 73.7 / 11 | 60 / 2092 | 0.69 | 1.56 | 68% / 21% / 12% | 9.7 / 17.4 | 53 |
+| 96 | DEP=8, thunder | 3,985 | 119.6 | 19.3 / 3.9 | 180 / 1209 | 1.68 | 1.75 | 66% / 19% / 14% | 48.6 / 14.5 | 9 |
+| 128 | TP=8, no-router | 851 | 33.8 | 2.9 / 0.19 | 1755 / 1926 | 109.82 | 1.00 | 5% / 16% / 79% | 11.5 / 226.9 | 10 |
+| 128 | TP=8, thunder | 3,459 | 109.0 | 66.3 / 15 | 48 / 2149 | 0.73 | 3.61 | 69% / 13% / 18% | 12.1 / 34.9 | 49 |
+| 128 | DEP=8, thunder | 4,212 | 121.7 | 16.8 / 5.6 | 126 / 1638 | 1.50 | 4.56 | 70% / 13% / 17% | 56.9 / 32.0 | 9 |
+
+Forced admissions after 1800 s at 96 / 128 sessions: TP=8 with thunder 66 / 131. DEP=8 with thunder 30 / 62.
+
+Output tokens of completed requests in each 10 minutes of the profiling window (thousands):
+
+| | 0 to 10 | 10 to 20 | 20 to 30 | 30 to 40 | 40 to 50 | 50 to 60 |
+|---|---|---|---|---|---|---|
+| DEP=8, thunder, c=64 | 483 | 546 | 996 | 577 | 515 | 502 |
+| DEP=8, thunder, c=96 | 425 | 843 | 783 | 509 | 381 | 490 |
+| DEP=8, thunder, c=128 | 493 | 1,001 | 1,169 | 509 | 142 | 202 |
+| TP=8, thunder, c=96 | 640 | 931 | 652 | 320 | 49 | 282 |
+| TP=8, thunder, c=128 | 718 | 1,093 | 922 | 297 | 80 | 28 |
+
+- DEP=8 with thunder stays at 120 to 126 tok/s per GPU from 48 sessions. The peak is at 64 sessions. At 96 and 128 sessions, it gives 1.19x and 1.12x the TP=8 thunder throughput.
+- The tail and session progress stay better than TP=8 with thunder. Each user stays slower: the decode interactivity p90 is 9, against 49 to 53.
+- From 96 sessions, the forced admissions after 1800 s also hurt DEP=8. At 128 sessions, the output decreases from approximately 1,000k to 142k to 202k tokens for each 10 minutes after minute 30. Each rank runs 7 requests on average, 32 requests wait in vLLM, and vLLM computes 17% of prompt tokens. The decrease is smaller than on TP=8 (28k to 80k), because thunder holds fewer sessions and forces in half as many.
+
 ## 6. Figures
 
-Throughput and agent metrics (TP=8 dashed, DEP=8 solid)
+Throughput and agent metrics (TP=8 dashed, DEP=8 solid). At 96 and 128 sessions, only the thunder arm ran on DEP=8.
 
 ![](b200/results/report-compare/fig1-throughput-agent-metrics.png)
 
@@ -137,7 +167,7 @@ Why TP=8 with thunder is faster for each user:
 Conclusion:
 
 - At 24 and 32 sessions, use TP=8 with llm-d-thunder-agent-simplified: the throughput is 1.04x to 1.07x higher and each user is faster.
-- At 48 sessions and more, use DEP=8 with llm-d-thunder-agent-simplified: higher throughput, much shorter tail and more session progress, but each user is slower.
+- At 48 sessions and more, use DEP=8 with llm-d-thunder-agent-simplified: higher throughput, much shorter tail and more session progress, but each user is slower. Its best point is approximately 64 sessions. More sessions do not increase throughput, and from 96 sessions the forced admissions return as a problem. To solve this, thunder must change how it selects and forces in held sessions. A different setting is not sufficient.
 - Do not use DEP=8 without a router that limits the sessions on each rank. Session affinity alone is not sufficient from 48 sessions.
 - The rule of the step 26 report, section 8, stays correct. On each rank, the sessions fit less well than on TP=8, and a miss is a recompute. The prediction of this step treated the 8 pools as one pool. That was wrong.
 
