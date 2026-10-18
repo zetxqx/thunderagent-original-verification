@@ -1063,7 +1063,24 @@ function purge(container) {
   container.replaceChildren();
 }
 
+// Rebuilding the cards and the sidebar empties them for a moment, and the browser then moves
+// the page (and the sidebar) back to the top. Keep the page height and both scroll positions,
+// except when the tab changes.
+let renderedTab = null;
 function render() {
+  const main = document.querySelector('main');
+  const sidebar = $('sidebar');
+  const sameTab = renderedTab === state.ui.tab;
+  const pageY = window.scrollY, sideY = sidebar.scrollTop;
+  main.style.minHeight = `${main.offsetHeight}px`;
+  renderContent();
+  sidebar.scrollTop = sideY;
+  window.scrollTo(0, sameTab ? pageY : 0);
+  main.style.minHeight = '';
+  renderedTab = state.ui.tab;
+}
+
+function renderContent() {
   renderSidebar();
   const has = state.points.length > 0;
   $('title').textContent = state.bundles.map(b => b.data.title).filter(Boolean).join(' + ');
