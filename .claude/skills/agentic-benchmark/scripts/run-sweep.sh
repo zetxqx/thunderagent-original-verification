@@ -23,5 +23,5 @@ for c in "$@"; do
 done
 
 uv run "$SCRIPTS/analyze.py" --out "$RESULTS/$LABEL/report" "$RESULTS/$LABEL"/c*
-rm -f "$RESULTS/bobbm.kubeconfig"
+rm -f "$RESULTS"/*.kubeconfig   # the pinned kubeconfig written by lib.sh pin_kube
 [ -z "$FAILED" ] || { echo "points that did not succeed or are invalid:$FAILED"; exit 1; }

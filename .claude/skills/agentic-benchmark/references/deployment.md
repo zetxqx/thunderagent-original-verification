@@ -4,11 +4,13 @@ Everything here is what steps 07 to 23 ran. Re-check live values with `model-ser
 
 ## 1. Cluster and namespace
 
+The scripts read these from `profiles/bobbm.env` (the default `PROFILE`). Another cluster gets its own `profiles/<name>.env` and `PROFILE=<name>`; a single value can also be overridden from the environment (`NS=... DEPLOY=...`). The one-time manifests in `manifests/` are written for this profile; edit the namespace and names for another.
+
 | | |
 |---|---|
 | Cluster | GKE `bobbm`, context `gke_bobzetian-gke-dev_us-central1_bobbm`. The scripts pin it through a private kubeconfig; never rely on the laptop's current context |
 | Namespace | `llm-d-program-aware-scheduling` |
-| vLLM | Deployment `program-aware-vllm-decode`, labels `llm-d.ai/guide=program-aware-scheduling,llm-d.ai/role=decode`, container `modelserver`, port 8000 |
+| vLLM | Deployment `program-aware-vllm-decode`, labels `llm-d.ai/guide=program-aware-scheduling,llm-d.ai/role=decode` (`DECODE_SELECTOR`), container `modelserver` (`VLLM_CONTAINER`), port 8000 |
 | Main EPP | Deployment `program-aware-scheduling-epp`, Helm release `program-aware-scheduling`, gateway URL `http://program-aware-scheduling-epp:80`, metrics port 9090 (kube-rbac) |
 | GPU nodes | pool `bobbm-spoth100`, `a3-highgpu-4g` **spot** (4x H100 80GB, 104 vCPU, 965 GiB), `us-central1-a`. A preemption mid-run invalidates the point |
 | Client nodes | `default-pool` (non-spot CPU) |
@@ -81,7 +83,7 @@ Timeouts on the request path must be ordered: gate backstop < flow-control `defa
 - Legacy (steps 10 to 21, inference-perf): `10-llm-d-router-replicates/render-lane.sh <lane> <arm>` and `20-cpu-offload-pool/lanes.sh`. Use the lane EPP bullet above for new steps; its pool-mode variant (`MODE=pool` with a lane `DECODE_SELECTOR`) restarts the whole vLLM deployment and so cannot run lanes in parallel.
 - Main release: `helm upgrade` with `-f <(helm get values ...)` plus `--set-file` for the plugin config. Never `--reuse-values`. Save `helm get manifest` first and restore with `16-thunder-minimal-pool/restore-main-release.sh <saved>`; Helm keeps only 10 revisions, so never roll back by number.
 - `MODE=pool RESTART=1` restarts the whole vLLM deployment and the EPP. That restarts every lane: do not run it while another lane or another person's experiment uses the namespace.
-- **No router, any cluster (`MODE=direct`)**: the client calls `URL` (the vLLM Service) directly; before each point `deploy/$DEPLOY` is restarted, with `SERVER_ENV` (for example `MAX_NUM_SEQS=8`) set in the same rollout. Point it at another cluster with `CTX`, `KUBECONFIG_SOURCE`, `NS`, `DECODE_SELECTOR`, `CLIENT_POOL`; set `GPUS_PER_POD` when GPUs come from DRA and `MODEL_SERVER_COLLECT=0` off bobbm. Step 25 (`25-glm52-tp8-offload/b200/run-grid.sh`, cluster `a4-pr`) is the first user.
+- **No router, any cluster (`MODE=direct`)**: the client calls `URL` (the vLLM Service) directly; before each point `deploy/$DEPLOY` is restarted, with `SERVER_ENV` (for example `MAX_NUM_SEQS=8`) set in the same rollout. Point it at another cluster with `PROFILE=<name>` (a `profiles/<name>.env` with `CTX`, `KUBECONFIG_SOURCE`, `NS`, `DECODE_SELECTOR`, `VLLM_CONTAINER`, `CLIENT_NODE_LABEL`, `CLIENT_POOL`, `STORAGE_CLASS`, `MODEL_SERVER_COLLECT=0`); set `GPUS_PER_POD` when GPUs come from DRA. Step 25 (`25-glm52-tp8-offload/b200/run-grid.sh`, cluster `a4-pr`) is the first user.
 - **Exploration without restarts (`RESET=1 RESTART=0`, direct or pool mode)**: empties both KV tiers of each vLLM pod (`POST /reset_prefix_cache?reset_external=true`, needs `VLLM_SERVER_DEV_MODE=1`) and restarts the EPP instead of restarting vLLM, which takes about 27 min with 820 GiB of CPU offload (15 min to pre-fault the region, 4 min to pin it). Not AgentX's rule: use it to find where to look, not for InferenceX comparisons. Step 25 `run-explore.sh` runs two servers in parallel this way (one arm each, `LANE` picks the PVC).
 
 ## 4. Client: aiperf with the AgentX scenario

@@ -31,7 +31,8 @@ Open the reference you need, not all of them:
 | `scripts/export_bundle.py` | one JSON bundle per step for the interactive dashboard (repo `dashboard/`, format in `dashboard/SCHEMA.md`) |
 | `scripts/figstyle.py` | the `scientific-figure-making` style for every figure, PNG only |
 | `scripts/epp_scrape.py` | EPP metrics scraper (runs in the Job) |
-| `scripts/lib.sh` | cluster constants, `pin_kube`, `vllm_get` |
+| `scripts/lib.sh` | loads the profile, `pin_kube`, `vllm_get`, `selector_yaml` |
+| `profiles/<name>.env` | cluster, namespace, deployment, selector, container, images and dataset of one target (`PROFILE=<name>`, default `bobbm`); every value can still be overridden from the environment |
 | `manifests/` | PVC, lane Service, metrics-reader RBAC, EPP arm plugin configs, per-lane EPP values and RBAC (`lane-epp-*.yaml`) |
 
 Scripts live only here. A step folder holds its README, its own config (arm files, values) and `results/` (every figure lives in a `results/.../report/` folder), and calls these scripts with `RESULTS=<step>/results`. Fix or extend a script here, not by copying it into a step. Steps 20 to 23 still hold their own copies; leave them as the record of what those steps ran.

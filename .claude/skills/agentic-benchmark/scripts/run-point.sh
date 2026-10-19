@@ -17,11 +17,14 @@
 #   EPP_DEPLOY); the vLLM deployment and the EPP are restarted before the point.
 #   A native sidecar scrapes the EPP metrics port every 10 s (EPP_SCRAPE=0 to skip).
 # MODE=direct: the vLLM pods of deploy/$DEPLOY (DECODE_SELECTOR), reached at URL
-#   with no EPP, on any cluster (set CTX, KUBECONFIG_SOURCE, NS, CLIENT_POOL). The
-#   deployment is restarted before the point; SERVER_ENV ("K=V K2=V2", e.g. the
-#   point's MAX_NUM_SEQS) is set on container VLLM_CONTAINER in the same rollout
-#   (also in MODE=pool).
+#   with no EPP, on any cluster (set PROFILE=<name> for profiles/<name>.env, or
+#   CTX, KUBECONFIG_SOURCE, NS, CLIENT_POOL one by one). The deployment is restarted
+#   before the point; SERVER_ENV ("K=V K2=V2", e.g. the point's MAX_NUM_SEQS) is set
+#   on container VLLM_CONTAINER in the same rollout (also in MODE=pool).
 #   GPUS_PER_POD overrides the count read from nvidia.com/gpu (empty under DRA).
+#
+# Cluster, deployment, image and dataset defaults come from the profile
+# (scripts/lib.sh, profiles/*.env); any of them can be overridden from the environment.
 # RESET=1 with RESTART=0 (MODE=direct or pool): instead of a fresh server, empty
 #   both KV tiers of each vLLM pod (POST /reset_prefix_cache?reset_external=true,
 #   needs VLLM_SERVER_DEV_MODE=1) and, in pool mode, restart the EPP. Faster, but
@@ -36,7 +39,7 @@
 set -euo pipefail
 
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPTS/lib.sh"   # NS DEPLOY CTX RESULTS pin_kube vllm_get vllm_pod_on deploy_selector
+source "$SCRIPTS/lib.sh"   # profile defaults, RESULTS, pin_kube, vllm_get, vllm_pod_on, deploy_selector, selector_yaml
 
 CONC=${1:?usage: run-point.sh <concurrency> [run-label]}
 LABEL=${2:-$(date -u +%Y%m%d-%H%M%S)}
@@ -45,18 +48,10 @@ LANE=${LANE:-a}
 LANE_EPP=${LANE_EPP:-0}
 case "$LANE" in *[!a-z0-9]*|"") echo "LANE must be lowercase letters or digits" >&2; exit 1 ;; esac
 
-IMAGE=${IMAGE:-us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/agentx-harness:agentx-v1.0.6}
-MODEL=${MODEL:-Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8}
 TOKENIZER=${TOKENIZER:-$MODEL}
-DATASET=${DATASET:-semianalysis_cc_traces_weka_062126_256k}
-DECODE_SELECTOR=${DECODE_SELECTOR:-llm-d.ai/guide=program-aware-scheduling,llm-d.ai/role=decode}
-EPP_DEPLOY=${EPP_DEPLOY:-program-aware-scheduling-epp}
-EPP_METRICS_PORT=${EPP_METRICS_PORT:-9090}
 RESTART=${RESTART:-1}
 RESET=${RESET:-0}
-VLLM_PORTS=${VLLM_PORTS:-8000}
-if [ "$LANE" = a ]; then PVC=${PVC:-agentx-data}; else PVC=${PVC:-agentx-data-$LANE}; fi
-CLIENT_POOL=${CLIENT_POOL:-default-pool}
+if [ "$LANE" = a ]; then PVC=${PVC:-$PVC_BASE}; else PVC=${PVC:-$PVC_BASE-$LANE}; fi
 CLIENT_CPU=${CLIENT_CPU:-8}
 CLIENT_MEM=${CLIENT_MEM:-32Gi}
 CLIENT_MEM_REQUEST=${CLIENT_MEM_REQUEST:-$CLIENT_MEM}  # below CLIENT_MEM to pack more clients on a node
@@ -69,9 +64,9 @@ case "$MODE" in
       EPP_DEPLOY=agentx-epp-$LANE-epp
       URL=${URL:-http://agentx-epp-$LANE-epp:80}; SESSION_ID_HEADER=${SESSION_ID_HEADER:-true}; EPP_SCRAPE=${EPP_SCRAPE:-1}
     else
-      URL=${URL:-http://agentx-lane-$LANE:8000}; SESSION_ID_HEADER=${SESSION_ID_HEADER:-false}; EPP_SCRAPE=0
+      URL=${URL:-http://agentx-lane-$LANE:${VLLM_PORTS%% *}}; SESSION_ID_HEADER=${SESSION_ID_HEADER:-false}; EPP_SCRAPE=0
     fi ;;
-  pool) URL=${URL:-http://program-aware-scheduling-epp:80}; SESSION_ID_HEADER=${SESSION_ID_HEADER:-true}; EPP_SCRAPE=${EPP_SCRAPE:-1} ;;
+  pool) URL=${URL:-$EPP_URL}; SESSION_ID_HEADER=${SESSION_ID_HEADER:-true}; EPP_SCRAPE=${EPP_SCRAPE:-1} ;;
   direct) URL=${URL:?MODE=direct needs URL}; SESSION_ID_HEADER=${SESSION_ID_HEADER:-false}; EPP_SCRAPE=0 ;;
   *) echo "MODE must be lane, pool or direct" >&2; exit 1 ;;
 esac
@@ -115,7 +110,7 @@ restart_deploy() {
     for kv in $SERVER_ENV; do
       env_json="$env_json{\"name\":\"${kv%%=*}\",\"value\":\"${kv#*=}\"},"
     done
-    kc patch "deploy/$DEPLOY" --type=strategic -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}},\"spec\":{\"containers\":[{\"name\":\"${VLLM_CONTAINER:-modelserver}\",\"env\":[${env_json%,}]}]}}}}"
+    kc patch "deploy/$DEPLOY" --type=strategic -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}},\"spec\":{\"containers\":[{\"name\":\"$VLLM_CONTAINER\",\"env\":[${env_json%,}]}]}}}}"
   else
     kc rollout restart "deploy/$DEPLOY"
   fi
@@ -126,7 +121,7 @@ reset_caches() {
   local p port
   for p in $(decode_pods); do
     for port in $VLLM_PORTS; do
-      kc exec "$p" -c modelserver -- python3 -c "
+      kc exec "$p" -c "$VLLM_CONTAINER" -- python3 -c "
 import urllib.request
 r = urllib.request.urlopen(urllib.request.Request(
     'http://localhost:$port/reset_prefix_cache?reset_external=true', method='POST'), timeout=120)
@@ -158,8 +153,8 @@ apiVersion: v1
 kind: Service
 metadata: {name: agentx-lane-$LANE, namespace: $NS}
 spec:
-  selector: {llm-d.ai/guide: program-aware-scheduling, llm-d.ai/role: decode, agentx-lane: "$LANE"}
-  ports: [{name: http, port: 8000, targetPort: 8000}]
+  selector: $(selector_yaml "$DECODE_SELECTOR" "agentx-lane=$LANE")
+  ports: [{name: http, port: ${VLLM_PORTS%% *}, targetPort: ${VLLM_PORTS%% *}}]
 EOF
 fi
 kc get pvc "$PVC" >/dev/null 2>&1 || kc apply -f - <<EOF
@@ -168,8 +163,8 @@ kind: PersistentVolumeClaim
 metadata: {name: $PVC, namespace: $NS}
 spec:
   accessModes: [ReadWriteOnce]
-  storageClassName: standard-rwo
-  resources: {requests: {storage: 200Gi}}
+  storageClassName: $STORAGE_CLASS
+  resources: {requests: {storage: $PVC_SIZE}}
 EOF
 
 EPPS=""
@@ -253,7 +248,7 @@ FIRST=$(echo "$TARGETS" | head -1)
 # serve a real completion before the Job starts.
 log "waiting for $URL to serve a completion"
 for i in $(seq 1 30); do
-  if kc exec "$FIRST" -c modelserver -- python3 -c "
+  if kc exec "$FIRST" -c "$VLLM_CONTAINER" -- python3 -c "
 import json, urllib.request
 req = urllib.request.Request('$URL/v1/chat/completions',
     data=json.dumps({'model': '$MODEL', 'max_tokens': 1,
@@ -295,8 +290,8 @@ for p in $TARGETS; do
     > "$OUT/meta/node-$node-pods.txt"
   vllm_get "$p" /metrics | grep -E '^vllm:cache_config_info' > "$OUT/meta/cache-config-$p.txt" || true
 done
-# collect.sh reads the bobbm program-aware deployment; other clusters set MODEL_SERVER_COLLECT=0.
-[ "${MODEL_SERVER_COLLECT:-1}" = 1 ] && { "$REPO_ROOT/model-server/collect.sh" > "$OUT/meta/model-server.txt" 2>&1 || true; }
+# collect.sh reads the bobbm program-aware deployment; other profiles set MODEL_SERVER_COLLECT=0.
+[ "$MODEL_SERVER_COLLECT" = 1 ] && { "$REPO_ROOT/model-server/collect.sh" > "$OUT/meta/model-server.txt" 2>&1 || true; }
 
 DURATION_ARG=""
 [ -n "$DURATION" ] && DURATION_ARG="--benchmark-duration $DURATION"
@@ -305,7 +300,7 @@ SA_YAML=""; SIDECAR_YAML=""; SCRIPTS_VOLUME_YAML=""
 if [ "$EPP_SCRAPE" = 1 ]; then
   kc create configmap agentic-bench-scripts --from-file=epp_scrape.py="$SCRIPTS/epp_scrape.py" \
     --dry-run=client -o yaml | kc apply -f - >/dev/null
-  SA_YAML="serviceAccountName: thunderagent-metrics-reader"
+  SA_YAML="serviceAccountName: $METRICS_READER_SA"
   SIDECAR_YAML="initContainers:
       - name: epp-scrape
         image: python:3.12-alpine
@@ -343,7 +338,7 @@ spec:
     spec:
       restartPolicy: Never
       $SA_YAML
-      nodeSelector: {cloud.google.com/gke-nodepool: $CLIENT_POOL}
+      nodeSelector: {$CLIENT_NODE_LABEL: $CLIENT_POOL}
       securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
       $SIDECAR_YAML
       containers:
@@ -447,7 +442,7 @@ EOF
 
 log "saving vLLM and EPP logs"
 for p in $TARGETS; do
-  kc logs "$p" -c modelserver 2>&1 | gzip > "$OUT/meta/vllm-$p.log.gz" || true
+  kc logs "$p" -c "$VLLM_CONTAINER" 2>&1 | gzip > "$OUT/meta/vllm-$p.log.gz" || true
 done
 for p in $EPPS; do
   kc logs "$p" --all-containers --prefix > "$OUT/epp-$p.log" 2>&1 || true
@@ -458,7 +453,7 @@ wait_api || true
 # The pid keeps names apart when two points (parallel arms) finish in the same second.
 FETCH="agentx-fetch-$(date +%s)-$$"
 kc run "$FETCH" --image=busybox:1.36 --restart=Never \
-  --overrides="{\"spec\":{\"nodeSelector\":{\"cloud.google.com/gke-nodepool\":\"$CLIENT_POOL\"},\"volumes\":[{\"name\":\"data\",\"persistentVolumeClaim\":{\"claimName\":\"$PVC\",\"readOnly\":true}}],\"containers\":[{\"name\":\"fetch\",\"image\":\"busybox:1.36\",\"command\":[\"sleep\",\"3600\"],\"volumeMounts\":[{\"name\":\"data\",\"mountPath\":\"/data\",\"readOnly\":true}]}]}}"
+  --overrides="{\"spec\":{\"nodeSelector\":{\"$CLIENT_NODE_LABEL\":\"$CLIENT_POOL\"},\"volumes\":[{\"name\":\"data\",\"persistentVolumeClaim\":{\"claimName\":\"$PVC\",\"readOnly\":true}}],\"containers\":[{\"name\":\"fetch\",\"image\":\"busybox:1.36\",\"command\":[\"sleep\",\"3600\"],\"volumeMounts\":[{\"name\":\"data\",\"mountPath\":\"/data\",\"readOnly\":true}]}]}}"
 kc wait --for=condition=Ready "pod/$FETCH" --timeout=10m
 # fetch <remote dir> <local dir>: file by file with a size check and retries; kubectl cp
 # of the whole tree broke off on large files ("unexpected EOF", truncated jsonl).
