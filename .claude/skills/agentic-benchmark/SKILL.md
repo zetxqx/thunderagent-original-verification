@@ -26,6 +26,7 @@ Open the reference you need, not all of them:
 | `scripts/render-lane-epp.sh` | renders a per-lane EPP release (EPP + envoy that see only that lane's pod) for an arm's plugin file |
 | `scripts/vllm-offload.py` | clean copy of the live vLLM deployment, or its CPU KV offloading variant (`--kv-offloading-size`, memory, `/dev/shm`, one replica per node) for `kubectl replace` |
 | `scripts/analyze.py` | `summary.csv`, `summary.md` with validity checks; calls `point_figures.py` |
+| `scripts/router_metrics.py` | EPP scrape parser, `gate_*` and `epp_*` columns and checks (`GATE_METRIC_PREFIX` for another gate plugin) |
 | `scripts/point_figures.py` | per-point figures, the sweep Pareto and the concurrency view, into the report folder (style rules: references/figures.md) |
 | `scripts/make_figures.py` | across-arm figures fig1 to fig5 and `ratios.md` |
 | `scripts/export_bundle.py` | one JSON bundle per step for the interactive dashboard (repo `dashboard/`, format in `dashboard/SCHEMA.md`) |

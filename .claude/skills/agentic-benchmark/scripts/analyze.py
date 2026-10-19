@@ -21,20 +21,26 @@ BENCHMARK-METRICS.md:
 """
 
 import argparse
-import gzip
 import importlib.util
 import json
 import re
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
 import numpy as np
 import pandas as pd
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import router_metrics  # noqa: E402
+# Router and gate metric names are re-exported: point_figures.py and export_bundle.py read them here.
+from router_metrics import EPP_QUEUE, GATE, GATE_COUNTERS, epp_columns, load_epp  # noqa: E402,F401
+
 PCTS = {"mean": None, "p50": 50, "p75": 75, "p90": 90, "p95": 95, "p99": 99}
-# vLLM v0.28 default for this server (../model-server/README.md): a step cannot
-# carry more prefill than this, so a bin above it is a metrics artifact.
-MAX_BATCHED_TOKENS = 8192
+# vLLM's max_num_batched_tokens: a step cannot carry more prefill than this, so a
+# bin above it is a metrics artifact. Read per point from the recorded deployment
+# (--max-num-batched-tokens); this is the vLLM default when the flag is absent.
+DEFAULT_MAX_BATCHED_TOKENS = 8192
 UNIT_TO_S = {"ns": 1e-9, "us": 1e-6, "ms": 1e-3, "s": 1.0, "sec": 1.0}
 
 
@@ -59,6 +65,17 @@ def number(entry: dict | None) -> float | None:
     if not isinstance(entry, dict) or entry.get("value") is None:
         return None
     return float(entry["value"])
+
+
+def max_batched_tokens(point: Path, default: int = DEFAULT_MAX_BATCHED_TOKENS) -> int:
+    """vLLM's --max-num-batched-tokens from the point's recorded deployment
+    (meta/vllm-deployment.yaml, as written by run-point.sh), else the default."""
+    path = point / "meta" / "vllm-deployment.yaml"
+    if path.exists():
+        # "--flag=N", "--flag N", or the flag and its value as two YAML list items
+        if m := re.search(r"--max-num-batched-tokens[\"']?[=\s,]+(?:-\s+)?[\"']?(\d+)", path.read_text(errors="replace")):
+            return int(m.group(1))
+    return default
 
 
 def load_records(path: Path) -> pd.DataFrame:
@@ -253,136 +270,6 @@ def inflight(ok: pd.DataFrame, t0: int, step_s: float = 5.0) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-GATE = "llm_d_epp_thunder_agent_"
-EPP_QUEUE = "llm_d_epp_flow_control_request_queue_duration_seconds"
-SAMPLE = re.compile(r"^([a-zA-Z_:][\w:]*)(?:\{([^}]*)\})?\s+(\S+)")
-# Summary column -> EPP counter. The first name that exists wins: PR3 renamed
-# holds_total to delayed_dispatches_total.
-GATE_COUNTERS = {
-    "gate_delayed_dispatches": [GATE + "delayed_dispatches_total", GATE + "holds_total"],
-    "gate_pauses": [GATE + "pauses_total"],
-    "gate_resumes": [GATE + "resumes_total"],
-    "gate_releases": [GATE + "releases_total"],
-    "gate_starvation_promotions": [GATE + "starvation_promotions_total"],
-    "epp_requests": ["llm_d_epp_request_total"],
-    "epp_request_errors": ["llm_d_epp_request_error_total"],
-}
-
-
-EPP_KEEP = (GATE, EPP_QUEUE, "llm_d_epp_flow_control_queue_size",
-            "llm_d_epp_request_total", "llm_d_epp_request_error_total")
-
-
-def load_epp(path: Path) -> pd.DataFrame:
-    """Parse raw-epp-metrics.txt.gz written by epp_scrape.py into long form:
-    one row per snapshot and series (ts in seconds, url, metric, labels, value).
-    Only the metrics in EPP_KEEP are kept: a snapshot can have 200k series, mostly
-    llm_d_epp_request_* histogram buckets per model name, which this report does not use."""
-    rows, ts, url = [], None, None
-    try:
-        with gzip.open(path, "rt") as f:
-            for line in f:
-                if line.startswith("# ts="):
-                    head = dict(kv.split("=", 1) for kv in line[2:].split())
-                    ts, url = float(head["ts"]), head.get("url", "")
-                    continue
-                if line.startswith("#") or ts is None or not line.startswith(EPP_KEEP):
-                    continue
-                m = SAMPLE.match(line)
-                if m:
-                    rows.append((ts, url, m.group(1), m.group(2) or "", float(m.group(3))))
-    except EOFError:
-        # A copy cut short (run-point.sh warns "did not copy completely") ends mid-stream;
-        # keep the snapshots read so far instead of failing the whole report.
-        print(f"WARNING: {path} is truncated; using the snapshots before the cut")
-    return pd.DataFrame(rows, columns=["ts", "url", "metric", "labels", "value"])
-
-
-def epp_window(epp: pd.DataFrame, metric: str, t0: float, t1: float) -> pd.DataFrame:
-    """Snapshots of one metric inside [t0, t1], starting from the last snapshot
-    at or before t0 so a counter delta covers the whole window."""
-    d = epp[epp["metric"] == metric]
-    before = d.loc[d["ts"] <= t0, "ts"]
-    lo = before.max() if len(before) else t0
-    return d[(d["ts"] >= lo) & (d["ts"] <= t1)]
-
-
-def epp_increase(epp: pd.DataFrame, metric: str, t0: float, t1: float) -> pd.Series:
-    """Increase of every series of a counter from t0 to t1. Per-flow series (one per
-    session) appear with their first request, so a series first seen after t0 starts
-    from 0; taking its first value in the window as the base dropped that request
-    (thunder c32: 1132 of 1298 queue waits counted, non-monotonic histogram buckets)."""
-    d = epp[(epp["metric"] == metric) & (epp["ts"] <= t1)].sort_values("ts")
-    if d.empty:
-        return pd.Series(dtype=float)
-    last = d.groupby(["url", "labels"])["value"].last()
-    base = d[d["ts"] <= t0].groupby(["url", "labels"])["value"].last()
-    return (last - base.reindex(last.index).fillna(0)).clip(lower=0)
-
-
-def epp_delta(epp: pd.DataFrame, metric: str, t0: float, t1: float) -> float:
-    inc = epp_increase(epp, metric, t0, t1)
-    return float(inc.sum()) if len(inc) else float("nan")
-
-
-def epp_gauge(epp: pd.DataFrame, metric: str, t0: float, t1: float) -> pd.Series:
-    """A gauge summed over its series (pods, flows) per snapshot."""
-    d = epp_window(epp, metric, t0, t1)
-    return d.groupby("ts")["value"].sum()
-
-
-def epp_hist_buckets(epp: pd.DataFrame, base: str, t0: float, t1: float) -> pd.Series:
-    """Cumulative count at or below each bucket bound (le) over the window, summed across series."""
-    inc = epp_increase(epp, base + "_bucket", t0, t1)
-    if inc.empty:
-        return pd.Series(dtype=float)
-    le = inc.index.get_level_values("labels").str.extract(r'le="([^"]+)"')[0].astype(float).to_numpy()
-    return inc.groupby(le).sum().sort_index()
-
-
-def epp_hist_quantile(cum: pd.Series, q: float) -> float | None:
-    """Quantile from cumulative bucket counts, interpolated linearly inside the bucket.
-    None when it lies above the largest finite bound: the histogram cannot tell how far
-    (the EPP queue-duration histogram stops at 60 s, gate holds last up to 1800 s)."""
-    if cum.empty or not cum.iloc[-1]:
-        return None
-    rank, prev_le, prev_c = q * cum.iloc[-1], 0.0, 0.0
-    for le, c in cum.items():
-        if c >= rank:
-            if np.isinf(le):
-                return None
-            return prev_le + (le - prev_le) * (rank - prev_c) / (c - prev_c) if c > prev_c else le
-        prev_le, prev_c = le, c
-    return None
-
-
-def epp_columns(epp: pd.DataFrame, t0: float, t1: float) -> dict:
-    out: dict = {}
-    for col, names in GATE_COUNTERS.items():
-        for name in names:
-            v = epp_delta(epp, name, t0, t1)
-            if not np.isnan(v):
-                out[col] = v
-                break
-    s, c = epp_delta(epp, EPP_QUEUE + "_sum", t0, t1), epp_delta(epp, EPP_QUEUE + "_count", t0, t1)
-    out["epp_queue_wait_mean_s"] = s / c if c else None
-    # Most turns of admitted sessions pass the gate at once, so the p90 is often
-    # near zero while the held minority sets the mean and the p99.
-    cum = epp_hist_buckets(epp, EPP_QUEUE, t0, t1)
-    out["epp_queue_wait_p90_s"] = epp_hist_quantile(cum, 0.9)
-    out["epp_queue_wait_p99_s"] = epp_hist_quantile(cum, 0.99)
-    finite = cum[~np.isinf(cum.index)] if len(cum) else cum
-    if len(finite) and cum.iloc[-1]:
-        out["epp_queue_wait_top_bucket_s"] = float(finite.index[-1])
-        out["epp_queue_wait_over_top_bucket_pct"] = 100 * (1 - finite.iloc[-1] / cum.iloc[-1])
-    qs = epp_gauge(epp, "llm_d_epp_flow_control_queue_size", t0, t1)
-    out["epp_queue_size_mean"], out["epp_queue_size_max"] = (qs.mean(), qs.max()) if len(qs) else (None, None)
-    ws = epp_gauge(epp, GATE + "endpoint_working_set_tokens", t0, t1)
-    cap = epp_gauge(epp, GATE + "endpoint_capacity_tokens", t0, t1)
-    if len(ws) and len(cap) and cap.mean():
-        out["gate_working_set_over_capacity_mean"] = ws.mean() / cap.mean()
-        out["gate_working_set_over_capacity_max"] = (ws / cap.reindex(ws.index)).max()
-    return out
 
 
 def client_columns(ok: pd.DataFrame, errors: int, num_gpus: int, cost: float | None, slo: float,
@@ -428,6 +315,7 @@ def analyze_point(d: Path, out: Path, cost: float | None, slo: float, skip_minut
     df = load_records(art / "profile_export.jsonl")
     conc = int(meta.get("concurrency") or d.name.lstrip("c"))
     num_gpus = int(meta.get("num_gpus") or 1)
+    max_batched = max_batched_tokens(d)  # d is reused for DataFrames below
     pods = {netloc(u) for u in str(meta.get("server_metrics_urls", "")).split()}
 
     prof = df[df["phase"] == "profiling"]
@@ -456,6 +344,7 @@ def analyze_point(d: Path, out: Path, cost: float | None, slo: float, skip_minut
         "label": meta.get("label", d.parent.name),
         "conc": conc,
         "num_gpus": num_gpus,
+        "max_batched_tokens": max_batched,
         "mode": meta.get("mode"),
         "job_status": finish.get("job_status"),
         "pod_changed": finish.get("pod_changed"),
@@ -559,7 +448,7 @@ def analyze_point(d: Path, out: Path, cost: float | None, slo: float, skip_minut
         row["working_set_over_pool_mean"] = fl["working_set"].mean() / pool
         row["working_set_over_pool_max"] = fl["working_set"].max() / pool
     if parquet.exists():
-        row.update(engine_steps(parquet, pods))
+        row.update(engine_steps(parquet, pods, max_batched=max_batched))
     epp_path = art.parent / "epp" / "raw-epp-metrics.txt.gz"  # d is reused for DataFrames above
     row["epp_scraped"] = epp_path.exists()
     if epp_path.exists():
@@ -567,13 +456,14 @@ def analyze_point(d: Path, out: Path, cost: float | None, slo: float, skip_minut
     return row
 
 
-def engine_step_bins(parquet: Path, pods: set[str], bin_s: int = 10) -> pd.DataFrame:
+def engine_step_bins(parquet: Path, pods: set[str], bin_s: int = 10,
+                     max_batched: int = DEFAULT_MAX_BATCHED_TOKENS) -> pd.DataFrame:
     """Per pod and bin: steps, iteration tokens, generated tokens, from counter deltas.
 
     Only bins where the pod had running requests at every scrape are kept, so idle
     time is not mistaken for slow steps. Columns T_ms and prefill_k (k prefill tokens
     per step), t_s (bin start, seconds since the first scrape), and impossible: more
-    prefill per step than MAX_BATCHED_TOKENS. Seen once on lane-20m/c16 (run as try-lane-c16-20m) (10 steps,
+    prefill per step than max_batched (vLLM's max_num_batched_tokens). Seen once on lane-20m/c16 (run as try-lane-c16-20m) (10 steps,
     217k tokens after a 20 s stretch with almost no steps): the step histogram lagged
     and caught up in one bin, most likely while the vLLM frontend was busy.
     """
@@ -599,14 +489,15 @@ def engine_step_bins(parquet: Path, pods: set[str], bin_s: int = 10) -> pd.DataF
     df["B"] = df["gen"] / df["steps"]
     df["prefill_k"] = (df["tokens"] - df["gen"]) / df["steps"] / 1000
     df["t_s"] = df.index.get_level_values("b") * bin_s
-    df["impossible"] = df["prefill_k"] > MAX_BATCHED_TOKENS / 1000
+    df["impossible"] = df["prefill_k"] > max_batched / 1000
     return df
 
 
-def engine_steps(parquet: Path, pods: set[str], bin_s: int = 10) -> dict:
+def engine_steps(parquet: Path, pods: set[str], bin_s: int = 10,
+                 max_batched: int = DEFAULT_MAX_BATCHED_TOKENS) -> dict:
     """Engine step metrics (BENCHMARK-METRICS 2.3): output throughput = B / T,
     B decoding requests per step, T step time; fit T = a + b x (k prefill tokens per step)."""
-    df = engine_step_bins(parquet, pods, bin_s)
+    df = engine_step_bins(parquet, pods, bin_s, max_batched)
     dropped = int(df["impossible"].sum()) if not df.empty else 0
     df = df[~df["impossible"]] if not df.empty else df
     if df.empty:
@@ -656,14 +547,7 @@ def checks(r: pd.Series) -> list[str]:
         out.append("light load: hit rate above 85% and KV peak below 80% (BENCHMARK-METRICS calibration rule)")
     if r.get("conc", 0) > 393:
         out.append("concurrency above the 393 traces: traces are reused across lanes (cache-bust keeps them distinct)")
-    if r.get("mode") == "pool" and not r.get("epp_scraped"):
-        out.append("no EPP metrics: router and gate behavior unknown")
-    if pd.notna(r.get("gate_pauses")) and r.get("gate_pauses", 0) == 0 and r.get("gate_delayed_dispatches", 0) == 0:
-        out.append("thunder gate never delayed or paused a session: it did not engage")
-    if pd.notna(r.get("gate_starvation_promotions")) and r["gate_starvation_promotions"] > 0:
-        out.append(f"{r['gate_starvation_promotions']:.0f} forced admissions: demand is past the pool's capacity")
-    if pd.notna(r.get("epp_request_errors")) and r["epp_request_errors"] > 0:
-        out.append(f"{r['epp_request_errors']:.0f} EPP request errors (see epp-*.log)")
+    out += router_metrics.checks(r)
     return out
 
 
