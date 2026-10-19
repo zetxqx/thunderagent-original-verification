@@ -26,6 +26,7 @@ Open the reference you need, not all of them:
 | `scripts/run-point.sh` | one concurrency point: fresh server, aiperf Job, EPP scrape sidecar (pool mode), metadata, copy back |
 | `scripts/run-sweep.sh` | points in order, then `analyze.py` |
 | `scripts/run-lanes.sh` | points in parallel, one vLLM pod (lane) each, from a shared queue; then `analyze.py` |
+| `scripts/verify-point.sh` | the smoke checklist on one or more point folders (bash + python3 only) |
 | `scripts/render-lane-epp.sh` | renders a per-lane EPP release (EPP + envoy that see only that lane's pod) for an arm's plugin file |
 | `scripts/vllm-offload.py` | clean copy of the live vLLM deployment, or its CPU KV offloading variant (`--kv-offloading-size`, memory, `/dev/shm`, one replica per node) for `kubectl replace` |
 | `scripts/analyze.py` | `summary.csv`, `summary.md` with validity checks; calls `point_figures.py` |
@@ -38,6 +39,7 @@ Open the reference you need, not all of them:
 | `scripts/lib.sh` | loads the profile, `pin_kube`, `vllm_get`, `selector_yaml` |
 | `profiles/<name>.env` | cluster, namespace, deployment, selector, container, images and dataset of one target (`PROFILE=<name>`, default `bobbm`); every value can still be overridden from the environment |
 | `manifests/` | PVC, lane Service, metrics-reader RBAC, EPP arm plugin configs, per-lane EPP values and RBAC (`lane-epp-*.yaml`) |
+| `tests/` | pytest for `analyze.py`, `router_metrics.py` and `verify-point.sh` on a synthetic point; run with `tests/run.sh` (uv) after changing a parser or a check |
 
 Scripts live only here. A step folder holds its README, its own config (arm files, values) and `results/` (every figure lives in a `results/.../report/` folder), and calls these scripts with `RESULTS=<step>/results`. Fix or extend a script here, not by copying it into a step. Steps 20 to 23 still hold their own copies; leave them as the record of what those steps ran.
 
@@ -48,7 +50,7 @@ Scripts live only here. A step folder holds its README, its own config (arm file
 3. **Put the arm in place** (references/deployment.md section 3). Save `helm get manifest` before touching the main release. Record every shared-state change in `08-cluster-changes.md`.
 4. **Smoke point** after any script, image or config change:
    `RESULTS=$PWD/results MODE=pool RESTART=0 DURATION=120 EXTRA_ARGS="--unsafe-override --num-dataset-entries 8 --warmup-requests-per-lane 1" ../.claude/skills/agentic-benchmark/scripts/run-point.sh 4 smoke1`
-   Then check: `summary.md` has numbers, `epp/raw-epp-metrics.txt.gz` exists (pool), `epp-*.log` has no gate warnings ("setups that defeat the gate"), a response carries cached tokens.
+   Then `scripts/verify-point.sh results/smoke1/c4`: job succeeded and pods unchanged, completed profiling requests, the server-metrics parquet, a response carrying cached tokens, and in pool or lane-EPP mode the EPP scrape and no gate warning ("setups that defeat the gate") in `epp-*.log`. Then read `summary.md`.
 5. **Calibration point** (`DURATION=900`) of the baseline at the concurrency that should carry the conclusion: hit rate below 85% or KV peak above 80%, else raise the load.
 6. **Sweep**, one label per arm, replicates as `<arm>-r1`, `<arm>-r2`, ...:
    `RESULTS=$PWD/results MODE=pool nohup ../.claude/skills/agentic-benchmark/scripts/run-sweep.sh thunder-r1 8 16 32 64 128 > results/thunder-r1.log 2>&1 &`
