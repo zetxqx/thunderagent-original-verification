@@ -8,7 +8,10 @@
 
 SKILL_SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SKILL_SCRIPTS/.." && pwd)"
-REPO_ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
+# The benchmark repo (step folders, model-server/collect.sh). Defaults to the repo this
+# skill lives in (.claude/skills/agentic-benchmark); set REPO_ROOT when the skill is
+# installed elsewhere (e.g. ~/.gemini/config/skills).
+REPO_ROOT=${REPO_ROOT:-$(cd "$SKILL_DIR/../../.." && pwd)}
 RESULTS=${RESULTS:-$PWD/results}  # each step passes its own results folder
 
 PROFILE=${PROFILE:-bobbm}

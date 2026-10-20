@@ -7,7 +7,7 @@ description: Benchmark multi-turn, tool-calling (agentic) LLM inference against 
 
 The workflow and shared scripts for every new benchmark step in this repo. Steps 01 to 22 used inference-perf; from step 23 on the standard client is AgentX (`aiperf --scenario agentx`), the same client and rules as SemiAnalysis InferenceX, so results are comparable with theirs. The scripts target one cluster at a time through a profile (`profiles/<name>.env`, default `bobbm`): cluster, namespace, deployment, container, images and dataset come from there, and any value can be overridden from the environment.
 
-Prerequisites on the machine that runs the scripts: `kubectl` with a context for the target cluster, `helm` (lane EPPs), `uv` (Python scripts declare their own dependencies), `gcloud` only for Cloud Logging. Runs take hours: start them with `nohup ... &` and keep the machine awake (macOS: `caffeinate -i`).
+The scripts live in the repo at `.claude/skills/agentic-benchmark/`; a copy installed elsewhere (for discovery) needs `REPO_ROOT=<repo checkout>` so `model-server/collect.sh` and the step folders resolve. Prerequisites on the machine that runs the scripts: `kubectl` with a context for the target cluster, `helm` (lane EPPs), `uv` (Python scripts declare their own dependencies), `gcloud` only for Cloud Logging. Runs take hours: start them with `nohup ... &` and keep the machine awake (macOS: `caffeinate -i`).
 
 Open the reference you need, not all of them:
 
