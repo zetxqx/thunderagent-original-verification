@@ -1,0 +1,168 @@
+apiVersion: v1
+data:
+  default-plugins.yaml: |
+    apiVersion: llm-d.ai/v1
+    kind: EndpointPickerConfig
+    plugins:
+    - type: queue-scorer
+    - type: kv-cache-utilization-scorer
+    - type: prefix-cache-scorer
+    - type: metrics-data-source
+      parameters:
+        scheme: "http"
+        path: "/metrics"
+        insecureSkipVerify: true
+    - type: core-metrics-extractor
+    schedulingProfiles:
+    - name: default
+      plugins:
+      - pluginRef: queue-scorer
+        weight: 2
+      - pluginRef: kv-cache-utilization-scorer
+        weight: 2
+      - pluginRef: prefix-cache-scorer
+        weight: 3
+  endpoints.yaml: |
+    endpoints:
+    - name: glm52-dep8-c-rank0
+      namespace: bobzetian-llmd
+      address: "10.0.34.129"
+      port: "8000"
+    - name: glm52-dep8-c-rank1
+      namespace: bobzetian-llmd
+      address: "10.0.34.129"
+      port: "8001"
+    - name: glm52-dep8-c-rank2
+      namespace: bobzetian-llmd
+      address: "10.0.34.129"
+      port: "8002"
+    - name: glm52-dep8-c-rank3
+      namespace: bobzetian-llmd
+      address: "10.0.34.129"
+      port: "8003"
+    - name: glm52-dep8-c-rank4
+      namespace: bobzetian-llmd
+      address: "10.0.34.129"
+      port: "8004"
+    - name: glm52-dep8-c-rank5
+      namespace: bobzetian-llmd
+      address: "10.0.34.129"
+      port: "8005"
+    - name: glm52-dep8-c-rank6
+      namespace: bobzetian-llmd
+      address: "10.0.34.129"
+      port: "8006"
+    - name: glm52-dep8-c-rank7
+      namespace: bobzetian-llmd
+      address: "10.0.34.129"
+      port: "8007"
+  payload-agnostic.yaml: |
+    # Request-format agnostic routing. Use this when the request format is
+    # unknown or unsupported, so the EPP cannot rely on scorers that read the
+    # request body (e.g. the prefix-cache scorer). The passthrough parser does
+    # not parse the body, and routing falls back to backend-state scorers:
+    #   - active-request-scorer  : prefers the least busy endpoint
+    #   - session-affinity-scorer: keeps a session pinned to the same endpoint
+    # Select it by setting router.epp.pluginsConfigFile: payload-agnostic.yaml
+    apiVersion: llm-d.ai/v1
+    kind: EndpointPickerConfig
+    plugins:
+    - type: passthrough-parser
+    - type: active-request-scorer
+    - type: session-affinity-scorer
+    requestHandler:
+      parsers:
+      - pluginRef: passthrough-parser
+    schedulingProfiles:
+    - name: default
+      plugins:
+      - pluginRef: active-request-scorer
+        weight: 1
+      - pluginRef: session-affinity-scorer
+        weight: 1
+  thunder-plugins.yaml: |
+    # Step 29: llm-d-router v1.0.0 (ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0) turn-priority
+    # in front of a GLM-5.2 DEP=8 server: step 28's flow-control config on top of step 27's
+    # dep8-affinity scheduling profile, so the only difference from step 27's dep8-affinity arm
+    # is the flow-control layer (program-aware fairness, turn-priority strategy).
+    #
+    # Endpoints: the 8 rank API servers of one glm52-dep8 server (ports 8000 to 8007), from a file
+    # (file-discovery: no Kubernetes API, so no RBAC, which our account cannot create on a4-pr).
+    #
+    # Flow control (as step 28): every session is one program (agent-identity reads aiperf's
+    # X-Session-ID). When the pool is saturated, requests wait at the router and the deepest
+    # session goes first: score = turns already dispatched + 0.05 x head wait in seconds (defaults;
+    # a session idle for 120 s counts as turn one). defaultRequestTTL 0: no waiting request is shed.
+    # Saturation: the utilization detector, pool saturation = average over the 8 ranks of
+    # max(waiting / 5, kv_usage / 0.8), the same thresholds as step 28's (defaulted) detector.
+    #
+    # Scheduling (as step 27's dep8-affinity): a session stays on the rank that served it
+    # (session-affinity-scorer, strategy session_id, weight 1); a new session goes to the rank
+    # with the fewest in-flight tokens (token-load-scorer, weight 0.1, so a known session's rank
+    # always wins).
+    #
+    # headroom 100 on the detector: with flow control on, the loader also injects the detector as a
+    # Filter into the scheduling profile, and by default (headroom 0) it removes every rank whose
+    # waiting queue exceeds 5 or whose KV usage exceeds 0.8 from the candidates before the scorers
+    # run. With offload on, the ranks sit above 0.8 most of the time, so the default filter would
+    # move sessions off their rank (a cache miss on the new rank, a dead copy on the old one) and
+    # the arm would measure filter-induced migration, not turn-priority. headroom 100 lifts the
+    # filter limits to queue 505 and KV 1.0 (capped), so the filter never removes a rank for load;
+    # it does not change the saturation signal (thresholds 5 and 0.8 are unchanged).
+    apiVersion: llm-d.ai/v1
+    kind: EndpointPickerConfig
+    featureGates:
+    - flowControl
+    plugins:
+    - name: vllm-endpoints
+      type: file-discovery
+      parameters:
+        path: /config/endpoints.yaml
+        watchFile: true
+    - type: agent-identity
+      parameters:
+        additionalSessionHeaders:
+        - x-session-id
+    - type: program-aware-fairness
+      parameters:
+        strategy: turn-priority
+    - type: utilization-detector
+      parameters:
+        queueDepthThreshold: 5
+        kvCacheUtilThreshold: 0.8
+        headroom: 100
+    - type: session-affinity-scorer
+      parameters:
+        strategy: session_id
+    - type: inflight-load-producer
+    - type: token-load-scorer
+    - type: max-score-picker
+    - type: single-profile-handler
+    flowControl:
+      defaultRequestTTL: "0s"
+      defaultPriorityBand:
+        fairnessPolicyRef: program-aware-fairness
+      saturationDetector:
+        pluginRef: utilization-detector
+    schedulingProfiles:
+    - name: default
+      plugins:
+      - pluginRef: session-affinity-scorer
+        weight: 1
+      - pluginRef: token-load-scorer
+        weight: 0.1
+      - pluginRef: max-score-picker
+    dataLayer:
+      discovery:
+        endpoints:
+          pluginRef: vllm-endpoints
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"default-plugins.yaml":"apiVersion: llm-d.ai/v1\nkind: EndpointPickerConfig\nplugins:\n- type: queue-scorer\n- type: kv-cache-utilization-scorer\n- type: prefix-cache-scorer\n- type: metrics-data-source\n  parameters:\n    scheme: \"http\"\n    path: \"/metrics\"\n    insecureSkipVerify: true\n- type: core-metrics-extractor\nschedulingProfiles:\n- name: default\n  plugins:\n  - pluginRef: queue-scorer\n    weight: 2\n  - pluginRef: kv-cache-utilization-scorer\n    weight: 2\n  - pluginRef: prefix-cache-scorer\n    weight: 3\n","endpoints.yaml":"endpoints:\n- name: glm52-dep8-c-rank0\n  namespace: bobzetian-llmd\n  address: \"10.0.34.129\"\n  port: \"8000\"\n- name: glm52-dep8-c-rank1\n  namespace: bobzetian-llmd\n  address: \"10.0.34.129\"\n  port: \"8001\"\n- name: glm52-dep8-c-rank2\n  namespace: bobzetian-llmd\n  address: \"10.0.34.129\"\n  port: \"8002\"\n- name: glm52-dep8-c-rank3\n  namespace: bobzetian-llmd\n  address: \"10.0.34.129\"\n  port: \"8003\"\n- name: glm52-dep8-c-rank4\n  namespace: bobzetian-llmd\n  address: \"10.0.34.129\"\n  port: \"8004\"\n- name: glm52-dep8-c-rank5\n  namespace: bobzetian-llmd\n  address: \"10.0.34.129\"\n  port: \"8005\"\n- name: glm52-dep8-c-rank6\n  namespace: bobzetian-llmd\n  address: \"10.0.34.129\"\n  port: \"8006\"\n- name: glm52-dep8-c-rank7\n  namespace: bobzetian-llmd\n  address: \"10.0.34.129\"\n  port: \"8007\"\n","payload-agnostic.yaml":"# Request-format agnostic routing. Use this when the request format is\n# unknown or unsupported, so the EPP cannot rely on scorers that read the\n# request body (e.g. the prefix-cache scorer). The passthrough parser does\n# not parse the body, and routing falls back to backend-state scorers:\n#   - active-request-scorer  : prefers the least busy endpoint\n#   - session-affinity-scorer: keeps a session pinned to the same endpoint\n# Select it by setting router.epp.pluginsConfigFile: payload-agnostic.yaml\napiVersion: llm-d.ai/v1\nkind: EndpointPickerConfig\nplugins:\n- type: passthrough-parser\n- type: active-request-scorer\n- type: session-affinity-scorer\nrequestHandler:\n  parsers:\n  - pluginRef: passthrough-parser\nschedulingProfiles:\n- name: default\n  plugins:\n  - pluginRef: active-request-scorer\n    weight: 1\n  - pluginRef: session-affinity-scorer\n    weight: 1\n","thunder-plugins.yaml":"# Step 29: llm-d-router v1.0.0 (ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0) turn-priority\n# in front of a GLM-5.2 DEP=8 server: step 28's flow-control config on top of step 27's\n# dep8-affinity scheduling profile, so the only difference from step 27's dep8-affinity arm\n# is the flow-control layer (program-aware fairness, turn-priority strategy).\n#\n# Endpoints: the 8 rank API servers of one glm52-dep8 server (ports 8000 to 8007), from a file\n# (file-discovery: no Kubernetes API, so no RBAC, which our account cannot create on a4-pr).\n#\n# Flow control (as step 28): every session is one program (agent-identity reads aiperf's\n# X-Session-ID). When the pool is saturated, requests wait at the router and the deepest\n# session goes first: score = turns already dispatched + 0.05 x head wait in seconds (defaults;\n# a session idle for 120 s counts as turn one). defaultRequestTTL 0: no waiting request is shed.\n# Saturation: the utilization detector, pool saturation = average over the 8 ranks of\n# max(waiting / 5, kv_usage / 0.8), the same thresholds as step 28's (defaulted) detector.\n#\n# Scheduling (as step 27's dep8-affinity): a session stays on the rank that served it\n# (session-affinity-scorer, strategy session_id, weight 1); a new session goes to the rank\n# with the fewest in-flight tokens (token-load-scorer, weight 0.1, so a known session's rank\n# always wins).\n#\n# headroom 100 on the detector: with flow control on, the loader also injects the detector as a\n# Filter into the scheduling profile, and by default (headroom 0) it removes every rank whose\n# waiting queue exceeds 5 or whose KV usage exceeds 0.8 from the candidates before the scorers\n# run. With offload on, the ranks sit above 0.8 most of the time, so the default filter would\n# move sessions off their rank (a cache miss on the new rank, a dead copy on the old one) and\n# the arm would measure filter-induced migration, not turn-priority. headroom 100 lifts the\n# filter limits to queue 505 and KV 1.0 (capped), so the filter never removes a rank for load;\n# it does not change the saturation signal (thresholds 5 and 0.8 are unchanged).\napiVersion: llm-d.ai/v1\nkind: EndpointPickerConfig\nfeatureGates:\n- flowControl\nplugins:\n- name: vllm-endpoints\n  type: file-discovery\n  parameters:\n    path: /config/endpoints.yaml\n    watchFile: true\n- type: agent-identity\n  parameters:\n    additionalSessionHeaders:\n    - x-session-id\n- type: program-aware-fairness\n  parameters:\n    strategy: turn-priority\n- type: utilization-detector\n  parameters:\n    queueDepthThreshold: 5\n    kvCacheUtilThreshold: 0.8\n    headroom: 100\n- type: session-affinity-scorer\n  parameters:\n    strategy: session_id\n- type: inflight-load-producer\n- type: token-load-scorer\n- type: max-score-picker\n- type: single-profile-handler\nflowControl:\n  defaultRequestTTL: \"0s\"\n  defaultPriorityBand:\n    fairnessPolicyRef: program-aware-fairness\n  saturationDetector:\n    pluginRef: utilization-detector\nschedulingProfiles:\n- name: default\n  plugins:\n  - pluginRef: session-affinity-scorer\n    weight: 1\n  - pluginRef: token-load-scorer\n    weight: 0.1\n  - pluginRef: max-score-picker\ndataLayer:\n  discovery:\n    endpoints:\n      pluginRef: vllm-endpoints\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"agentx-epp-pc-epp","namespace":"bobzetian-llmd"}}
+  creationTimestamp: "2026-10-20T00:38:59Z"
+  name: agentx-epp-pc-epp
+  namespace: bobzetian-llmd
+  resourceVersion: "1792456739768751013"
+  uid: f4546f2d-7806-4151-9a3f-fdaf23b17382
