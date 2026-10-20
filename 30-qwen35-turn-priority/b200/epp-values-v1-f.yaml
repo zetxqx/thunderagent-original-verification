@@ -1,0 +1,25 @@
+# Extra Helm values for the step 30 lane EPP in front of qwen35-tp4-f on cluster a4-pr
+# (render-lane-epp.sh EXTRA_VALUES): step 26's epp-values-qf.yaml (node pool, no HF_TOKEN env, the
+# server's vLLM Service ClusterIP as the one endpoint) plus the image: llm-d-router v1.0.0 from ghcr.io.
+router:
+  epp:
+    image:
+      registry: ghcr.io
+      repository: llm-d/llm-d-router-endpoint-picker
+      tag: v1.0.0
+    env: []
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - {key: cloud.google.com/gke-nodepool, operator: In, values: [pool-1]}
+    # The endpoints file for file-discovery, mounted next to the plugin config.
+    # 10.0.34.161 is the ClusterIP of Service qwen35-tp4-f.
+    pluginsCustomConfig:
+      endpoints.yaml: |
+        endpoints:
+        - name: qwen35-tp4-f
+          namespace: bobzetian-llmd
+          address: "10.0.34.161"
+          port: "8000"
