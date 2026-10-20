@@ -1,0 +1,98 @@
+=== removing leftover jobs of this label (00:43:23)
+=== 1. the two DEP=8 servers (00:43:32)
+deployment "glm52-dep8-b" successfully rolled out
+glm52-dep8-b-8487555bf6-k8rzk   1/1   Running   0     4d16h   10.4.34.60   gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-13z6   <none>   <none>
+deployment "glm52-dep8-c" successfully rolled out
+glm52-dep8-c-6f46c5d7fc-nqtg7   1/1   Running   0     4d16h   10.4.5.105   gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-0x6t   <none>   <none>
+=== 2. lane EPPs, llm-d-router v1.0.0 turn-priority + session affinity (00:43:37)
+deployment "agentx-epp-pb-epp" successfully rolled out
+EPP b: strategy: session_id strategy: turn-priority ; headroom: 100; 8 rank endpoints; images: docker.io/envoyproxy/envoy:distroless-v1.33.2 ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0
+deployment "agentx-epp-pc-epp" successfully rolled out
+EPP c: strategy: session_id strategy: turn-priority ; headroom: 100; 8 rank endpoints; images: docker.io/envoyproxy/envoy:distroless-v1.33.2 ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0
+=== 3. smoke test: c = 4, 120 s, server b (00:43:54)
+smoke test passed (00:51:53)
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority-smoke/c4: job succeeded, pods unchanged
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority-smoke/c4: 51 of 51 profiling requests completed
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority-smoke/c4: 49 responses carry cached tokens
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority-smoke/c4: server metrics parquet present
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority-smoke/c4: aiperf.log has the profiling complete line
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority-smoke/c4: EPP scrape present
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority-smoke/c4: no gate warnings in epp-*.log
+EPP error lines in the smoke test: /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority-smoke/c4/epp-agentx-epp-pb-epp-7b5dbbb5c8-mcj92.log:226
+EPP error lines in the smoke test: /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority-smoke/c4/epp-scrape.log:0
+smoke EPP gauge: llm_d_epp_flow_control_pool_saturation{inference_pool="",stage="effective"} 0
+smoke EPP gauge: # HELP llm_d_epp_flow_control_stale_endpoints [ALPHA] Number of candidate endpoints whose metrics are missing or older than the staleness threshold, as of the most recent saturation evaluation. Recorded by the utilization saturation detector, which scores these endpoints according to stalenessPolicy: saturated by default or excluded under ignore. A nonzero value during a dispatch stall indicates a metrics collection problem rather than genuine overload. Labeled by the pipeline stage ('prefill' or 'decode') whose endpoints were evaluated; the stage label is empty when the detector is evaluated without stage partitioning.
+smoke EPP gauge: # TYPE llm_d_epp_flow_control_stale_endpoints gauge
+smoke EPP gauge: llm_d_epp_flow_control_stale_endpoints{detector="utilization-detector",stage="decode"} 0
+=== 4. points (00:51:53)
+=== dep8-turn-priority c64 on server b start (00:51:53)
+=== dep8-turn-priority c48 on server c start (00:52:13)
+=== dep8-turn-priority c48 on server c done (02:19:09)
+=== dep8-turn-priority c24 on server c start (02:19:09)
+=== dep8-turn-priority c64 on server b done (02:24:33)
+=== dep8-turn-priority c32 on server b start (02:24:33)
+=== dep8-turn-priority c24 on server c done (03:39:26)
+=== chain c done (03:39:26)
+=== dep8-turn-priority c32 on server b done (03:45:43)
+=== chain b done (03:45:43)
+=== teardown: delete the lane EPPs; the servers stay up (03:45:43)
+=== 5. reports (03:45:49)
+analyzing /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/c24
+analyzing /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/c32
+analyzing /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/c48
+analyzing /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/c64
+skip /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority-retry/c*: no profile_export.jsonl
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c24-dep8-turn-priority/timeline.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c24-dep8-turn-priority/cache.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c24-dep8-turn-priority/prefill.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c24-dep8-turn-priority/latency.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c24-dep8-turn-priority/isl-osl.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c24-dep8-turn-priority/gate.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c32-dep8-turn-priority/timeline.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c32-dep8-turn-priority/cache.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c32-dep8-turn-priority/prefill.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c32-dep8-turn-priority/latency.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c32-dep8-turn-priority/isl-osl.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c32-dep8-turn-priority/gate.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c48-dep8-turn-priority/timeline.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c48-dep8-turn-priority/cache.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c48-dep8-turn-priority/prefill.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c48-dep8-turn-priority/latency.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c48-dep8-turn-priority/isl-osl.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c48-dep8-turn-priority/gate.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c64-dep8-turn-priority/timeline.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c64-dep8-turn-priority/cache.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c64-dep8-turn-priority/prefill.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c64-dep8-turn-priority/latency.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c64-dep8-turn-priority/isl-osl.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/c64-dep8-turn-priority/gate.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/pareto.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/29-glm52-dep8-turn-priority/b200/results/dep8-turn-priority/report/concurrency.png
+# AgentX sweep report
+
+## Whole profiling window (AgentX)
+
+| label              |   conc |   completed |   errors |   total_tput_per_gpu |   output_tput_per_gpu |   p90_intvty |   p90_ttft_s |   p90_e2el_s |   p99_e2el_s |   p90_e2e_norm_intvty |   overall_hit_pct |   theoretical_hit_pct |   kv_usage_avg_pct |   waiting_avg_sum |   preemptions |   goodput_output_tput |   working_set_over_pool_mean |   batch_B |   step_time_T_ms |   epp_queue_wait_p90_s |
+|:-------------------|-------:|------------:|---------:|---------------------:|----------------------:|-------------:|-------------:|-------------:|-------------:|----------------------:|------------------:|----------------------:|-------------------:|------------------:|--------------:|----------------------:|-----------------------------:|----------:|-----------------:|-----------------------:|
+| dep8-turn-priority |     24 |        2660 |        0 |             1.22e+04 |                  89.3 |        31.2  |          3.8 |         49.3 |   165        |                 19    |              93.8 |                  97.2 |               33.2 |              1.18 |             0 |                 704   |                        0.734 |      6.13 |             51.9 |               0.000455 |
+| dep8-turn-priority |     32 |        2434 |        0 |             1.09e+04 |                  79.3 |        14.6  |         12.6 |         92.5 |   308        |                  7.11 |              91   |                  97.1 |               47.3 |              4.79 |             5 |                 608   |                        0.918 |      7.07 |             76.1 |               0.000456 |
+| dep8-turn-priority |     48 |        2087 |        0 |             8.84e+03 |                  63   |         7.74 |         81.2 |        176   |   558        |                  2.37 |              85.8 |                  96.9 |               67.1 |             14.6  |            11 |                 431   |                        1.33  |      9.84 |            143   |               1.72     |
+| dep8-turn-priority |     64 |         977 |        0 |             3.86e+03 |                  26.9 |         4.18 |        394   |        559   |     1.39e+03 |                  0.49 |              54.8 |                  96.3 |               67.6 |             28    |             2 |                  73.2 |                        1.74  |      9.16 |            307   |             nan        |
+
+## Steady state: requests started after minute 5 (sweep figures use these)
+
+| label              |   conc |   ss_completed |   ss_total_tput_per_gpu |   ss_output_tput_per_gpu |   ss_p50_intvty |   ss_p90_intvty |   ss_p50_e2e_norm_intvty |   ss_p90_e2e_norm_intvty |   ss_p50_ttft_s |   ss_p90_ttft_s |   ss_p90_e2el_s |   ss_p99_e2el_s |   ss_goodput_output_tput |   ss_overall_hit_pct |   ss_kv_usage_avg_pct |   ss_waiting_avg_sum |
+|:-------------------|-------:|---------------:|------------------------:|-------------------------:|----------------:|----------------:|-------------------------:|-------------------------:|----------------:|----------------:|----------------:|----------------:|-------------------------:|---------------------:|----------------------:|---------------------:|
+| dep8-turn-priority |     24 |           2385 |                1.26e+04 |                     91   |           71.9  |           31.2  |                    54    |                   19.3   |           0.936 |            3.89 |            49.7 |      167        |                    717   |                 93.9 |                  35.5 |                 1.27 |
+| dep8-turn-priority |     32 |           2059 |                1.08e+04 |                     79   |           54.9  |           13.3  |                    38.8  |                    6.12  |           1.2   |           15.2  |           100   |      333        |                    603   |                 90.9 |                  50.5 |                 5.19 |
+| dep8-turn-priority |     48 |           1731 |                8.53e+03 |                     58.2 |           27    |            7.22 |                    12.4  |                    2.1   |           7.08  |           93.2  |           185   |      539        |                    387   |                 85.3 |                  71.8 |                15.9  |
+| dep8-turn-priority |     64 |            642 |                3.34e+03 |                     22   |            7.37 |            3.69 |                     1.62 |                    0.405 |         226     |          465    |           710   |        1.44e+03 |                     21.2 |                 47.3 |                  71.9 |                30.4  |
+
+## Validity checks
+
+- dep8-turn-priority c=24: 5 requests cancelled when the grace period ended (not in the exports)
+- dep8-turn-priority c=32: 13 requests cancelled when the grace period ended (not in the exports), 5 of them without a first token (counted as SLO misses); working set peaked at 1.12x the KV pool (expect evictions)
+- dep8-turn-priority c=48: 42 requests cancelled when the grace period ended (not in the exports), 17 of them without a first token (counted as SLO misses); server hit 85.8% is 11.0 points below theoretical 96.9%; in-flight working set peaked at 1.39x the KV pool; working set peaked at 1.62x the KV pool (expect evictions)
+- dep8-turn-priority c=64: 64 requests cancelled when the grace period ended (not in the exports), 43 of them without a first token (counted as SLO misses); server hit 54.8% is 41.4 points below theoretical 96.3%; in-flight working set peaked at 1.98x the KV pool; working set peaked at 2.01x the KV pool (expect evictions)
+
+=== done, rc=0 (04:12:33)

@@ -1,0 +1,215 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "2"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"agentx-epp-pb-epp","app.kubernetes.io/version":"0.0.0","llm-d.ai/igw-mode":"llm-d-router-standalone"},"name":"agentx-epp-pb-epp","namespace":"bobzetian-llmd"},"spec":{"replicas":1,"selector":{"matchLabels":{"llm-d-router-standalone":"agentx-epp-pb-epp"}},"strategy":{"type":"Recreate"},"template":{"metadata":{"annotations":{"checksum/config":"77943ee666a7557aeb71a2b2a7e154a0a3cc1dccb04f75a3adad201d3b5466e2"},"labels":{"llm-d-router-standalone":"agentx-epp-pb-epp","llm-d.ai/igw-mode":"llm-d-router-standalone"}},"spec":{"affinity":{"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"cloud.google.com/gke-nodepool","operator":"In","values":["pool-1"]}]}]}}},"containers":[{"args":["--service-node","envoy-sidecar","--log-level","warn","--concurrency","8","--drain-strategy","immediate","--drain-time-s","60","-c","/etc/envoy/envoy.yaml"],"command":["envoy"],"env":[{"name":"NS_NAME","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"POD_NAME","valueFrom":{"fieldRef":{"fieldPath":"metadata.name"}}}],"image":"docker.io/envoyproxy/envoy:distroless-v1.33.2","imagePullPolicy":"IfNotPresent","lifecycle":{"preStop":{"sleep":{"seconds":5}}},"name":"envoy-proxy","ports":[{"containerPort":8081,"name":"http-8081"},{"containerPort":19001,"name":"metrics-19001"}],"readinessProbe":{"failureThreshold":1,"httpGet":{"path":"/ready","port":19001,"scheme":"HTTP"},"periodSeconds":5,"successThreshold":1,"timeoutSeconds":1},"resources":{"limits":{"memory":"8Gi"},"requests":{"cpu":"1","memory":"2Gi"}},"volumeMounts":[{"mountPath":"/etc/envoy","name":"config","readOnly":true}]},{"args":["--endpoint-selector","agentx-lane=pb","--endpoint-target-ports","8000","--zap-encoder","json","--config-file","/config/thunder-plugins.yaml","--grpc-health-port","9003","--allow-experimental-plugins=true","--v=2","--tracing=false"],"env":[{"name":"NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}},{"name":"POD_NAME","valueFrom":{"fieldRef":{"fieldPath":"metadata.name"}}}],"image":"ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0","imagePullPolicy":"IfNotPresent","lifecycle":{"preStop":{"sleep":{"seconds":5}}},"livenessProbe":{"grpc":{"port":9003,"service":"liveness"},"initialDelaySeconds":5,"periodSeconds":10},"name":"epp","ports":[{"containerPort":9002,"name":"grpc"},{"containerPort":9003,"name":"grpc-health"},{"containerPort":9090,"name":"metrics"}],"readinessProbe":{"grpc":{"port":9003,"service":"readiness"},"periodSeconds":2},"resources":{"limits":{"memory":"8Gi"},"requests":{"cpu":"1","memory":"2Gi"}},"volumeMounts":[{"mountPath":"/config","name":"plugins-config-volume"}]}],"serviceAccountName":"agentx-epp-pb-epp","terminationGracePeriodSeconds":130,"volumes":[{"configMap":{"items":[{"key":"envoy.yaml","path":"envoy.yaml"}],"name":"agentx-epp-pb-envoy"},"name":"config"},{"configMap":{"name":"agentx-epp-pb-epp"},"name":"plugins-config-volume"}]}}}}
+  creationTimestamp: "2026-10-20T00:38:55Z"
+  generation: 2
+  labels:
+    app.kubernetes.io/name: agentx-epp-pb-epp
+    app.kubernetes.io/version: 0.0.0
+    llm-d.ai/igw-mode: llm-d-router-standalone
+  name: agentx-epp-pb-epp
+  namespace: bobzetian-llmd
+  resourceVersion: "1792457063241583010"
+  uid: d841a8bb-0a1b-41d7-b09c-95bb64d0b8f2
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      llm-d-router-standalone: agentx-epp-pb-epp
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        checksum/config: 77943ee666a7557aeb71a2b2a7e154a0a3cc1dccb04f75a3adad201d3b5466e2
+        kubectl.kubernetes.io/restartedAt: "2026-10-20T00:44:12Z"
+      labels:
+        llm-d-router-standalone: agentx-epp-pb-epp
+        llm-d.ai/igw-mode: llm-d-router-standalone
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: cloud.google.com/gke-nodepool
+                operator: In
+                values:
+                - pool-1
+      containers:
+      - args:
+        - --service-node
+        - envoy-sidecar
+        - --log-level
+        - warn
+        - --concurrency
+        - "8"
+        - --drain-strategy
+        - immediate
+        - --drain-time-s
+        - "60"
+        - -c
+        - /etc/envoy/envoy.yaml
+        command:
+        - envoy
+        env:
+        - name: NS_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        image: docker.io/envoyproxy/envoy:distroless-v1.33.2
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            sleep:
+              seconds: 5
+        name: envoy-proxy
+        ports:
+        - containerPort: 8081
+          name: http-8081
+          protocol: TCP
+        - containerPort: 19001
+          name: metrics-19001
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 1
+          httpGet:
+            path: /ready
+            port: 19001
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            memory: 8Gi
+          requests:
+            cpu: "1"
+            memory: 2Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/envoy
+          name: config
+          readOnly: true
+      - args:
+        - --endpoint-selector
+        - agentx-lane=pb
+        - --endpoint-target-ports
+        - "8000"
+        - --zap-encoder
+        - json
+        - --config-file
+        - /config/thunder-plugins.yaml
+        - --grpc-health-port
+        - "9003"
+        - --allow-experimental-plugins=true
+        - --v=2
+        - --tracing=false
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        image: ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            sleep:
+              seconds: 5
+        livenessProbe:
+          failureThreshold: 3
+          grpc:
+            port: 9003
+            service: liveness
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: epp
+        ports:
+        - containerPort: 9002
+          name: grpc
+          protocol: TCP
+        - containerPort: 9003
+          name: grpc-health
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          grpc:
+            port: 9003
+            service: readiness
+          periodSeconds: 2
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            memory: 8Gi
+          requests:
+            cpu: "1"
+            memory: 2Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /config
+          name: plugins-config-volume
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: agentx-epp-pb-epp
+      serviceAccountName: agentx-epp-pb-epp
+      terminationGracePeriodSeconds: 130
+      volumes:
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: envoy.yaml
+            path: envoy.yaml
+          name: agentx-epp-pb-envoy
+        name: config
+      - configMap:
+          defaultMode: 420
+          name: agentx-epp-pb-epp
+        name: plugins-config-volume
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-10-20T00:44:23Z"
+    lastUpdateTime: "2026-10-20T00:44:23Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-10-20T00:38:55Z"
+    lastUpdateTime: "2026-10-20T00:44:23Z"
+    message: ReplicaSet "agentx-epp-pb-epp-7b5dbbb5c8" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 2
+  readyReplicas: 1
+  replicas: 1
+  terminatingReplicas: 0
+  updatedReplicas: 1
