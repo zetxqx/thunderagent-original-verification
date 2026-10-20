@@ -37,7 +37,7 @@ Open the reference you need, not all of them:
 | `scripts/figstyle.py` | the `scientific-figure-making` style for every figure, PNG only |
 | `scripts/epp_scrape.py` | EPP metrics scraper (runs in the Job) |
 | `scripts/lib.sh` | loads the profile, `pin_kube`, `vllm_get`, `selector_yaml` |
-| `profiles/<name>.env` | cluster, namespace, deployment, selector, container, images and dataset of one target (`PROFILE=<name>`, default `bobbm`); every value can still be overridden from the environment |
+| `profiles/<name>.env` | cluster, namespace, deployment, selector, container, images and dataset of one target (`PROFILE=<name>`, default `bobbm`; `a4-pr` for the B200 cluster of steps 25 to 28); every value can still be overridden from the environment |
 | `manifests/` | PVC, lane Service, metrics-reader RBAC, EPP arm plugin configs, per-lane EPP values and RBAC (`lane-epp-*.yaml`) |
 | `tests/` | pytest for `analyze.py`, `router_metrics.py` and `verify-point.sh` on a synthetic point; run with `tests/run.sh` (uv) after changing a parser or a check |
 
