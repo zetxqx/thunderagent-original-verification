@@ -1,0 +1,91 @@
+=== removing leftover jobs of this label (07:28:23)
+=== 1. waiting for the three servers (07:28:31)
+Waiting for deployment "qwen35-tp4-b" rollout to finish: 0 of 1 updated replicas are available...
+deployment "qwen35-tp4-b" successfully rolled out
+server b available (07:47:51): qwen35-tp4-b-5bd5f56dfd-mjkkk gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-000v
+deployment "qwen35-tp4-d" successfully rolled out
+server d available (07:47:53): qwen35-tp4-d-7d86b99db9-8mnl5 gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-000v
+deployment "qwen35-tp4-f" successfully rolled out
+server f available (07:47:56): qwen35-tp4-f-75644578c-b6n2p gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-14rm
+=== 2. lane EPPs, llm-d-router v1.0.0 turn-priority (07:47:57)
+deployment "agentx-epp-ub-epp" successfully rolled out
+EPP b: strategy: turn-priority ; endpoint address: "10.0.37.3"; images: docker.io/envoyproxy/envoy:distroless-v1.33.2 ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0
+deployment "agentx-epp-ud-epp" successfully rolled out
+EPP d: strategy: turn-priority ; endpoint address: "10.0.47.250"; images: docker.io/envoyproxy/envoy:distroless-v1.33.2 ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0
+deployment "agentx-epp-uf-epp" successfully rolled out
+EPP f: strategy: turn-priority ; endpoint address: "10.0.34.161"; images: docker.io/envoyproxy/envoy:distroless-v1.33.2 ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0
+=== 3. smoke test: c = 4, 120 s, server b (07:48:25)
+smoke test passed (07:55:10)
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority-smoke/c4: job succeeded, pods unchanged
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority-smoke/c4: 12 of 12 profiling requests completed
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority-smoke/c4: 12 responses carry cached tokens
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority-smoke/c4: server metrics parquet present
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority-smoke/c4: aiperf.log has the profiling complete line
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority-smoke/c4: EPP scrape present
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority-smoke/c4: no gate warnings in epp-*.log
+EPP error lines in the smoke test: /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority-smoke/c4/epp-agentx-epp-ub-epp-685dfdd954-8nvv9.log:184
+EPP error lines in the smoke test: /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority-smoke/c4/epp-scrape.log:0
+smoke EPP gauge: # HELP llm_d_epp_flow_control_stale_endpoints [ALPHA] Number of candidate endpoints whose metrics are missing or older than the staleness threshold, as of the most recent saturation evaluation. Recorded by the utilization saturation detector, which scores these endpoints according to stalenessPolicy: saturated by default or excluded under ignore. A nonzero value during a dispatch stall indicates a metrics collection problem rather than genuine overload. Labeled by the pipeline stage ('prefill' or 'decode') whose endpoints were evaluated; the stage label is empty when the detector is evaluated without stage partitioning.
+smoke EPP gauge: # TYPE llm_d_epp_flow_control_stale_endpoints gauge
+smoke EPP gauge: llm_d_epp_flow_control_stale_endpoints{detector="utilization-detector",stage="decode"} 0
+=== 4. points (07:55:10)
+=== qwen35-turn-priority c32 on server b start (07:55:10)
+=== qwen35-turn-priority c48 on server d start (07:55:30)
+=== qwen35-turn-priority c64 on server f start (07:55:50)
+=== qwen35-turn-priority c32 on server b done (09:05:45)
+=== qwen35-turn-priority c48 on server d done (09:09:30)
+=== qwen35-turn-priority c64 on server f done (09:10:50)
+=== teardown: delete the lane EPPs, scale the servers back to 0 (09:10:50)
+deployment.apps/qwen35-tp4-b scaled
+deployment.apps/qwen35-tp4-d scaled
+deployment.apps/qwen35-tp4-f scaled
+=== 5. reports (09:11:02)
+analyzing /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/c32
+analyzing /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/c48
+analyzing /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/c64
+skip /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority-retry/c*: no profile_export.jsonl
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c32-qwen35-turn-priority/timeline.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c32-qwen35-turn-priority/cache.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c32-qwen35-turn-priority/prefill.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c32-qwen35-turn-priority/latency.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c32-qwen35-turn-priority/isl-osl.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c32-qwen35-turn-priority/gate.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c48-qwen35-turn-priority/timeline.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c48-qwen35-turn-priority/cache.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c48-qwen35-turn-priority/prefill.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c48-qwen35-turn-priority/latency.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c48-qwen35-turn-priority/isl-osl.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c48-qwen35-turn-priority/gate.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c64-qwen35-turn-priority/timeline.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c64-qwen35-turn-priority/cache.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c64-qwen35-turn-priority/prefill.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c64-qwen35-turn-priority/latency.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c64-qwen35-turn-priority/isl-osl.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/c64-qwen35-turn-priority/gate.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/pareto.png
+wrote /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/30-qwen35-turn-priority/b200/results/qwen35-turn-priority/report/concurrency.png
+# AgentX sweep report
+
+## Whole profiling window (AgentX)
+
+| label                |   conc |   completed |   errors |   total_tput_per_gpu |   output_tput_per_gpu |   p90_intvty |   p90_ttft_s |   p90_e2el_s |   p99_e2el_s |   p90_e2e_norm_intvty |   overall_hit_pct |   theoretical_hit_pct |   kv_usage_avg_pct |   waiting_avg_sum |   preemptions |   goodput_output_tput |   working_set_over_pool_mean |   batch_B |   step_time_T_ms |   epp_queue_wait_p90_s |
+|:---------------------|-------:|------------:|---------:|---------------------:|----------------------:|-------------:|-------------:|-------------:|-------------:|----------------------:|------------------:|----------------------:|-------------------:|------------------:|--------------:|----------------------:|-----------------------------:|----------:|-----------------:|-----------------------:|
+| qwen35-turn-priority |     32 |        4640 |        0 |             3.48e+04 |                   304 |         46.6 |         1.44 |         25.4 |           85 |                 34.7  |              93   |                  96.5 |               36.6 |             0.136 |             0 |              1.22e+03 |                        0.863 |      34.5 |             28   |                0.00049 |
+| qwen35-turn-priority |     48 |        6241 |        0 |             4.06e+04 |                   402 |         39.2 |         4.72 |         36.3 |          106 |                 22    |              91.3 |                  95.6 |               66.6 |             0.616 |             0 |              1.61e+03 |                        1.36  |      72   |             44.4 |                2.25    |
+| qwen35-turn-priority |     64 |        6537 |        0 |             4.01e+04 |                   419 |         29.4 |        22.6  |         55.6 |          146 |                  6.57 |              88.3 |                  95.3 |               86.7 |             5.74  |            58 |              1.68e+03 |                        1.78  |      93.5 |             55.4 |               21.7     |
+
+## Steady state: requests started after minute 5 (sweep figures use these)
+
+| label                |   conc |   ss_completed |   ss_total_tput_per_gpu |   ss_output_tput_per_gpu |   ss_p50_intvty |   ss_p90_intvty |   ss_p50_e2e_norm_intvty |   ss_p90_e2e_norm_intvty |   ss_p50_ttft_s |   ss_p90_ttft_s |   ss_p90_e2el_s |   ss_p99_e2el_s |   ss_goodput_output_tput |   ss_overall_hit_pct |   ss_kv_usage_avg_pct |   ss_waiting_avg_sum |
+|:---------------------|-------:|---------------:|------------------------:|-------------------------:|----------------:|----------------:|-------------------------:|-------------------------:|----------------:|----------------:|----------------:|----------------:|-------------------------:|---------------------:|----------------------:|---------------------:|
+| qwen35-turn-priority |     32 |           4361 |                3.62e+04 |                      319 |            95.6 |            46.2 |                     76.2 |                    34.3  |           0.767 |            1.45 |            26   |            85.7 |                 1.28e+03 |                 93.2 |                  39.3 |                0.147 |
+| qwen35-turn-priority |     48 |           5941 |                4.25e+04 |                      417 |            61.1 |            39   |                     48.2 |                    21.8  |           1.19  |            4.84 |            37.1 |           107   |                 1.67e+03 |                 91.4 |                  71.1 |                0.667 |
+| qwen35-turn-priority |     64 |           6189 |                4.14e+04 |                      434 |            48.2 |            29.1 |                     21.3 |                     6.33 |          11.3   |           23    |            57.3 |           153   |                 1.73e+03 |                 88.2 |                  93   |                6.25  |
+
+## Validity checks
+
+- qwen35-turn-priority c=32: working set peaked at 1.17x the KV pool (expect evictions)
+- qwen35-turn-priority c=48: 1 requests cancelled when the grace period ended (not in the exports); in-flight working set peaked at 1.20x the KV pool; working set peaked at 1.65x the KV pool (expect evictions)
+- qwen35-turn-priority c=64: 5 requests cancelled when the grace period ended (not in the exports); in-flight working set peaked at 1.61x the KV pool; working set peaked at 2.22x the KV pool (expect evictions)
+
+=== done, rc=0 (09:22:14)
