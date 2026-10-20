@@ -23,5 +23,6 @@ for c in "$@"; do
 done
 
 uv run "$SCRIPTS/analyze.py" --out "$RESULTS/$LABEL/report" "$RESULTS/$LABEL"/c*
-rm -f "$RESULTS"/*.kubeconfig   # the pinned kubeconfig written by lib.sh pin_kube
+# The pinned kubeconfig ($RESULTS/$PROFILE.kubeconfig, git-ignored) stays: another
+# run-point.sh on the same RESULTS may still use it (references/incidents.md, step 25).
 [ -z "$FAILED" ] || { echo "points that did not succeed or are invalid:$FAILED"; exit 1; }
