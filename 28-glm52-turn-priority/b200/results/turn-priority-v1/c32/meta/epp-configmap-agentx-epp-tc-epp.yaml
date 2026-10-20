@@ -1,0 +1,108 @@
+apiVersion: v1
+data:
+  default-plugins.yaml: |
+    apiVersion: llm-d.ai/v1
+    kind: EndpointPickerConfig
+    plugins:
+    - type: queue-scorer
+    - type: kv-cache-utilization-scorer
+    - type: prefix-cache-scorer
+    - type: metrics-data-source
+      parameters:
+        scheme: "http"
+        path: "/metrics"
+        insecureSkipVerify: true
+    - type: core-metrics-extractor
+    schedulingProfiles:
+    - name: default
+      plugins:
+      - pluginRef: queue-scorer
+        weight: 2
+      - pluginRef: kv-cache-utilization-scorer
+        weight: 2
+      - pluginRef: prefix-cache-scorer
+        weight: 3
+  endpoints.yaml: |
+    endpoints:
+    - name: glm52-tp8-c
+      namespace: bobzetian-llmd
+      address: "10.0.33.127"
+      port: "8000"
+  payload-agnostic.yaml: |
+    # Request-format agnostic routing. Use this when the request format is
+    # unknown or unsupported, so the EPP cannot rely on scorers that read the
+    # request body (e.g. the prefix-cache scorer). The passthrough parser does
+    # not parse the body, and routing falls back to backend-state scorers:
+    #   - active-request-scorer  : prefers the least busy endpoint
+    #   - session-affinity-scorer: keeps a session pinned to the same endpoint
+    # Select it by setting router.epp.pluginsConfigFile: payload-agnostic.yaml
+    apiVersion: llm-d.ai/v1
+    kind: EndpointPickerConfig
+    plugins:
+    - type: passthrough-parser
+    - type: active-request-scorer
+    - type: session-affinity-scorer
+    requestHandler:
+      parsers:
+      - pluginRef: passthrough-parser
+    schedulingProfiles:
+    - name: default
+      plugins:
+      - pluginRef: active-request-scorer
+        weight: 1
+      - pluginRef: session-affinity-scorer
+        weight: 1
+  thunder-plugins.yaml: |
+    # Step 28: llm-d-router v1.0.0 (ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0) with flow
+    # control and the program-aware fairness policy in its turn-priority strategy (upstream #2116).
+    # Every session is one program: agent-identity reads aiperf's X-Session-ID, and the director
+    # copies it to the fairness ID. When the pool is saturated, requests wait at the router and the
+    # deepest session goes first: score = turns already dispatched + turnPriorityTimeWeight x head
+    # wait in seconds (defaults: 0.05 per second, a session idle for 120 s counts as turn one).
+    # Saturation is v1.0.0's default utilization detector (not configured here, so the loader adds
+    # it): saturated when vLLM's waiting queue reaches 5 or its KV cache usage reaches 0.8.
+    # defaultRequestTTL 0: a waiting request is never shed (the default 60 s would turn waits into
+    # errors, and AgentX stops a run at 10% failed requests); the envoy ext_proc timeout is 2400 s.
+    # Endpoints come from a file (file-discovery: no Kubernetes API, so no RBAC, which our account
+    # cannot create on a4-pr), as in step 25.
+    apiVersion: llm-d.ai/v1
+    kind: EndpointPickerConfig
+    featureGates:
+    - flowControl
+    plugins:
+    - name: vllm-endpoints
+      type: file-discovery
+      parameters:
+        path: /config/endpoints.yaml
+        watchFile: true
+    - type: agent-identity
+      parameters:
+        additionalSessionHeaders:
+        - x-session-id
+    - type: program-aware-fairness
+      parameters:
+        strategy: turn-priority
+    - type: max-score-picker
+    - type: single-profile-handler
+    flowControl:
+      defaultRequestTTL: "0s"
+      defaultPriorityBand:
+        fairnessPolicyRef: program-aware-fairness
+    schedulingProfiles:
+    - name: default
+      plugins:
+      - pluginRef: max-score-picker
+    dataLayer:
+      discovery:
+        endpoints:
+          pluginRef: vllm-endpoints
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"default-plugins.yaml":"apiVersion: llm-d.ai/v1\nkind: EndpointPickerConfig\nplugins:\n- type: queue-scorer\n- type: kv-cache-utilization-scorer\n- type: prefix-cache-scorer\n- type: metrics-data-source\n  parameters:\n    scheme: \"http\"\n    path: \"/metrics\"\n    insecureSkipVerify: true\n- type: core-metrics-extractor\nschedulingProfiles:\n- name: default\n  plugins:\n  - pluginRef: queue-scorer\n    weight: 2\n  - pluginRef: kv-cache-utilization-scorer\n    weight: 2\n  - pluginRef: prefix-cache-scorer\n    weight: 3\n","endpoints.yaml":"endpoints:\n- name: glm52-tp8-c\n  namespace: bobzetian-llmd\n  address: \"10.0.33.127\"\n  port: \"8000\"\n","payload-agnostic.yaml":"# Request-format agnostic routing. Use this when the request format is\n# unknown or unsupported, so the EPP cannot rely on scorers that read the\n# request body (e.g. the prefix-cache scorer). The passthrough parser does\n# not parse the body, and routing falls back to backend-state scorers:\n#   - active-request-scorer  : prefers the least busy endpoint\n#   - session-affinity-scorer: keeps a session pinned to the same endpoint\n# Select it by setting router.epp.pluginsConfigFile: payload-agnostic.yaml\napiVersion: llm-d.ai/v1\nkind: EndpointPickerConfig\nplugins:\n- type: passthrough-parser\n- type: active-request-scorer\n- type: session-affinity-scorer\nrequestHandler:\n  parsers:\n  - pluginRef: passthrough-parser\nschedulingProfiles:\n- name: default\n  plugins:\n  - pluginRef: active-request-scorer\n    weight: 1\n  - pluginRef: session-affinity-scorer\n    weight: 1\n","thunder-plugins.yaml":"# Step 28: llm-d-router v1.0.0 (ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0) with flow\n# control and the program-aware fairness policy in its turn-priority strategy (upstream #2116).\n# Every session is one program: agent-identity reads aiperf's X-Session-ID, and the director\n# copies it to the fairness ID. When the pool is saturated, requests wait at the router and the\n# deepest session goes first: score = turns already dispatched + turnPriorityTimeWeight x head\n# wait in seconds (defaults: 0.05 per second, a session idle for 120 s counts as turn one).\n# Saturation is v1.0.0's default utilization detector (not configured here, so the loader adds\n# it): saturated when vLLM's waiting queue reaches 5 or its KV cache usage reaches 0.8.\n# defaultRequestTTL 0: a waiting request is never shed (the default 60 s would turn waits into\n# errors, and AgentX stops a run at 10% failed requests); the envoy ext_proc timeout is 2400 s.\n# Endpoints come from a file (file-discovery: no Kubernetes API, so no RBAC, which our account\n# cannot create on a4-pr), as in step 25.\napiVersion: llm-d.ai/v1\nkind: EndpointPickerConfig\nfeatureGates:\n- flowControl\nplugins:\n- name: vllm-endpoints\n  type: file-discovery\n  parameters:\n    path: /config/endpoints.yaml\n    watchFile: true\n- type: agent-identity\n  parameters:\n    additionalSessionHeaders:\n    - x-session-id\n- type: program-aware-fairness\n  parameters:\n    strategy: turn-priority\n- type: max-score-picker\n- type: single-profile-handler\nflowControl:\n  defaultRequestTTL: \"0s\"\n  defaultPriorityBand:\n    fairnessPolicyRef: program-aware-fairness\nschedulingProfiles:\n- name: default\n  plugins:\n  - pluginRef: max-score-picker\ndataLayer:\n  discovery:\n    endpoints:\n      pluginRef: vllm-endpoints\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"agentx-epp-tc-epp","namespace":"bobzetian-llmd"}}
+  creationTimestamp: "2026-10-19T21:03:07Z"
+  name: agentx-epp-tc-epp
+  namespace: bobzetian-llmd
+  resourceVersion: "1792443787704575013"
+  uid: afbe5028-96b5-4b6e-93aa-d9e61293cb80

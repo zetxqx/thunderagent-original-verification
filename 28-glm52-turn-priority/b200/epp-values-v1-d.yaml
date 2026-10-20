@@ -1,0 +1,25 @@
+# Extra Helm values for the step 28 lane EPP in front of glm52-tp8-d on cluster a4-pr
+# (render-lane-epp.sh EXTRA_VALUES), as step 25's epp-values-a4pr files plus the image:
+# llm-d-router v1.0.0 from ghcr.io (public). The EPP runs on node pool pool-1; the plugin
+# config has no tokenizer, so the HF_TOKEN env (secret absent here) is dropped.
+router:
+  epp:
+    image:
+      registry: ghcr.io
+      repository: llm-d/llm-d-router-endpoint-picker
+      tag: v1.0.0
+    env: []
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - {key: cloud.google.com/gke-nodepool, operator: In, values: [pool-1]}
+    # The endpoints file for file-discovery; 10.0.44.102 is the ClusterIP of Service glm52-tp8-d.
+    pluginsCustomConfig:
+      endpoints.yaml: |
+        endpoints:
+        - name: glm52-tp8-d
+          namespace: bobzetian-llmd
+          address: "10.0.44.102"
+          port: "8000"
