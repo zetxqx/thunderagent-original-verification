@@ -51,6 +51,13 @@ spec:
         command: [bash, -c]
         args:
         - |
+          # vllm-project/vllm#62862 fix toggle; see the decode pod.
+          if [ "${VLLM_PR62862:-0}" = 1 ]; then
+            SP=/usr/local/lib/python3.12/dist-packages/vllm
+            cp /pr62862/scheduler.py "$SP/v1/core/sched/scheduler.py"
+            cp /pr62862/multi_connector.py "$SP/distributed/kv_transfer/kv_connector/v1/multi_connector.py"
+            echo "VLLM_PR62862: applied zetxqx/vllm#1"
+          fi
           exec vllm serve Qwen/Qwen3.5-397B-A17B-FP8 \
             --revision ea5b4f81096f3901c91dea97f81324302495781d \
             --served-model-name Qwen/Qwen3.5-397B-A17B-FP8 \
@@ -69,6 +76,7 @@ spec:
             --enable-auto-tool-choice --tool-call-parser qwen3_coder \
             --enable-prompt-tokens-details
         env:
+        - {name: VLLM_PR62862, value: "1"}
         - {name: MAX_NUM_SEQS, value: "64"}
         - {name: GPU_MEMORY_UTILIZATION, value: "0.8"}
         - name: KV_TRANSFER_CONFIG
@@ -105,7 +113,10 @@ spec:
         - {name: dshm, mountPath: /dev/shm}
         - {name: hf-cache, mountPath: /root/.cache/huggingface}
         - {name: nvidia-install-dir, mountPath: /usr/local/nvidia/lib64}
+        - {name: pr62862, mountPath: /pr62862}
       volumes:
+      - name: pr62862
+        configMap: {name: vllm-pr62862}
       - name: dshm
         emptyDir: {medium: Memory, sizeLimit: 450Gi}
       - name: hf-cache
@@ -160,14 +171,16 @@ spec:
         command: [bash, -c]
         args:
         - |
-          # Work around vLLM v0.31.0 MultiConnector bug (multi_connector.py:214-218):
-          # NixlConnector sets supports_divergent_local_hybrid_hits=True so D reuses its local
-          # FullAttention prefix blocks even when Mamba has 0 cached blocks on D, pulling only the
-          # uncached suffix FullAttention blocks + 1 Mamba state block over NIXL. Wrapping
-          # NixlConnector + OffloadingConnector in MultiConnector used all(...), turning that
-          # property into False because OffloadingConnector inherits False.
-          sed -i 's/and all(/and any(/' \
-            /usr/local/lib/python3.12/dist-packages/vllm/distributed/kv_transfer/kv_connector/v1/multi_connector.py
+          # Work around vLLM v0.31.0 MultiConnector bug (vllm-project/vllm#62862): with
+          # VLLM_PR62862=1, overlay the fix from zetxqx/vllm#1 (pr62862/, ported onto v0.31.0;
+          # the image's two files are byte-identical to v0.31.0). D then reuses its local
+          # FullAttention prefix blocks and pulls only the uncached suffix + 1 Mamba block over NIXL.
+          if [ "${VLLM_PR62862:-0}" = 1 ]; then
+            SP=/usr/local/lib/python3.12/dist-packages/vllm
+            cp /pr62862/scheduler.py "$SP/v1/core/sched/scheduler.py"
+            cp /pr62862/multi_connector.py "$SP/distributed/kv_transfer/kv_connector/v1/multi_connector.py"
+            echo "VLLM_PR62862: applied zetxqx/vllm#1"
+          fi
           exec vllm serve Qwen/Qwen3.5-397B-A17B-FP8 \
             --revision ea5b4f81096f3901c91dea97f81324302495781d \
             --served-model-name Qwen/Qwen3.5-397B-A17B-FP8 \
@@ -186,6 +199,7 @@ spec:
             --enable-auto-tool-choice --tool-call-parser qwen3_coder \
             --enable-prompt-tokens-details
         env:
+        - {name: VLLM_PR62862, value: "1"}
         - {name: MAX_NUM_SEQS, value: "128"}
         - {name: GPU_MEMORY_UTILIZATION, value: "0.8"}
         - name: KV_TRANSFER_CONFIG
@@ -222,7 +236,10 @@ spec:
         - {name: dshm, mountPath: /dev/shm}
         - {name: hf-cache, mountPath: /root/.cache/huggingface}
         - {name: nvidia-install-dir, mountPath: /usr/local/nvidia/lib64}
+        - {name: pr62862, mountPath: /pr62862}
       volumes:
+      - name: pr62862
+        configMap: {name: vllm-pr62862}
       - name: dshm
         emptyDir: {medium: Memory, sizeLimit: 450Gi}
       - name: hf-cache

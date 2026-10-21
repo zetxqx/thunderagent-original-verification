@@ -1,0 +1,106 @@
+=== 0. ConfigMaps and proxy (16:50:06)
+Waiting for deployment "pd-proxy" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "pd-proxy" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "pd-proxy" rollout to finish: 1 old replicas are pending termination...
+deployment "pd-proxy" successfully rolled out
+=== fix: 1. servers with VLLM_PR62862=1 (16:50:20)
+Waiting for deployment "qwen35-pd-prefill" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "qwen35-pd-prefill" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "qwen35-pd-prefill" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "qwen35-pd-prefill" rollout to finish: 0 of 1 updated replicas are available...
+deployment "qwen35-pd-prefill" successfully rolled out
+deployment "qwen35-pd-decode" successfully rolled out
+qwen35-pd-prefill-7b559d7d89-4q75w: patch applied lines=1 (want 1)
+qwen35-pd-decode-6f4dd5dcdf-lw9tx: patch applied lines=1 (want 1)
+=== fix: 2. one request through the proxy (17:04:02)
+{"id":"chatcmpl-c891671b-93d7-4332-9566-77e1ff3d06a4","object":"chat.completion","created":1792602243,"model":"Qwen/Qwen3.5-397B-A17B-FP8","choices":[{"index":0,"message":{"role":"assistant","content":null,"refusal":null,"annotations":null,"audio":null,"function_call":null,"reasoning":"Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Prefill/decode disaggregation (a technique in large language model inference).\n    *   Constraint: Write exactly one sentence.\n\n2.  **Identify Key Concepts:**\n    *   Prefill phase: Processing"},"logprobs":null,"finish_reason":"length","stop_reason":null,"token_ids":null,"routed_experts":null}],"service_tier":null,"system_fingerprint":"vllm-0.31.0-tp4-8ec7557c","usage":{"prompt_tokens":21,"total_tokens":85,"completion_tokens":64,"prompt_to
+(Worker_TP0 pid=1541) INFO 10-21 17:04:03 [base_worker.py:1114] NIXL compatibility check passed (hash: 72ccd64316468957a46b7f4e36fe43724dcdc764ca283e2ee7dda8c656ebeb14)
+(Worker_TP3 pid=1544) INFO 10-21 17:04:03 [base_worker.py:1114] NIXL compatibility check passed (hash: 72ccd64316468957a46b7f4e36fe43724dcdc764ca283e2ee7dda8c656ebeb14)
+INFO:     10.4.11.57:50510 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+=== fix: 3. AgentX c=4, 120 s (17:04:05)
+point finished (17:09:33)
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/31-qwen35-1p1d/b200/results/qwen35-1p1d-proxy-fix/c4: job succeeded, pods unchanged
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/31-qwen35-1p1d/b200/results/qwen35-1p1d-proxy-fix/c4: 12 of 12 profiling requests completed
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/31-qwen35-1p1d/b200/results/qwen35-1p1d-proxy-fix/c4: 12 responses carry cached tokens
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/31-qwen35-1p1d/b200/results/qwen35-1p1d-proxy-fix/c4: server metrics parquet present
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/31-qwen35-1p1d/b200/results/qwen35-1p1d-proxy-fix/c4: aiperf.log has the profiling complete line
+=== fix: 4. counter deltas over the point (17:09:37)
+--- P
+  vllm:external_prefix_cache_hits_total                            0
+  vllm:external_prefix_cache_queries_total                   1258285
+  vllm:kv_offload_size_sum                               37952471040
+  vllm:kv_offload_total_bytes_total                      37952471040
+  vllm:nixl_bytes_transferred_count                                0
+  vllm:nixl_bytes_transferred_sum                                  0
+  vllm:nixl_num_failed_transfers_total                             0
+  vllm:prefix_cache_hits_total                               3349472
+  vllm:prefix_cache_queries_total                            4607757
+  vllm:prompt_tokens_total                                   4607757
+  vllm:request_success_total                                      56
+--- D
+  vllm:external_prefix_cache_hits_total                      1079533
+  vllm:external_prefix_cache_queries_total                   1079589
+  vllm:kv_offload_size_sum                               30332682240
+  vllm:kv_offload_total_bytes_total                      30332682240
+  vllm:nixl_bytes_transferred_count                              224
+  vllm:nixl_bytes_transferred_sum                        48386408448
+  vllm:nixl_num_failed_transfers_total                             0
+  vllm:prefix_cache_hits_total                               3528224
+  vllm:prefix_cache_queries_total                            4607813
+  vllm:prompt_tokens_total                                   4607813
+  vllm:request_success_total                                      56
+--- client: 55 requests in 12 conversations
+    TTFT ms median 1251, max 10554
+qwen35-pd-prefill-7b559d7d89-4q75w: 0 error lines
+qwen35-pd-decode-6f4dd5dcdf-lw9tx: 0 error lines
+=== base: 1. servers with VLLM_PR62862=0 (17:09:40)
+Waiting for deployment "qwen35-pd-prefill" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "qwen35-pd-prefill" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "qwen35-pd-prefill" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "qwen35-pd-prefill" rollout to finish: 0 of 1 updated replicas are available...
+deployment "qwen35-pd-prefill" successfully rolled out
+deployment "qwen35-pd-decode" successfully rolled out
+qwen35-pd-prefill-679b98b88b-2xcdm: patch applied lines=0 (want 0)
+qwen35-pd-decode-989cf65b4-bw6ms: patch applied lines=0 (want 0)
+=== base: 2. one request through the proxy (17:23:31)
+{"id":"chatcmpl-660fefdf-3943-429f-88cb-0f9bf43f46a1","object":"chat.completion","created":1792603413,"model":"Qwen/Qwen3.5-397B-A17B-FP8","choices":[{"index":0,"message":{"role":"assistant","content":null,"refusal":null,"annotations":null,"audio":null,"function_call":null,"reasoning":"Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Prefill/decode disaggregation (a technique in large language model inference).\n    *   Constraint: Write exactly one sentence.\n\n2.  **Identify Key Concepts:**\n    *   Prefill phase: Processing"},"logprobs":null,"finish_reason":"length","stop_reason":null,"token_ids":null,"routed_experts":null}],"service_tier":null,"system_fingerprint":"vllm-0.31.0-tp4-8ec7557c","usage":{"prompt_tokens":21,"total_tokens":85,"completion_tokens":64,"prompt_to
+(Worker_TP3 pid=1541) INFO 10-21 17:23:33 [base_worker.py:1114] NIXL compatibility check passed (hash: 72ccd64316468957a46b7f4e36fe43724dcdc764ca283e2ee7dda8c656ebeb14)
+(Worker_TP1 pid=1539) INFO 10-21 17:23:33 [base_worker.py:1114] NIXL compatibility check passed (hash: 72ccd64316468957a46b7f4e36fe43724dcdc764ca283e2ee7dda8c656ebeb14)
+INFO:     10.4.11.57:40160 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+=== base: 3. AgentX c=4, 120 s (17:23:35)
+point finished (17:28:59)
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/31-qwen35-1p1d/b200/results/qwen35-1p1d-proxy-base/c4: job succeeded, pods unchanged
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/31-qwen35-1p1d/b200/results/qwen35-1p1d-proxy-base/c4: 12 of 12 profiling requests completed
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/31-qwen35-1p1d/b200/results/qwen35-1p1d-proxy-base/c4: 12 responses carry cached tokens
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/31-qwen35-1p1d/b200/results/qwen35-1p1d-proxy-base/c4: server metrics parquet present
+  ok /usr/local/google/home/bobzetian/projects/playground/thunderagent-original-verification/31-qwen35-1p1d/b200/results/qwen35-1p1d-proxy-base/c4: aiperf.log has the profiling complete line
+=== base: 4. counter deltas over the point (17:29:03)
+--- P
+  vllm:external_prefix_cache_hits_total                            0
+  vllm:external_prefix_cache_queries_total                   1258254
+  vllm:kv_offload_size_sum                               37952471040
+  vllm:kv_offload_total_bytes_total                      37952471040
+  vllm:nixl_bytes_transferred_count                                0
+  vllm:nixl_bytes_transferred_sum                                  0
+  vllm:nixl_num_failed_transfers_total                             0
+  vllm:prefix_cache_hits_total                               3349472
+  vllm:prefix_cache_queries_total                            4607726
+  vllm:prompt_tokens_total                                   4607726
+  vllm:request_success_total                                      56
+--- D
+  vllm:external_prefix_cache_hits_total                      4607726
+  vllm:external_prefix_cache_queries_total                   4607782
+  vllm:kv_offload_size_sum                               30332682240
+  vllm:kv_offload_total_bytes_total                      30332682240
+  vllm:nixl_bytes_transferred_count                              224
+  vllm:nixl_bytes_transferred_sum                       163999252480
+  vllm:nixl_num_failed_transfers_total                             0
+  vllm:prefix_cache_hits_total                                     0
+  vllm:prefix_cache_queries_total                            4607782
+  vllm:prompt_tokens_total                                   4607782
+  vllm:request_success_total                                      56
+--- client: 55 requests in 12 conversations
+    TTFT ms median 1202, max 10550
+qwen35-pd-prefill-679b98b88b-2xcdm: 0 error lines
+qwen35-pd-decode-989cf65b4-bw6ms: 0 error lines
+=== done (17:29:06)

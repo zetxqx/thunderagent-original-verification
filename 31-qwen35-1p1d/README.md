@@ -147,6 +147,29 @@ Turn-by-turn comparison on the 12 identical profiling turns (`03e110ac6921c2fe*`
    - Because our deployment wraps `NixlConnector` + `OffloadingConnector` inside `MultiConnector`, `MultiConnector.supports_divergent_local_hybrid_hits` (`vllm/distributed/kv_transfer/kv_connector/v1/multi_connector.py:214-218`) evaluated `all(c.supports_divergent_local_hybrid_hits for c in self._connectors)`. Since `OffloadingConnector` inherits `False` from `KVConnectorBase_V1`, `all([True, False])` evaluated to `False`, disabling `get_computed_blocks_for_connector()` on D.
    - Hot-patching `multi_connector.py` on `qwen35-pd-decode` (`all(` -> `any(`) in **Smoke 5** restored D's local `FullAttention` prefix cache hit rate from **0%** to **76.6% (`3.53M / 4.61M` tokens)**, reduced tokens pulled over NIXL from **4.61M (100%)** to **1.08M (23.4%)**, cut total NIXL RDMA bytes transferred from **164.0 GB** to **48.4 GB (−70.5%)**, and lowered the 12-matched-turn median TTFT to **807.8 ms** (mean **828.1 ms**, max **1,199.5 ms**).
 
+## Router-less A/B of the upstream fix (2026-10-21 16:50-17:29)
+
+The fix for [vllm-project/vllm#62862](https://github.com/vllm-project/vllm/issues/62862), [zetxqx/vllm#1](https://github.com/zetxqx/vllm/pull/1), applied cleanly to v0.31.0. The image's `scheduler.py` and `multi_connector.py` are byte-identical to v0.31.0, so with `VLLM_PR62862=1` both pods copy the patched files from ConfigMap `vllm-pr62862` ([`b200/pr62862/`](b200/pr62862/)) before `vllm serve`. This replaces smoke 5's decode-only `sed all -> any`, and the fix now runs on P too.
+
+| | |
+|---|---|
+| Router | none: vLLM's NIXL integration-test proxy ([`b200/toy_proxy_server.py`](b200/toy_proxy_server.py), v0.31.0 copy; one change: streamed responses are `text/event-stream`), Deployment [`b200/pd-proxy.yaml`](b200/pd-proxy.yaml) on 5qjv. Every request: P with `max_tokens=1` + `do_remote_decode`, then D (vLLM 8200 directly, not the sidecar) with P's `kv_transfer_params`; the same path as `always-disagg-pd-decider` + sidecar |
+| Servers | as smokes 4-5 (`bidirectional_kv_xfer: false`, `MultiConnector` = NIXL + Offloading); arms differ only in `VLLM_PR62862` |
+| Point | [`b200/run-proxy-ab.sh`](b200/run-proxy-ab.sh): both servers restarted per arm, the patch's startup line checked on both pods, one request, AgentX c=4 for 120 s (`run-point.sh` MODE=direct, both KV tiers emptied), `verify-point.sh` all ok in both arms, 0 error lines |
+
+| Counter (warmup + 120 s profiling) | base (stock v0.31.0) | fix (zetxqx/vllm#1) |
+|---|---|---|
+| requests on P / D | 56 / 56 | 56 / 56 |
+| P local prefix-cache hits | 3.35M / 4.61M (73%) | 3.35M / 4.61M (73%) |
+| **D local prefix-cache hits** | **0 (0%)** | **3.53M / 4.61M (76.6%)** |
+| D tokens from the connectors | 4.61M (100%) | 1.08M (23.4%) |
+| **NIXL transfers / bytes / failed** | 224 / **164.0 GB** / 0 | 224 / **48.4 GB (-70.5%)** / 0 |
+| CPU tier stores P / D | 38.0 / 30.3 GB | 38.0 / 30.3 GB |
+
+- Both arms match the EPP-routed smokes: base equals smoke 4 (164.0 GB, D 0 hits), and fix equals smoke 5 to the token (48.39 GB, D 3,528,224 hits). The proxy does not change the data path, and the full PR behaves as the one-line hot-patch did on D.
+- P is unchanged (same hits and offload stores). On P, Nixl matches nothing, so the scheduler reconciles and queries all connectors as before. The fix on P is a no-op for this workload.
+- **TTFT does not move at c=4** ([`b200/results/proxy-ab-ttft.txt`](b200/results/proxy-ab-ttft.txt), 55 requests matched by conversation and turn): median 1,202 -> 1,251 ms, mean 2,141 -> 2,044 ms; the 12 profiling turns 841 -> 863 ms median, 857 -> 848 ms mean. With 4 RDMA NICs per server the full-prompt pull costs about 27 ms (smoke 1), so TTFT is P's prefill either way. The fix's measured effect here is network and D-side KV traffic (-115.6 GB per point). It should show in TTFT only where NIXL bandwidth is contended: higher concurrency, more D per P, or fewer NICs.
+
 ## Next steps
 
 1. Benchmark against step 26/30's aggregated TP=4 servers at c = 32, 48, 64 (same 8 GPUs: two aggregated servers against 1P1D), with `prefix-based-pd-decider` and `bidirectional_kv_xfer: false`.
