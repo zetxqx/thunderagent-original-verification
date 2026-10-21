@@ -1,0 +1,35 @@
+# Step 31: four B200 plus four RDMA NICs per TP=4 server (prefill or decode), from DRA.
+# On a4-highgpu-8g each PCIe root holds 2 GPUs and 2 RDMA NICs, so one matchAttribute over all
+# eight devices cannot be met; the claim asks for two (2 GPU + 2 NIC) groups, each on one root,
+# as the llm-d-pd-disaggregation namespace does for 2 GPUs (xroot-gpu-nic-2x2-sameroot).
+# The NIC selector keeps devices that have an IPv4 address (RoCE needs one).
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: qwen35-tp4-gpu-nic
+  namespace: bobzetian-llmd
+spec:
+  spec:
+    devices:
+      requests:
+      - name: gpu-a
+        exactly: {deviceClassName: gpu.nvidia.com, allocationMode: ExactCount, count: 2}
+      - name: nic-a
+        exactly:
+          deviceClassName: mrdma.google.com
+          allocationMode: ExactCount
+          count: 2
+          selectors:
+          - cel: {expression: 'has(device.attributes["dra.net"].ipv4) && device.attributes["dra.net"].ipv4 != ""'}
+      - name: gpu-b
+        exactly: {deviceClassName: gpu.nvidia.com, allocationMode: ExactCount, count: 2}
+      - name: nic-b
+        exactly:
+          deviceClassName: mrdma.google.com
+          allocationMode: ExactCount
+          count: 2
+          selectors:
+          - cel: {expression: 'has(device.attributes["dra.net"].ipv4) && device.attributes["dra.net"].ipv4 != ""'}
+      constraints:
+      - {requests: [gpu-a, nic-a], matchAttribute: resource.kubernetes.io/pcieRoot}
+      - {requests: [gpu-b, nic-b], matchAttribute: resource.kubernetes.io/pcieRoot}
