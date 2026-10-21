@@ -1,0 +1,51 @@
+# Step 31, second smoke: the P/D EPP with prefix-based-pd-decider instead of always-disagg-pd-decider.
+# A request takes the remote-prefill path only when the part of its prompt that the decode pod does not
+# hold is at least nonCachedTokens long; otherwise the decode pod prefills it locally. 4096 splits this
+# workload's turns: first turns of a session are 65k to 165k tokens, later turns add 0 to 3.7k tokens
+# (smoke 1's records), so first turns and large tool outputs go to prefill and the rest stay on decode.
+#
+# What the decode pod "holds" comes from approx-prefix-cache-producer: the EPP's own record of which
+# prompts it routed where, not the decode pod's real cache. That is the point of this smoke: if the
+# decode pod does not keep the KV it received over NIXL (smoke 1: 0 local prefix-cache hits), the
+# local turns here become full recomputes on decode, visible in its prefix-cache counters.
+#
+# approx-prefix-cache-producer: autoTune (default) takes the block size (2128, vLLM's block for this
+# hybrid model) and the per-pod LRU capacity from the endpoints' cache_config_info. Both match caps
+# are 0, so the whole prompt is matched: the default maxPrefixTokensToMatch (131072) is below this
+# workload's longest prompts (up to 256k), and a 165k prompt would count 34k tokens as uncached even
+# when decode holds all of it.
+apiVersion: llm-d.ai/v1
+kind: EndpointPickerConfig
+plugins:
+- name: vllm-endpoints
+  type: file-discovery
+  parameters:
+    path: /config/endpoints.yaml
+    watchFile: true
+- type: approx-prefix-cache-producer
+  parameters:
+    maxPrefixTokensToMatch: 0
+    maxPrefixBlocksToMatch: 0
+- type: prefix-based-pd-decider
+  parameters:
+    nonCachedTokens: 4096
+- type: disagg-profile-handler
+  parameters:
+    deciders:
+      prefill: prefix-based-pd-decider
+- type: prefill-filter
+- type: decode-filter
+- type: max-score-picker
+schedulingProfiles:
+- name: prefill
+  plugins:
+  - pluginRef: prefill-filter
+  - pluginRef: max-score-picker
+- name: decode
+  plugins:
+  - pluginRef: decode-filter
+  - pluginRef: max-score-picker
+dataLayer:
+  discovery:
+    endpoints:
+      pluginRef: vllm-endpoints
