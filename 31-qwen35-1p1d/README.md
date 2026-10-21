@@ -1,6 +1,6 @@
 # Step 31: minimal P/D (1 prefill + 1 decode) for Qwen3.5-397B-A17B-FP8 with CPU offload on both, 8x B200
 
-Status: smoke test done (2026-10-21). The P/D path works end to end; no benchmark yet.
+Status: two smoke tests done (2026-10-21). The P/D path works end to end; decode reuses the KV it computes but not the KV it receives over NIXL (second smoke); no benchmark yet.
 
 ## Question
 
@@ -47,9 +47,31 @@ Every decode request took its whole prompt (85k tokens on average, about 744 MB 
 
 The next smoke runs `prefix-based-pd-decider` and checks D's local hit counter; the vLLM source (`nixl/base_scheduler.py`, D-side `get_num_new_matched_tokens` and block caching) says which case it is.
 
+## Second smoke: prefix-based-pd-decider (2026-10-21 04:55)
+
+Same pair, EPP switched to [`b200/pd-plugins-prefix.yaml`](b200/pd-plugins-prefix.yaml): `prefix-based-pd-decider` with `nonCachedTokens: 4096`, `approx-prefix-cache-producer` matching the whole prompt (the default 131072-token cap is below this workload's longest prompts). Runner [`b200/run-smoke-prefix.sh`](b200/run-smoke-prefix.sh); counters are deltas over the point. `verify-point.sh` all ok.
+
+| | always-disagg (smoke 1) | prefix-based (smoke 2) |
+|---|---|---|
+| requests on P / D | 51 / 48 | 19 / 56 |
+| D local prefix-cache hits | 0 | 2.58M of 4.61M (56%) |
+| D tokens over NIXL | 4.02M (100%) | 1.09M (24%) |
+| NIXL bytes | 142.8 GB | 40.0 GB |
+
+Per turn, from the client records (the decode sidecar reports D's own cached tokens for turns that stay on D):
+
+| turn class | turns | prompt tokens | cached | TTFT median |
+|---|---|---|---|---|
+| first turn of a conversation (P) | 12 | 0.76M | 0 | 2.18 s |
+| later turn, new tokens >= 4096 (P) | 11 | 0.79M | 0.37M (P's cache) | 1.24 s |
+| later turn on D, cache hit | 26 | 2.38M | 2.22M | 0.81 s |
+| **later turn on D right after a P turn, cache 0** | **6** | **0.68M** | **0** | **2.75 s** |
+
+The pattern in every conversation: the turn after a remote-prefill turn finds nothing in D's prefix cache and prefills its whole prompt on D (165k tokens: TTFT 5.7 s; 192k: 10.1 s); from the next turn on, D hits the KV it computed itself. So **D reuses the KV it computes, not the KV it receives over NIXL**. Candidate causes, not yet separated: for this hybrid model a prefix hit also needs the GDN state at the matched block boundary (vLLM `mamba_cache_mode` `align`), which a NIXL transfer of the final state does not provide; or `bidirectional_kv_xfer` keeps received blocks for P to read back (TTL 480 s) outside D's prefix cache.
+
 ## Next steps
 
-1. Resolve the decode-side prefix-cache question above.
+1. Separate the two candidate causes of the decode-side miss after each remote prefill: rerun with `bidirectional_kv_xfer` off (server restart), and read vLLM v0.31's NIXL scheduler for how received blocks enter D's prefix cache for hybrid (Mamba/GDN) groups.
 2. Benchmark against step 26/30's aggregated TP=4 servers at c = 32, 48, 64 (same 8 GPUs: two aggregated servers against 1P1D), with `prefix-based-pd-decider`.
 3. P/D-aware llm-d-thunder-agent-simplified: v1.0.0's plugin enters prefill pods in its ledger and their empty room admits new sessions (`saturation.go`, `fairness.go`); the fix skips `llm-d.ai/role=prefill` endpoints. The capacity then follows from step 1.
 
