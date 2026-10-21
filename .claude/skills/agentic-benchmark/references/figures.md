@@ -50,7 +50,7 @@ Time axes are minutes since profiling started; the dotted vertical line is the 3
 | `c<N>-<label>/gate.png` (pool mode, EPP scraped) | (a) gate events per minute (b) EPP queue size (c) gate ledger working set vs capacity per pod (d) EPP queue wait | Did the gate engage, and when? |
 | `aiperf_artifacts/swim_lane.html` | per-session Gantt chart (from aiperf) | Which sessions stalled, how subagents fan out |
 
-Engine-step bins with more prefill per step than `max_num_batched_tokens` (8192) cannot happen under chunked prefill; they are metrics-lag artifacts and are dropped (`step_bins_dropped`).
+Engine-step bins with more prefill per step than vLLM's `max_num_batched_tokens` (the point's `max_batched_tokens` column) cannot happen under chunked prefill; they are metrics-lag artifacts and are dropped (`step_bins_dropped`).
 
 ## Across-arm figures (`make_figures.py`)
 

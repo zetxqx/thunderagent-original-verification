@@ -2,7 +2,7 @@
 
 Runs as a native sidecar of the aiperf Job (MODE=pool), so it starts before
 aiperf and stops when aiperf exits. The port enforces kube-rbac, so the pod
-runs as service account thunderagent-metrics-reader and sends its token.
+runs as the profile's METRICS_READER_SA service account and sends its token.
 A killed pod loses at most the snapshot being written.
 
 Env: EPP_METRICS_URLS (space-separated), OUT_DIR, INTERVAL (seconds, default 10).

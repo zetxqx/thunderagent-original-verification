@@ -4,11 +4,13 @@ Everything here is what steps 07 to 23 ran. Re-check live values with `model-ser
 
 ## 1. Cluster and namespace
 
+The scripts read these from `profiles/bobbm.env` (the default `PROFILE`). Another cluster gets its own `profiles/<name>.env` and `PROFILE=<name>`; a single value can also be overridden from the environment (`NS=... DEPLOY=...`). The one-time manifests in `manifests/` are written for this profile; edit the namespace and names for another.
+
 | | |
 |---|---|
 | Cluster | GKE `bobbm`, context `gke_bobzetian-gke-dev_us-central1_bobbm`. The scripts pin it through a private kubeconfig; never rely on the laptop's current context |
 | Namespace | `llm-d-program-aware-scheduling` |
-| vLLM | Deployment `program-aware-vllm-decode`, labels `llm-d.ai/guide=program-aware-scheduling,llm-d.ai/role=decode`, container `modelserver`, port 8000 |
+| vLLM | Deployment `program-aware-vllm-decode`, labels `llm-d.ai/guide=program-aware-scheduling,llm-d.ai/role=decode` (`DECODE_SELECTOR`), container `modelserver` (`VLLM_CONTAINER`), port 8000 |
 | Main EPP | Deployment `program-aware-scheduling-epp`, Helm release `program-aware-scheduling`, gateway URL `http://program-aware-scheduling-epp:80`, metrics port 9090 (kube-rbac) |
 | GPU nodes | pool `bobbm-spoth100`, `a3-highgpu-4g` **spot** (4x H100 80GB, 104 vCPU, 965 GiB), `us-central1-a`. A preemption mid-run invalidates the point |
 | Client nodes | `default-pool` (non-spot CPU) |
@@ -55,7 +57,7 @@ Plugin configs in `manifests/epp/`:
 | thunder gate (PR3) | `thunder-pr3-plugins.yaml` | `agent-identity` (session from `x-session-id`) + `thunder-agent` in three slots: scheduling profile (session affinity), saturation detector, fairness policy (the gate) |
 | no router | none | `MODE=lane`: client talks to one vLLM pod directly |
 
-Lanes in parallel (`MODE=lane`): set `LANE=a|b|c|d` to run one point per vLLM pod at the same time. Each lane has its own Service `agentx-lane-<lane>` and PVC (`agentx-data` for `a`, `agentx-data-<lane>` otherwise; the PVCs are RWO, so lanes cannot share one). Before a point the lane deletes its pod and claims a fresh replacement with a resource-version guarded label, so lanes restarting together never share a pod; a lane's first pod must be Ready (a pod still starting is another lane's replacement). Lanes share nodes and neighbors: each point records them in `meta/`. Example: `for p in a:12 b:20 c:24 d:32; do LANE=${p%:*} RESULTS=$PWD/results DURATION=1200 nohup caffeinate -i <skill>/scripts/run-point.sh ${p#*:} <label> > results/<label>-${p%:*}.log 2>&1 & done`.
+Lanes in parallel (`MODE=lane`): set `LANE=a|b|c|d` to run one point per vLLM pod at the same time. Each lane has its own Service `agentx-lane-<lane>` and PVC (`agentx-data` for `a`, `agentx-data-<lane>` otherwise; the PVCs are RWO, so lanes cannot share one). Before a point the lane deletes its pod and claims a fresh replacement with a resource-version guarded label, so lanes restarting together never share a pod; a lane's first pod must be Ready (a pod still starting is another lane's replacement). Lanes share nodes and neighbors: each point records them in `meta/`. Example: `for p in a:12 b:20 c:24 d:32; do LANE=${p%:*} RESULTS=$PWD/results DURATION=1200 nohup <skill>/scripts/run-point.sh ${p#*:} <label> > results/<label>-${p%:*}.log 2>&1 & done`.
 
 EPP image for PR3: `us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker:thunder-agent-pr3-a025437b-produces` (digest `sha256:e038ea5a...`), PR3 plus the Produces() fix in `24-thunder-pr3-lanes/thunder-produces.patch`; the default of `render-lane-epp.sh`. The plain `thunder-agent-pr3-a025437b` fails every request ("wrote undeclared request attribute inflight-estimate/thunder-agent"). Both log one harmless "parsing response" error per streamed response. Build other images with the `cloud-build-epp` skill.
 
@@ -81,7 +83,7 @@ Timeouts on the request path must be ordered: gate backstop < flow-control `defa
 - Legacy (steps 10 to 21, inference-perf): `10-llm-d-router-replicates/render-lane.sh <lane> <arm>` and `20-cpu-offload-pool/lanes.sh`. Use the lane EPP bullet above for new steps; its pool-mode variant (`MODE=pool` with a lane `DECODE_SELECTOR`) restarts the whole vLLM deployment and so cannot run lanes in parallel.
 - Main release: `helm upgrade` with `-f <(helm get values ...)` plus `--set-file` for the plugin config. Never `--reuse-values`. Save `helm get manifest` first and restore with `16-thunder-minimal-pool/restore-main-release.sh <saved>`; Helm keeps only 10 revisions, so never roll back by number.
 - `MODE=pool RESTART=1` restarts the whole vLLM deployment and the EPP. That restarts every lane: do not run it while another lane or another person's experiment uses the namespace.
-- **No router, any cluster (`MODE=direct`)**: the client calls `URL` (the vLLM Service) directly; before each point `deploy/$DEPLOY` is restarted, with `SERVER_ENV` (for example `MAX_NUM_SEQS=8`) set in the same rollout. Point it at another cluster with `CTX`, `KUBECONFIG_SOURCE`, `NS`, `DECODE_SELECTOR`, `CLIENT_POOL`; set `GPUS_PER_POD` when GPUs come from DRA and `MODEL_SERVER_COLLECT=0` off bobbm. Step 25 (`25-glm52-tp8-offload/b200/run-grid.sh`, cluster `a4-pr`) is the first user.
+- **No router, any cluster (`MODE=direct`)**: the client calls `URL` (the vLLM Service) directly; before each point `deploy/$DEPLOY` is restarted, with `SERVER_ENV` (for example `MAX_NUM_SEQS=8`) set in the same rollout. Point it at another cluster with `PROFILE=<name>` (a `profiles/<name>.env` with `CTX`, `KUBECONFIG_SOURCE`, `NS`, `DECODE_SELECTOR`, `VLLM_CONTAINER`, `CLIENT_NODE_LABEL`, `CLIENT_POOL`, `STORAGE_CLASS`, `MODEL_SERVER_COLLECT=0`); set `GPUS_PER_POD` when GPUs come from DRA. `profiles/a4-pr.env` is the B200 cluster of steps 25 to 28 (`PROFILE=a4-pr`); those steps' scripts predate it and export the same values themselves.
 - **Exploration without restarts (`RESET=1 RESTART=0`, direct or pool mode)**: empties both KV tiers of each vLLM pod (`POST /reset_prefix_cache?reset_external=true`, needs `VLLM_SERVER_DEV_MODE=1`) and restarts the EPP instead of restarting vLLM, which takes about 27 min with 820 GiB of CPU offload (15 min to pre-fault the region, 4 min to pin it). Not AgentX's rule: use it to find where to look, not for InferenceX comparisons. Step 25 `run-explore.sh` runs two servers in parallel this way (one arm each, `LANE` picks the PVC).
 
 ## 4. Client: aiperf with the AgentX scenario
@@ -127,5 +129,5 @@ Client Job: `default-pool`, 8 CPU, 32Gi, `activeDeadlineSeconds` 21600, runs as 
 
 - One fresh server per point (AgentX rule: "restart the server for every CONC value... do not flush caches or reuse a live server").
 - Start with powers of two, 8 to 256 on the 4-pod pool (8.9M KV tokens; a session often holds over 100k tokens, so the working set passes the pool at a few dozen sessions). Add points around the knee.
-- One point is about 1.5 to 2 h (restart, primer warmup, 60 min, collection). Plan sweeps overnight with `nohup caffeinate -i`.
+- One point is about 1.5 to 2 h (restart, primer warmup, 60 min, collection). Plan sweeps overnight with `nohup` and keep the machine awake (macOS: `caffeinate -i`).
 - Run a 10-minute calibration point first (`DURATION=900`), and a smoke point (`EXTRA_ARGS="--unsafe-override --num-dataset-entries 8 --warmup-requests-per-lane 1" DURATION=120`) after any script or config change.

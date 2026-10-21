@@ -90,7 +90,8 @@ From vLLM counters, summed over pods, per pod kept in the parquet.
 | `running_avg_sum`, `waiting_avg_sum`, `*_max_pod` | `vllm:num_requests_running/waiting` | Active-batch limit |
 | `waiting_<reason>_share_pct` | `vllm:num_requests_waiting_by_reason` | Why requests wait (KV `capacity` or `deferred`) |
 | `preemptions` | `vllm:num_preemptions` | Pressure shown as preemption |
-| `batch_B`, `step_time_T_ms`, `prefill_tokens_per_step` | from `vllm:iteration_tokens_total` and `vllm:generation_tokens` deltas per 10 s bin, busy bins only | Output throughput = B / T |
+| `batch_B`, `step_time_T_ms`, `prefill_tokens_per_step` | from `vllm:iteration_tokens_total` and `vllm:generation_tokens` deltas per 10 s bin, busy bins only; bins with more prefill per step than `max_batched_tokens` are metrics-lag artifacts and dropped (`step_bins_dropped`) | Output throughput = B / T |
+| `max_batched_tokens` | vLLM `--max-num-batched-tokens` from the point's `meta/vllm-deployment.yaml` (8192, vLLM's default, when the flag is absent) | The prefill-per-step ceiling |
 | `step_fit_a_ms`, `step_fit_b_ms_per_k`, `step_fit_r2` | fit T = a + b x (k prefill tokens per step) | On our setup T = 46 ms + 29 ms per k prefill tokens. The scheduler changes prefill per step, not B |
 | `prefill_compute_per_output_token` | `local_compute` prompt tokens / output tokens | Recompute cost |
 | `engine_request_{queue,prefill,decode}_time_avg_s` | vLLM histograms | Split TTFT into queueing and prefill |
@@ -109,6 +110,8 @@ Two limits, read them apart:
 - Active limit: running requests do not fit. Signals: `waiting` grows, one pod's KV near 100%, preemptions, throughput flat in concurrency.
 
 ## 7. Router and gate (pool mode, from the EPP scrape)
+
+Parsed by `scripts/router_metrics.py`. The gate counters are read under the prefix `llm_d_epp_thunder_agent_` (llm-d's thunder-agent plugin); another admission-control plugin that exports the same counter names under its own prefix is read with `GATE_METRIC_PREFIX=<prefix>` in the environment of `analyze.py`, `point_figures.py` and `export_bundle.py`. Columns whose counters are absent are left out, and `fig5-gate` and `gate.png` are skipped.
 
 | Column | Source | Use |
 |---|---|---|

@@ -6,7 +6,7 @@
 #
 # Usage: RESULTS=<step>/results [LANES="a b c d"] [LANE_EPP=1] run-lanes.sh <label> <conc>...
 # Other run-point.sh settings (DURATION, RESTART, EXTRA_ARGS, ...) pass through.
-#   nohup caffeinate -i run-lanes.sh <label> 32 24 20 16 12 > results/<label>.log 2>&1 &
+#   nohup run-lanes.sh <label> 32 24 20 16 12 > results/<label>.log 2>&1 &   (keep the machine awake)
 # Per point log: $RESULTS/<label>-<lane>-c<N>.log
 set -uo pipefail
 

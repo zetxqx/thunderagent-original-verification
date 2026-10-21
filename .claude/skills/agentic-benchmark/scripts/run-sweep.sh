@@ -4,7 +4,7 @@
 # Usage: RESULTS=<step>/results run-sweep.sh <run-label> <concurrency> [<concurrency> ...]
 # Example: RESULTS=$PWD/results run-sweep.sh lane-vllm-20261009 8 16 32 64 128
 # MODE, DURATION, EXTRA_ARGS and the other run-point.sh settings pass through.
-#   nohup caffeinate -i run-sweep.sh <label> ... > results/<label>.log 2>&1 &
+#   nohup run-sweep.sh <label> ... > results/<label>.log 2>&1 &   (keep the machine awake)
 set -uo pipefail
 
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
@@ -23,5 +23,6 @@ for c in "$@"; do
 done
 
 uv run "$SCRIPTS/analyze.py" --out "$RESULTS/$LABEL/report" "$RESULTS/$LABEL"/c*
-rm -f "$RESULTS/bobbm.kubeconfig"
+# The pinned kubeconfig ($RESULTS/$PROFILE.kubeconfig, git-ignored) stays: another
+# run-point.sh on the same RESULTS may still use it (references/incidents.md, step 25).
 [ -z "$FAILED" ] || { echo "points that did not succeed or are invalid:$FAILED"; exit 1; }
