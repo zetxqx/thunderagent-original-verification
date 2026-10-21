@@ -2,10 +2,15 @@
 # (5qjv, which caches the checkpoint), each server TP=4 on 4 B200 + 4 RDMA NICs (qwen35-tp4-gpu-nic).
 # Model flags are step 26's (vllm-qwen35.yaml.tmpl) and identical on P and D, so the NIXL KV layouts
 # match (FP8 KV, MTP 3, 2128-token blocks), with these changes:
-#   - KV transfer: MultiConnector = NixlConnector (P kv_producer, D kv_consumer, bidirectional so P can
-#     read a finished turn's KV back from D) + OffloadingConnector (CPU tier, 387 GiB per server =
-#     415538085888 bytes, server-wide, as step 26). --kv-offloading-size is NOT used: in vLLM v0.31 it
-#     overwrites kv_transfer_config.kv_connector with OffloadingConnector and would drop NIXL.
+#   - KV transfer: MultiConnector = NixlConnector (P kv_producer, D kv_consumer, bidirectional_kv_xfer
+#     false since our client/sidecar is one-way P -> D) + OffloadingConnector (CPU tier, 387 GiB per
+#     server = 415538085888 bytes, server-wide, as step 26). --kv-offloading-size is NOT used: in vLLM
+#     v0.31 it overwrites kv_transfer_config.kv_connector with OffloadingConnector and would drop NIXL.
+#   - --mamba-cache-mode all is passed on both P and D, though vLLM v0.31 falls back to 'align' at
+#     startup for Qwen3.5 (Qwen3_5MoeMTP does not implement SupportsMambaPrefixCaching; model_executor/
+#     models/config.py:654).
+#   - bidirectional_kv_xfer is false so D does not pin finished requests' blocks for 480 s waiting for a
+#     D -> P readback our client/sidecar never uses.
 #   - vLLM listens on 8200 in both pods (decode: the disagg sidecar takes 8000, as in llm-d's P/D
 #     recipe); one port lets run-point.sh read metrics from and reset both servers.
 #   - Hybrid-model settings from llm-d's Mamba-hybrid P/D guide (nemotron-3-ultra):
@@ -57,6 +62,7 @@ spec:
             --max-num-batched-tokens 16384 \
             --gpu-memory-utilization "$GPU_MEMORY_UTILIZATION" \
             --enable-prefix-caching \
+            --mamba-cache-mode all \
             --speculative-config '{"method":"mtp","num_speculative_tokens":3}' \
             --kv-transfer-config "$KV_TRANSFER_CONFIG" \
             --reasoning-parser qwen3 \
@@ -66,7 +72,7 @@ spec:
         - {name: MAX_NUM_SEQS, value: "64"}
         - {name: GPU_MEMORY_UTILIZATION, value: "0.8"}
         - name: KV_TRANSFER_CONFIG
-          value: '{"kv_connector":"MultiConnector","kv_role":"kv_both","kv_load_failure_policy":"fail","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_producer","kv_connector_extra_config":{"bidirectional_kv_xfer":true}},{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"cpu_bytes_to_use":415538085888,"lazy_offload":true}}]}}'
+          value: '{"kv_connector":"MultiConnector","kv_role":"kv_both","kv_load_failure_policy":"fail","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_producer","kv_connector_extra_config":{"bidirectional_kv_xfer":false}},{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"cpu_bytes_to_use":415538085888,"lazy_offload":true}}]}}'
         - {name: VLLM_NIXL_SIDE_CHANNEL_HOST, valueFrom: {fieldRef: {fieldPath: status.podIP}}}
         - {name: VLLM_SSM_CONV_STATE_LAYOUT, value: DS}
         - {name: VLLM_PREFIX_CACHE_RETENTION_INTERVAL, value: "0"}
@@ -165,6 +171,7 @@ spec:
             --max-num-batched-tokens 16384 \
             --gpu-memory-utilization "$GPU_MEMORY_UTILIZATION" \
             --enable-prefix-caching \
+            --mamba-cache-mode all \
             --speculative-config '{"method":"mtp","num_speculative_tokens":3}' \
             --kv-transfer-config "$KV_TRANSFER_CONFIG" \
             --reasoning-parser qwen3 \
@@ -174,7 +181,7 @@ spec:
         - {name: MAX_NUM_SEQS, value: "128"}
         - {name: GPU_MEMORY_UTILIZATION, value: "0.8"}
         - name: KV_TRANSFER_CONFIG
-          value: '{"kv_connector":"MultiConnector","kv_role":"kv_both","kv_load_failure_policy":"fail","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_consumer","kv_connector_extra_config":{"bidirectional_kv_xfer":true}},{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"cpu_bytes_to_use":415538085888,"lazy_offload":true}}]}}'
+          value: '{"kv_connector":"MultiConnector","kv_role":"kv_both","kv_load_failure_policy":"fail","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_consumer","kv_connector_extra_config":{"bidirectional_kv_xfer":false}},{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"cpu_bytes_to_use":415538085888,"lazy_offload":true}}]}}'
         - {name: VLLM_NIXL_SIDE_CHANNEL_HOST, valueFrom: {fieldRef: {fieldPath: status.podIP}}}
         - {name: VLLM_SSM_CONV_STATE_LAYOUT, value: DS}
         - {name: VLLM_PREFIX_CACHE_RETENTION_INTERVAL, value: "0"}

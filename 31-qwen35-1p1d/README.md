@@ -1,6 +1,6 @@
 # Step 31: minimal P/D (1 prefill + 1 decode) for Qwen3.5-397B-A17B-FP8 with CPU offload on both, 8x B200
 
-Status: two smoke tests done (2026-10-21). The P/D path works end to end; decode reuses the KV it computes but not the KV it receives over NIXL (second smoke); no benchmark yet.
+Status: three smoke tests done (2026-10-21). The P/D path works end to end; root cause of the decode-side prefix-cache miss on the turn immediately following a remote prefill is verified in vLLM v0.31 source and confirmed by Smoke 3 (`--mamba-cache-mode all` + `bidirectional_kv_xfer: false`).
 
 ## Question
 
@@ -67,13 +67,56 @@ Per turn, from the client records (the decode sidecar reports D's own cached tok
 | later turn on D, cache hit | 26 | 2.38M | 2.22M | 0.81 s |
 | **later turn on D right after a P turn, cache 0** | **6** | **0.68M** | **0** | **2.75 s** |
 
-The pattern in every conversation: the turn after a remote-prefill turn finds nothing in D's prefix cache and prefills its whole prompt on D (165k tokens: TTFT 5.7 s; 192k: 10.1 s); from the next turn on, D hits the KV it computed itself. So **D reuses the KV it computes, not the KV it receives over NIXL**. Candidate causes, not yet separated: for this hybrid model a prefix hit also needs the GDN state at the matched block boundary (vLLM `mamba_cache_mode` `align`), which a NIXL transfer of the final state does not provide; or `bidirectional_kv_xfer` keeps received blocks for P to read back (TTL 480 s) outside D's prefix cache.
+The pattern in every conversation: the turn after a remote-prefill turn finds nothing in D's prefix cache and prefills its whole prompt on D (165k tokens: TTFT 5.7 s; 192k: 10.1 s); from the next turn on, D hits the KV it computed itself. So **D reuses the KV it computes, not the KV it receives over NIXL**.
+
+## Third smoke: `--mamba-cache-mode all` + `bidirectional_kv_xfer: false` (2026-10-21 06:30)
+
+Both `qwen35-pd-prefill` and `qwen35-pd-decode` were updated with `--mamba-cache-mode all` and `"bidirectional_kv_xfer": false` ([`b200/vllm-qwen35-pd.yaml`](b200/vllm-qwen35-pd.yaml)) and tested with `LABEL=qwen35-1p1d-mamba-all-smoke` ([`b200/run-smoke-prefix.sh`](b200/run-smoke-prefix.sh)).
+
+### Startup verification: why `--mamba-cache-mode all` falls back to `align`
+
+At startup, vLLM v0.31 logs two warnings on both P and D (`vllm/model_executor/models/config.py:648-657`):
+
+```text
+WARNING [cache.py:345] Mamba cache mode 'all' is deprecated and will be removed in an upcoming release.
+WARNING [config.py:654] Hybrid or mamba-based model detected without support for prefix caching with Mamba cache 'all' mode: falling back to 'align' mode.
+```
+
+In vLLM v0.31.0, `SupportsMambaPrefixCaching` (`all` mode) is only implemented for Mamba1/Mamba2 (`mamba_attn.py`), not for Qwen3.5's Gated DeltaNet (`gdn_attn.py` / `Qwen3_5MoeMTP`). Consequently, `vllm:cache_config_info` reports `mamba_cache_mode="align"` even when `--mamba-cache-mode all` is passed.
+
+### Counter and per-turn comparison
+
+| | always-disagg (smoke 1) | prefix-based, `bi=true` (smoke 2) | prefix-based, `bi=false` (smoke 3) |
+|---|---|---|---|
+| requests on P / D | 51 / 48 | 19 / 56 | 25 / 76 |
+| client requests completed (120 s) | 47 | 55 | **75 (+36%)** |
+| client TTFT median | 2,135 ms | 1,564 ms | **715 ms** |
+| D local prefix-cache hits | 0 | 2.58M of 4.61M (56%) | 2.92M of 5.12M (57%) |
+| D tokens over NIXL | 4.02M (100%) | 1.09M (24%) | 1.19M (23%) |
+| NIXL transfers / bytes | 192 / 142.8 GB | 84 / 40.0 GB | 100 / 44.6 GB |
+
+Per-turn breakdown in Smoke 3 (`profile_export.jsonl`, 75 requests across 14 conversations):
+
+| turn class | turns | prompt tokens | cached | TTFT median |
+|---|---|---|---|---|
+| first turn of a conversation (P) | 14 | 0.80M | 0.02M | 2.20 s |
+| later turn, new tokens >= 4096 (P) | 16 | 0.96M | 0.47M (P's cache) | 0.98 s |
+| later turn on D, cache hit | 38 | 2.66M | 2.45M | 0.62 s |
+| **later turn on D right after a P turn, cache 0** | **7** | **0.69M** | **0** | **1.95 s** |
+
+### Verified root cause in vLLM v0.31.0
+
+1. **`bidirectional_kv_xfer` is not the cause of the miss, and disabling it improves throughput/TTFT:** With `bidirectional_kv_xfer: false`, D no longer pins finished requests' blocks for `decoder_kv_blocks_ttl = 480s` (`nixl/pull_scheduler.py:231-268`). Throughput at `c=4` rose from 55 to 75 requests (+36%) and median TTFT dropped from 1,564 ms to 715 ms, while the 7 D-turns immediately following a P-turn still got `cached = 0` (except subagent turns sharing a system-prompt prefix already locally prefilled on D).
+2. **Why `mamba_cache_mode="align"` cannot populate D's Mamba prefix cache from a NIXL transfer:**
+   - **On P (`vllm/distributed/kv_transfer/kv_connector/v1/nixl/base_scheduler.py:290-300`):** In `align` mode (`_ssm_state_slots_are_positional = False`), `get_exchange_clipped_blocks` clips the Mamba group to `blocks[-1:]` — only the single running Mamba state at `N - _prefill_backoff()` in the unaligned tail block is sent to D; block-aligned Mamba checkpoints materialized during P's chunked prefill are not transferred.
+   - **On D (`vllm/v1/core/single_type_kv_cache_manager.py:298-365`, `1989-1994`):** When allocating slots for `num_external_computed_tokens` received over NIXL, `MambaManager.get_num_skipped_tokens` returns `num_computed_tokens - 1`. `add_local_computed_blocks` pads all full prefix blocks `0 .. K-1` in `MambaManager.req_to_blocks` with `_null_block` and sets `num_cached_block = K`, allocating only 1 real Mamba block at index `K` for the tail state.
+   - **When NIXL recv finishes on D (`vllm/v1/core/sched/scheduler.py:3085`):** `cache_blocks` caches all `K` full blocks in `FullAttentionManager`, but caches **0 blocks** in `MambaManager` (`num_cached_blocks >= num_full_blocks` and blocks `0 .. K-1` are `_null_block`).
+   - **On the next turn on D (`vllm/v1/core/kv_cache_coordinator.py:1131-1200`):** `HybridKVCacheCoordinator.find_longest_cache_hit` intersects hits across `FullAttention` and `Mamba`. Because `MambaManager` has 0 cached blocks for that prefix on D, the combined hit is reduced to `0`, forcing D to run one local chunked prefill (which materializes and caches the block-aligned Mamba state on D so all subsequent D-turns hit).
 
 ## Next steps
 
-1. Separate the two candidate causes of the decode-side miss after each remote prefill: rerun with `bidirectional_kv_xfer` off (server restart), and read vLLM v0.31's NIXL scheduler for how received blocks enter D's prefix cache for hybrid (Mamba/GDN) groups.
-2. Benchmark against step 26/30's aggregated TP=4 servers at c = 32, 48, 64 (same 8 GPUs: two aggregated servers against 1P1D), with `prefix-based-pd-decider`.
-3. P/D-aware llm-d-thunder-agent-simplified: v1.0.0's plugin enters prefill pods in its ledger and their empty room admits new sessions (`saturation.go`, `fairness.go`); the fix skips `llm-d.ai/role=prefill` endpoints. The capacity then follows from step 1.
+1. Benchmark against step 26/30's aggregated TP=4 servers at c = 32, 48, 64 (same 8 GPUs: two aggregated servers against 1P1D), with `prefix-based-pd-decider` and `bidirectional_kv_xfer: false`.
+2. P/D-aware llm-d-thunder-agent-simplified: v1.0.0's plugin enters prefill pods in its ledger and their empty room admits new sessions (`saturation.go`, `fairness.go`); the fix skips `llm-d.ai/role=prefill` endpoints.
 
 ## Notes
 
