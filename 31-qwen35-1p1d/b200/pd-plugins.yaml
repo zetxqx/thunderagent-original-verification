@@ -1,0 +1,43 @@
+# Step 31: llm-d-router v1.0.0 (ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0) for a minimal
+# P/D pair (qwen35-pd-prefill, qwen35-pd-decode). Endpoints come from a file (file-discovery, no
+# Kubernetes API, so no RBAC, which our account cannot create on a4-pr); each endpoint carries its
+# llm-d.ai/role label, which prefill-filter and decode-filter read.
+#
+# disagg-profile-handler runs the decode profile (always), then the prefill profile when the prefill
+# decider approves; the EPP passes the picked prefill endpoint to the decode sidecar in
+# x-llm-d-prefiller-host-port. The decider here is always-disagg-pd-decider: every request takes the
+# remote-prefill path, which is what the smoke test has to exercise (NIXL transfer P -> D). For
+# agentic runs, prefix-based-pd-decider (prefill remotely only when the uncached suffix on the decode
+# pod is long) is the arm to compare.
+#
+# No flow control and no thunder-agent yet: v1.0.0's thunder-agent puts prefill pods in its ledger
+# (see the step 31 README). With one endpoint per role, the profiles need no scorers.
+apiVersion: llm-d.ai/v1
+kind: EndpointPickerConfig
+plugins:
+- name: vllm-endpoints
+  type: file-discovery
+  parameters:
+    path: /config/endpoints.yaml
+    watchFile: true
+- type: always-disagg-pd-decider
+- type: disagg-profile-handler
+  parameters:
+    deciders:
+      prefill: always-disagg-pd-decider
+- type: prefill-filter
+- type: decode-filter
+- type: max-score-picker
+schedulingProfiles:
+- name: prefill
+  plugins:
+  - pluginRef: prefill-filter
+  - pluginRef: max-score-picker
+- name: decode
+  plugins:
+  - pluginRef: decode-filter
+  - pluginRef: max-score-picker
+dataLayer:
+  discovery:
+    endpoints:
+      pluginRef: vllm-endpoints
