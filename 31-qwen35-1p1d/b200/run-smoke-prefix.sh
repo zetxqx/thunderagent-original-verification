@@ -19,7 +19,7 @@ export MODEL=Qwen/Qwen3.5-397B-A17B-FP8 DATASET=semianalysis_cc_traces_weka_0621
 export CLIENT_POOL=pool-1 GPUS_PER_POD=4 MODEL_SERVER_COLLECT=0
 export CLIENT_CPU=3 CLIENT_MEM=32Gi CLIENT_MEM_REQUEST=12Gi
 export RESTART=0 RESET=1 VLLM_PORTS=8200
-LABEL=qwen35-1p1d-prefix-smoke
+LABEL=${LABEL:-qwen35-1p1d-prefix-smoke}
 EPP=agentx-epp-pd-epp
 ts() { date -u +%H:%M:%S; }
 k() { KUBECONFIG=$KUBECONFIG_SOURCE kubectl --context "$CTX" -n "$NS" "$@"; }
