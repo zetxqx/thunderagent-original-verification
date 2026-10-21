@@ -84,16 +84,22 @@ WARNING [config.py:654] Hybrid or mamba-based model detected without support for
 
 In vLLM v0.31.0, `SupportsMambaPrefixCaching` (`all` mode) is only implemented for Mamba1/Mamba2 (`mamba_attn.py`), not for Qwen3.5's Gated DeltaNet (`gdn_attn.py` / `Qwen3_5MoeMTP`). Consequently, `vllm:cache_config_info` reports `mamba_cache_mode="align"` even when `--mamba-cache-mode all` is passed.
 
-### Counter and per-turn comparison
+### Counter and per-turn comparison (Smokes 1–4)
 
-| | always-disagg (smoke 1) | prefix-based, `bi=true` (smoke 2) | prefix-based, `bi=false` (smoke 3) |
-|---|---|---|---|
-| requests on P / D | 51 / 48 | 19 / 56 | 25 / 76 |
-| client requests completed (120 s) | 47 | 55 | **75 (+36%)** |
-| client TTFT median | 2,135 ms | 1,564 ms | **715 ms** |
-| D local prefix-cache hits | 0 | 2.58M of 4.61M (56%) | 2.92M of 5.12M (57%) |
-| D tokens over NIXL | 4.02M (100%) | 1.09M (24%) | 1.19M (23%) |
-| NIXL transfers / bytes | 192 / 142.8 GB | 84 / 40.0 GB | 100 / 44.6 GB |
+We also ran **Smoke 4** (`b200/results/qwen35-1p1d-always-bi-false-smoke/c4/`) with `always-disagg-pd-decider` and `bidirectional_kv_xfer: false` to isolate the effect of `bidirectional_kv_xfer` from the choice of PD decider:
+
+| | always-disagg, `bi=true` (smoke 1) | prefix-based, `bi=true` (smoke 2) | prefix-based, `bi=false` (smoke 3) | always-disagg, `bi=false` (smoke 4) |
+|---|---|---|---|---|
+| requests on P / D | 51 / 48 | 19 / 56 | 25 / 76 | 56 / 56 |
+| client requests completed (43 warmup + profiling) | 47 (43 + 4) | 55 (43 + 12) | 75 (43 + 32) | 55 (43 + 12) |
+| D peak / end `vllm:kv_cache_usage_perc` | **99.2% / 99.2%** | 31.7% / 31.6% | **4.2% / 0.0%** | **3.3% / 0.0%** |
+| client TTFT median (all requests) | 1,569 ms | 1,443 ms | **715 ms** | 1,222 ms |
+| client TTFT median (12 matched profiling turns) | — (stalled at 4) | 1,068 ms | 1,060 ms | **851 ms** |
+| client TTFT max (12 matched profiling turns) | — | 1,920 ms | 4,253 ms | **1,205 ms** |
+| P local prefix-cache hits | 2.86M of 4.10M (70%) | 0.44M of 1.09M (40%) | 0.49M of 1.19M (41%) | 3.35M of 4.61M (73%) |
+| D local prefix-cache hits | 0 | 2.58M of 4.61M (56%) | 2.92M of 5.12M (57%) | 0 |
+| D tokens over NIXL | 4.02M (100%) | 1.09M (24%) | 1.19M (23%) | 4.61M (100%) |
+| NIXL transfers / bytes | 192 / 142.8 GB | 84 / 40.0 GB | 100 / 44.6 GB | 224 / 164.0 GB |
 
 Per-turn breakdown in Smoke 3 (`profile_export.jsonl`, 75 requests across 14 conversations):
 
@@ -104,14 +110,40 @@ Per-turn breakdown in Smoke 3 (`profile_export.jsonl`, 75 requests across 14 con
 | later turn on D, cache hit | 38 | 2.66M | 2.45M | 0.62 s |
 | **later turn on D right after a P turn, cache 0** | **7** | **0.69M** | **0** | **1.95 s** |
 
-### Verified root cause in vLLM v0.31.0
+Turn-by-turn comparison on the 12 identical profiling turns (`03e110ac6921c2fe*`) across Smoke 2, Smoke 3, and Smoke 4:
 
-1. **`bidirectional_kv_xfer` is not the cause of the miss, and disabling it improves throughput/TTFT:** With `bidirectional_kv_xfer: false`, D no longer pins finished requests' blocks for `decoder_kv_blocks_ttl = 480s` (`nixl/pull_scheduler.py:231-268`). Throughput at `c=4` rose from 55 to 75 requests (+36%) and median TTFT dropped from 1,564 ms to 715 ms, while the 7 D-turns immediately following a P-turn still got `cached = 0` (except subagent turns sharing a system-prompt prefix already locally prefilled on D).
-2. **Why `mamba_cache_mode="align"` cannot populate D's Mamba prefix cache from a NIXL transfer:**
+| Session / Turn | ISL | OSL | Route under `prefix-based` | S2 (`prefix, bi=T`) | S3 (`prefix, bi=F`) | S4 (`always, bi=F`) |
+|---|---:|---:|---|---:|---:|---:|
+| `2a9654314a2beb` turn=2 | 77,870 | 5,306 | P (`>4096` new) | 1,163.9 ms | 1,180.1 ms | **1,062.3 ms** |
+| `2a9654314a2beb` turn=3 | 79,412 | 801 | **D after P (miss 79k!)** | 1,920.2 ms | 1,945.0 ms | **762.3 ms** |
+| `2a9654314a2beb` turn=4 | 86,199 | 4,033 | P (`>4096` new) | **786.8 ms** | 821.0 ms | 824.0 ms |
+| `2a9654314a2beb` turn=5 | 103,350 | 9,543 | P (`>4096` new) | 1,236.6 ms | 4,252.6 ms | **1,204.6 ms** |
+| `t_001_d7c3d5d2` turn=1 | 27,605 | 384 | P (first turn) | **247.5 ms** | 271.0 ms | 352.9 ms |
+| `t_001_d7c3d5d2` turn=2 | 61,195 | 931 | P (`>4096` new) | 1,245.5 ms | 1,231.3 ms | **1,194.7 ms** |
+| `t_001_d7c3d5d2` turn=3 | 62,805 | 346 | **D after P (miss 63k!)** | 1,158.5 ms | 1,271.6 ms | **722.7 ms** |
+| `t_001_d7c3d5d2` turn=4 | 64,606 | 190 | D after D (local hit) | **483.4 ms** | 519.3 ms | 724.4 ms |
+| `t_001_d7c3d5d2` turn=5 | 64,872 | 5,685 | D after D (local hit) | **352.6 ms** | 374.8 ms | 590.2 ms |
+| `t_002_e411ff6e` turn=1 | 48,642 | 4,917 | P (first turn) | 883.3 ms | 971.3 ms | **878.3 ms** |
+| `t_003_157ce302` turn=1 | 53,759 | 249 | P (first turn) | 1,036.3 ms | **983.0 ms** | 996.4 ms |
+| `t_003_157ce302` turn=2 | 78,394 | 3,846 | P (`>4096` new) | **1,100.1 ms** | 1,136.6 ms | 1,106.9 ms |
+| **Median TTFT (12 matched)** | | | | 1,068.2 ms | 1,059.8 ms | **851.1 ms** |
+| **Mean TTFT (12 matched)** | | | | 967.9 ms | 1,246.5 ms | **868.3 ms** |
+| **Max TTFT (12 matched)** | | | | 1,920.2 ms | 4,252.6 ms | **1,204.6 ms** |
+
+### Verified root causes in vLLM v0.31.0
+
+1. **Why Smoke 1 (`always-disagg`, `bi=true`) stalled at 4 profiling requests (`D KV usage = 99.2%`), and why `bidirectional_kv_xfer: false` fixes it:**
+   - With `bidirectional_kv_xfer: true`, `NixlPullScheduler._handle_completed_request` (`nixl/pull_scheduler.py:231-268`) registers every finished request on D into `_reqs_to_send` for `decoder_kv_blocks_ttl = 480s`, pinning its KV blocks on D so they cannot be evicted.
+   - Under `always-disagg` (Smoke 1), D pulled a fresh full-prompt copy on every turn (4.02M tokens across 48 requests), filling D's GPU KV pool to **99.2%** by `t=39.8s` (`vllm:num_requests_waiting = 3`).
+   - With `bidirectional_kv_xfer: false`, D frees blocks immediately on completion: peak D KV usage drops to **4.2%** (`prefix-based`, Smoke 3) and **3.3%** (`always-disagg`, Smoke 4), with **0.0%** pinned at the end of the run.
+2. **Why `mamba_cache_mode="align"` cannot populate D's Mamba prefix cache from a NIXL transfer (hurting `prefix-based-pd-decider`):**
    - **On P (`vllm/distributed/kv_transfer/kv_connector/v1/nixl/base_scheduler.py:290-300`):** In `align` mode (`_ssm_state_slots_are_positional = False`), `get_exchange_clipped_blocks` clips the Mamba group to `blocks[-1:]` — only the single running Mamba state at `N - _prefill_backoff()` in the unaligned tail block is sent to D; block-aligned Mamba checkpoints materialized during P's chunked prefill are not transferred.
    - **On D (`vllm/v1/core/single_type_kv_cache_manager.py:298-365`, `1989-1994`):** When allocating slots for `num_external_computed_tokens` received over NIXL, `MambaManager.get_num_skipped_tokens` returns `num_computed_tokens - 1`. `add_local_computed_blocks` pads all full prefix blocks `0 .. K-1` in `MambaManager.req_to_blocks` with `_null_block` and sets `num_cached_block = K`, allocating only 1 real Mamba block at index `K` for the tail state.
    - **When NIXL recv finishes on D (`vllm/v1/core/sched/scheduler.py:3085`):** `cache_blocks` caches all `K` full blocks in `FullAttentionManager`, but caches **0 blocks** in `MambaManager` (`num_cached_blocks >= num_full_blocks` and blocks `0 .. K-1` are `_null_block`).
-   - **On the next turn on D (`vllm/v1/core/kv_cache_coordinator.py:1131-1200`):** `HybridKVCacheCoordinator.find_longest_cache_hit` intersects hits across `FullAttention` and `Mamba`. Because `MambaManager` has 0 cached blocks for that prefix on D, the combined hit is reduced to `0`, forcing D to run one local chunked prefill (which materializes and caches the block-aligned Mamba state on D so all subsequent D-turns hit).
+   - **On the next turn on D (`vllm/v1/core/kv_cache_coordinator.py:1131-1200`):** `HybridKVCacheCoordinator.find_longest_cache_hit` intersects hits across `FullAttention` and `Mamba`. Because `MambaManager` has 0 cached blocks for that prefix on D, the combined hit is reduced to `0`, forcing D to recompute the entire prompt locally on the Decode GPUs (e.g., `2a9654314a2beb turn=3`: **1,945 ms** vs **762 ms** under `always-disagg`; `t_001_d7c3d5d2 turn=3`: **1,272 ms** vs **723 ms** under `always-disagg`).
+3. **Why `always-disagg` transfers 100% of FullAttention blocks on every turn instead of reusing D's local FullAttention cache (`MultiConnector` bug):**
+   - `NixlBaseConnector` sets `supports_divergent_local_hybrid_hits = True` (`nixl/connector.py:81-82`). When D uses `NixlConnector` alone, `scheduler._get_local_prefix_cache_hit()` (`scheduler.py:533`) calls `kv_cache_manager.get_computed_blocks_for_connector()` (`kv_cache_manager.py:322-369`), which returns D's local `FullAttention` prefix hit even when D's `Mamba` hit is `0`. D then reuses its local FullAttention prefix blocks and only pulls the new suffix FullAttention blocks + 1 Mamba state block over NIXL.
+   - However, because our deployment wraps `NixlConnector` + `OffloadingConnector` inside `MultiConnector`, `MultiConnector.supports_divergent_local_hybrid_hits` (`vllm/distributed/kv_transfer/kv_connector/v1/multi_connector.py:214-218`) evaluates `all(c.supports_divergent_local_hybrid_hits for c in self._connectors)`. Since `OffloadingConnector` inherits `False` from `KVConnectorBase_V1`, `all([True, False])` evaluates to `False`, disabling `get_computed_blocks_for_connector()` on D and forcing D to report `0` local hits and pull all FullAttention blocks over NIXL on every turn (~220 ms extra NIXL transfer on turns 4 and 5 of `t_001_d7c3d5d2`).
 
 ## Next steps
 

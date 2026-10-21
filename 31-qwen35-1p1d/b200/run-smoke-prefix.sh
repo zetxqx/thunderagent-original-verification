@@ -20,6 +20,8 @@ export CLIENT_POOL=pool-1 GPUS_PER_POD=4 MODEL_SERVER_COLLECT=0
 export CLIENT_CPU=3 CLIENT_MEM=32Gi CLIENT_MEM_REQUEST=12Gi
 export RESTART=0 RESET=1 VLLM_PORTS=8200
 LABEL=${LABEL:-qwen35-1p1d-prefix-smoke}
+PLUGINS_FILE=${PLUGINS_FILE:-$HERE/pd-plugins-prefix.yaml}
+DECIDER=${DECIDER:-prefix-based-pd-decider}
 EPP=agentx-epp-pd-epp
 ts() { date -u +%H:%M:%S; }
 k() { KUBECONFIG=$KUBECONFIG_SOURCE kubectl --context "$CTX" -n "$NS" "$@"; }
@@ -32,14 +34,14 @@ counters() {
 }
 mkdir -p "$RESULTS"
 
-echo "=== 1. EPP with prefix-based-pd-decider ($(ts))"
-PLUGINS="$HERE/pd-plugins-prefix.yaml" "$HERE/render-epp.sh" pd > "$RESULTS/lane-epp-pd-prefix.yaml" || { echo "render failed"; exit 1; }
-k apply -f "$RESULTS/lane-epp-pd-prefix.yaml" >/dev/null || { echo "apply failed"; exit 1; }
+echo "=== 1. EPP with $DECIDER ($(ts))"
+PLUGINS="$PLUGINS_FILE" "$HERE/render-epp.sh" pd > "$RESULTS/lane-epp-pd-$LABEL.yaml" || { echo "render failed"; exit 1; }
+k apply -f "$RESULTS/lane-epp-pd-$LABEL.yaml" >/dev/null || { echo "apply failed"; exit 1; }
 k rollout restart "deploy/$EPP" >/dev/null; k rollout status "deploy/$EPP" --timeout=5m || exit 1
 sleep 5
-k logs "deploy/$EPP" -c epp | grep -E '"parsed config"|prefix-based-pd-decider|ERROR' | grep -v 'parsing response' | cut -c1-500 | tail -4
-k get configmap "$EPP" -o yaml | grep -q 'prefill: prefix-based-pd-decider' && echo "decider in the EPP config: prefix-based-pd-decider" \
-  || { echo "the EPP config does not use prefix-based-pd-decider; stopping"; exit 1; }
+k logs "deploy/$EPP" -c epp | grep -E '"parsed config"|pd-decider|ERROR' | grep -v 'parsing response' | cut -c1-500 | tail -4
+k get configmap "$EPP" -o yaml | grep -q "prefill: $DECIDER" && echo "decider in the EPP config: $DECIDER" \
+  || { echo "the EPP config does not use $DECIDER; stopping"; exit 1; }
 
 P=$(pod_of qwen35-pd-prefill); D=$(pod_of qwen35-pd-decode)
 echo "=== 2. AgentX c=4, 120 s ($(ts))"
