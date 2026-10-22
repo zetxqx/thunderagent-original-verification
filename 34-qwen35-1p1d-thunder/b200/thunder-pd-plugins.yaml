@@ -1,0 +1,88 @@
+# Step 34: llm-d-thunder-agent-simplified on the step 33 1P1D pair (qwen35-pd-prefill, qwen35-pd-decode).
+# EPP image: llm-d-router PR zetxqx/llm-d-router#15 (thunder-agent tracks only decode pods under P/D
+# disaggregation), commit 8d1fbc87, us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/
+# llm-d-router-endpoint-picker:thunder-pd-8d1fbc87 (digest sha256:2fcce34c...).
+#
+# P/D: as step 31 (disagg-profile-handler + always-disagg-pd-decider: every request takes the
+# remote-prefill path, P then D, the same path as step 33's pd-proxy baseline). The decode pod's
+# disagg sidecar (8000) runs the prefill on the picked prefill pod, then decodes locally.
+#
+# Thunder: step 26's thunder-gpu-l10 settings (utilThreshold 1.0, idle lease 10 s, forced admission
+# 1800 s). Only the decode pod enters the ledger (PR #15), so every session is counted against one
+# entry; capacityTokens is the PREFILL server's GPU KV pool, 4843063 tokens (its vLLM
+# kv_cache_size_tokens): under always-disagg every turn's prompt is computed on P, so P's prefix cache
+# is the one whose overflow costs recompute, and in 1P1D P's working set equals the sum of all
+# sessions. (D's pool is 4658242 tokens.) cacheInfoSpec is dropped so the gate uses capacityTokens:
+# for this hybrid model block_size x num_gpu_blocks overstates the token capacity by about 13%.
+# Thunder is a scorer in the decode profile only.
+apiVersion: llm-d.ai/v1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- name: vllm-endpoints
+  type: file-discovery
+  parameters:
+    path: /config/endpoints.yaml
+    watchFile: true
+- type: openai-parser
+- type: metrics-data-source
+  parameters:
+    scheme: http
+    path: /metrics
+- type: core-metrics-extractor
+  parameters:
+    defaultEngine: vllm-no-cacheinfo
+    engineConfigs:
+    - name: vllm-no-cacheinfo
+      queuedRequestsSpec: vllm:num_requests_waiting
+      runningRequestsSpec: vllm:num_requests_running
+      kvUsageSpec: vllm:kv_cache_usage_perc
+      loraSpec: vllm:lora_requests_info
+- type: agent-identity
+  parameters:
+    additionalSessionHeaders:
+    - x-session-id
+- type: thunder-agent
+  name: thunder
+  parameters:
+    capacityTokens: 4843063
+    utilThreshold: 1.0
+    idleLeaseSeconds: 10
+    headWaitStarvationMs: 1800000
+    evictionTtlSeconds: 3600
+- type: always-disagg-pd-decider
+- type: disagg-profile-handler
+  parameters:
+    deciders:
+      prefill: always-disagg-pd-decider
+- type: prefill-filter
+- type: decode-filter
+- type: max-score-picker
+flowControl:
+  defaultRequestTTL: "0s"
+  saturationDetector:
+    pluginRef: thunder
+  defaultPriorityBand:
+    fairnessPolicyRef: thunder
+schedulingProfiles:
+- name: prefill
+  plugins:
+  - pluginRef: prefill-filter
+  - pluginRef: max-score-picker
+- name: decode
+  plugins:
+  - pluginRef: decode-filter
+  - pluginRef: thunder
+  - pluginRef: max-score-picker
+requestHandler:
+  parsers:
+  - pluginRef: openai-parser
+dataLayer:
+  sources:
+  - pluginRef: metrics-data-source
+    extractors:
+    - pluginRef: core-metrics-extractor
+  discovery:
+    endpoints:
+      pluginRef: vllm-endpoints
