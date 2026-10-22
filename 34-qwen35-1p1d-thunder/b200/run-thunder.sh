@@ -6,7 +6,7 @@
 #   1. smoke: AgentX c=4 for 120 s, verify-point (EPP scrape present, no gate warning);
 #   2. c=64 and c=96, 60 min each (step 26/33 settings: RESET=1, the EPP restarted before each point,
 #      so the ledger starts empty), a failed point retried once;
-#   3. analyze both arms together against step 33.
+#   3. analyze both arms together against step 33 (COMPARE_CONCS, default CONCS).
 # Usage: setsid nohup ./run-thunder.sh > results/run-thunder.log 2>&1 < /dev/null &
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -26,6 +26,7 @@ export MODE=pool URL=http://$EPP:80 EPP_DEPLOY=$EPP DEPLOY=qwen35-pd-decode DECO
 LABEL=${LABEL:-qwen35-1p1d-thunder-l10}
 CONCS=${CONCS:-64 96}
 SMOKE=${SMOKE:-1}
+COMPARE_CONCS=${COMPARE_CONCS:-$CONCS}   # points analyzed together at the end (e.g. "64 96 128")
 ts() { date -u +%H:%M:%S; }
 k() { KUBECONFIG=$KUBECONFIG_SOURCE kubectl --context "$CTX" -n "$NS" "$@"; }
 mkdir -p "$RESULTS"
@@ -54,6 +55,6 @@ done
 echo "=== analyze against step 33 ($(ts))"
 B33="$HERE/../../33-qwen35-1p1d-baseline/b200/results/qwen35-1p1d-baseline"
 pts=()
-for c in $CONCS; do pts+=("$B33/c$c"); for d in "$RESULTS"/$LABEL/c$c "$RESULTS"/$LABEL-retry/c$c; do [ -d "$d" ] && pts+=("$d"); done; done
+for c in $COMPARE_CONCS; do pts+=("$B33/c$c"); for d in "$RESULTS"/$LABEL/c$c "$RESULTS"/$LABEL-retry/c$c; do [ -d "$d" ] && pts+=("$d"); done; done
 uv run "$SCRIPTS/analyze.py" --ttft-slo 60 --skip-minutes 5 --out "$RESULTS/compare/report" "${pts[@]}"
 echo "=== done ($(ts))"
