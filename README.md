@@ -142,6 +142,10 @@ Open item, resolved in step 10: the extra errors were 600 s client timeouts on t
 
 `33-qwen35-1p1d-baseline/` runs Qwen3.5-397B-A17B-FP8 as 1 prefill + 1 decode server (TP=4 each on one 8x B200 node, KV over NIXL/RDMA, 387 GiB CPU tier on both, the vllm-project/vllm#62862 fix on), with no router (vLLM's NIXL toy proxy, every request P then D), at c = 32, 48, 64, 96, 128, one hour each. **The knee is c=64 (370 output tok/s/GPU, TTFT p50 3.2 s). Past it the system collapses instead of plateauing (287 tok/s/GPU and TTFT p50 36 s at c=96; 75 and 342 s at c=128), because the single prefill server queues 82 to 215 requests while decode sits idle, and cache thrashing (hit rate down to 55%) feeds the queue. Against two aggregated TP=4 servers (step 26), 1P1D gives 3x to 4x higher per-user decode speed but loses on throughput and TTFT beyond c=64.** Baseline for a P/D thunder-agent arm at c = 64 and 96.
 
+### 34. llm-d-thunder-agent-simplified on the 1P1D pair (done)
+
+`34-qwen35-1p1d-thunder/` puts thunder-agent (built from zetxqx/llm-d-router#15, which tracks only decode pods under P/D; capacity = the prefill server's GPU KV pool, lease 10 s) in front of step 33's 1P1D pair, always P then D through the llm-d disagg sidecar, at c = 64 and 96, one hour each. **At c=96 the gate keeps the pair at its knee: 355 against 287 output tok/s/GPU (1.23x), TTFT p50 4.7 s against 36 s, prefill queue 10 against 82, 20% more completed requests; the cost is the held sessions' tail (E2E p99 222 against 155 s, 26 forced admissions, mean router wait 9.8 s). At c=64, where the baseline does not thrash, it is a small loss (0.95x throughput, 1.19x TTFT p90 and E2E p99).**
+
 ## Proposals (not part of the numbered steps)
 
 `proposal/PROPOSAL.md` - eight ThunderAgent proposals; Part 3 and its Option B were run in step 13, the rest are unrun. Kept outside the numbered sequence.
