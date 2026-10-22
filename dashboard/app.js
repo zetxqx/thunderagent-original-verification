@@ -113,7 +113,7 @@ function addBundle(data, source, persistent) {
   const bundle = { uid: source, source, persistent, data };
   state.bundles.push(bundle);
   for (const a of data.arms) {
-    state.arms.push({ uid: `${source}::${a.id}`, bundle, id: a.id, name: a.name || a.id, baseline: !!a.baseline, color: null });
+    state.arms.push({ uid: `${source}::${a.id}`, bundle, id: a.id, name: a.name || a.id, baseline: !!a.baseline, preset: a.color || null, color: null });
   }
   for (const p of data.points) {
     const armUid = `${source}::${p.arm}`;
@@ -138,7 +138,8 @@ function removeBundle(source, rerender = true) {
 function refreshDerived() {
   let i = 0;
   for (const a of state.arms) {
-    a.color = state.ui.colors[a.uid] || (a.baseline ? PALETTE.baseline : PALETTE.arms[i++ % PALETTE.arms.length]);
+    // A bundle's arms[].color takes no palette slot, so the other arms keep their colors.
+    a.color = state.ui.colors[a.uid] || a.preset || (a.baseline ? PALETTE.baseline : PALETTE.arms[i++ % PALETTE.arms.length]);
     if (state.bundles.length > 1) a.label = `${a.name} (${a.bundle.data.title || a.bundle.source})`;
     else a.label = a.name;
   }

@@ -25,6 +25,7 @@ Only `schema`, `title`, `arms` and `points[].{id, arm, conc, summary}` are requi
 | `id` | string | arm id, referenced by `points[].arm` (the label without a replicate suffix) |
 | `name` | string | display name |
 | `baseline` | bool | drawn in red and used for ratios unless the user picks another |
+| `color` | string | optional CSS color (e.g. `#E0A33A`) used instead of the next palette color; a color picked in the sidebar still wins |
 
 ## `points[]`
 

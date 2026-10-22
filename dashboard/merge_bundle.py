@@ -6,7 +6,7 @@
 
 A point whose id is already in the target replaces it. --cpu-tier-tokens sets cpu_tier_tokens of the added points
 (export_bundle.py computes it from --kv-offloading-size, which is per rank under data parallel). --rename changes
-the display name of an arm in the target.
+the display name of an arm in the target. --color fixes an arm's color (arms[].color, SCHEMA.md).
 
 Used for (2026-10-15): step 27 DEP=8 points into the GLM bundle:
   uv run export_bundle.py --out /tmp/dep8-bundle/dep8.json --title x --arm dep8-affinity-retry=dep8-affinity \\
@@ -24,19 +24,23 @@ ap.add_argument("target", type=Path)
 ap.add_argument("source", type=Path)
 ap.add_argument("--name", action="append", default=[], help="ARM=TEXT display name of an added arm")
 ap.add_argument("--rename", action="append", default=[], help="ARM=TEXT new display name of a target arm")
+ap.add_argument("--color", action="append", default=[], help="ARM=#RRGGBB fixed color of an arm (added or in the target)")
 ap.add_argument("--cpu-tier-tokens", type=int)
 ap.add_argument("--title")
 ap.add_argument("--description-append", default="")
 args = ap.parse_args()
 
 target, source = json.load(open(args.target)), json.load(open(args.source))
-names, renames = (dict(x.split("=", 1) for x in xs) for xs in (args.name, args.rename))
+names, renames, colors = (dict(x.split("=", 1) for x in xs) for xs in (args.name, args.rename, args.color))
 for arm in target["arms"]:
     arm["name"] = renames.get(arm["id"], arm["name"])
 known = {a["id"] for a in target["arms"]}
 for arm in source["arms"]:
     if arm["id"] not in known:
         target["arms"].append({"id": arm["id"], "name": names.get(arm["id"], arm["name"]), "baseline": False})
+for arm in target["arms"]:
+    if arm["id"] in colors:
+        arm["color"] = colors[arm["id"]]
 added = {p["id"] for p in source["points"]}
 target["points"] = [p for p in target["points"] if p["id"] not in added]
 for p in source["points"]:
