@@ -1,0 +1,58 @@
+# Step 33 (copied from step 31), router-less P/D: vLLM's NIXL toy proxy (toy_proxy_server.py, ConfigMap pd-proxy-script)
+# in front of qwen35-pd-prefill:8200 and qwen35-pd-decode:8200 (decode vLLM directly, not the llm-d
+# sidecar on 8000). Every request: P with max_tokens=1 + do_remote_decode, then D with P's
+# kv_transfer_params, streamed back. Runs on 5qjv (vLLM image already cached there), no GPUs.
+# Not labeled stack=qwen35-1p1d, so run-point.sh's DECODE_SELECTOR does not reset or scrape it.
+# ConfigMap: kubectl create configmap pd-proxy-script --from-file=toy_proxy_server.py
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pd-proxy
+  namespace: bobzetian-llmd
+  labels: {app: pd-proxy}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: pd-proxy}
+  template:
+    metadata:
+      labels: {app: pd-proxy}
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-5qjv
+      tolerations:
+      - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      containers:
+      - name: proxy
+        image: vllm/vllm-openai:v0.31.0
+        command: [python3, /proxy/toy_proxy_server.py]
+        args:
+        - --host=0.0.0.0
+        - --port=8000
+        - --prefiller-host=qwen35-pd-prefill
+        - --prefiller-port=8200
+        - --decoder-host=qwen35-pd-decode
+        - --decoder-port=8200
+        ports:
+        - {name: http, containerPort: 8000}
+        readinessProbe:
+          httpGet: {path: /healthcheck, port: 8000}
+          periodSeconds: 5
+        resources:
+          requests: {cpu: "4", memory: 8Gi}
+          limits: {memory: 16Gi}
+        volumeMounts:
+        - {name: script, mountPath: /proxy}
+      volumes:
+      - name: script
+        configMap: {name: pd-proxy-script}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pd-proxy
+  namespace: bobzetian-llmd
+spec:
+  selector: {app: pd-proxy}
+  ports:
+  - {name: http, port: 8000, targetPort: 8000}
