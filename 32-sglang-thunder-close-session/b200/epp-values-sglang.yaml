@@ -1,0 +1,28 @@
+router:
+  epp:
+    image:
+      registry: us-central1-docker.pkg.dev
+      repository: bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker
+      tag: thunder-sglang-close-7eec9d9c
+    env: []
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - {key: cloud.google.com/gke-nodepool, operator: In, values: [pool-1]}
+    pluginsCustomConfig:
+      endpoints.yaml: |
+        endpoints:
+        - name: sglang-qwen35-a
+          namespace: bobzetian-llmd
+          address: "10.0.35.169"
+          port: "8000"
+          labels:
+            llm-d.ai/engine-type: sglang
+        - name: sglang-qwen35-b
+          namespace: bobzetian-llmd
+          address: "10.0.37.190"
+          port: "8000"
+          labels:
+            llm-d.ai/engine-type: sglang

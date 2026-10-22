@@ -1,0 +1,29 @@
+
+=== sglang-baseline-lru-1h
+profiling requests 2164, steady-state 1979; request-weighted hit (ss) 94.39%  uncached tokens/request (ss) 5,635
+  server http://10.4.34.70:8000/metrics: cached 103.3M / prompt 109.9M = 94.05%
+  server http://10.4.5.115:8000/metrics: cached 96.9M / prompt 102.6M = 94.46%
+  cold turns (hit<50%, turn>0): 40  uncached tokens in them 3.1M of 11.2M
+  release_session events in window: 0
+
+=== sglang-thunder-close-1h
+profiling requests 2129, steady-state 1930; request-weighted hit (ss) 92.13%  uncached tokens/request (ss) 7,876
+  server http://10.4.34.70:8000/metrics: cached 95.9M / prompt 104.8M = 91.55%
+  server http://10.4.5.115:8000/metrics: cached 96.0M / prompt 103.7M = 92.58%
+  cold turns (hit<50%, turn>0): 73  uncached tokens in them 7.3M of 15.2M
+  release_session events in window: 144
+  release_session events 144 (indexed>0: 140); session id matches: {'corr': np.int64(118), 'conv': np.int64(0), 'root': np.int64(34)}
+  first turn after a release (ss): n=14, hit 24.8%, uncached/turn 84,688, TTFT p50 4.09s p90 14.23s
+  all other turns>0 (ss):      n=1815, hit 93.9%, uncached/turn 6,313, TTFT p50 0.55s p90 1.43s
+  gap release->next turn: p50 316s p90 1205s; extra uncached tokens from post-release turns ~1.1M
+
+=== hit by idle gap since the same session's previous request ended (steady state, turn>0)
+         sglang-baseline-lru-1h                  sglang-thunder-close-1h                 
+                              n  hit% uncached_M                       n  hit% uncached_M
+b                                                                                        
+<5s                      1542.0  96.1        6.0                  1510.0  95.5        6.9
+5-30s                     158.0  96.7        0.6                   158.0  94.0        1.1
+30-60s                     35.0  91.6        0.3                    31.0  85.1        0.5
+60-120s                    35.0  94.9        0.2                    37.0  95.5        0.2
+120-300s                   49.0  96.3        0.2                    46.0  75.6        1.4
+>300s                      31.0  81.6        0.7                    29.0  41.6        2.0

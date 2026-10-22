@@ -1,0 +1,153 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "6"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"name":"sglang-qwen35-a","namespace":"bobzetian-llmd"},"spec":{"progressDeadlineSeconds":3600,"replicas":1,"selector":{"matchLabels":{"app":"sglang-qwen35-a"}},"strategy":{"type":"Recreate"},"template":{"metadata":{"annotations":{"cluster-autoscaler.kubernetes.io/safe-to-evict":"false"},"labels":{"app":"sglang-qwen35-a","llm-d.ai/engine-type":"sglang"}},"spec":{"containers":[{"args":["exec python3 -m sglang.launch_server \\\n  --model-path /root/.cache/huggingface/hub/models--Qwen--Qwen3.5-397B-A17B-FP8/snapshots/ea5b4f81096f3901c91dea97f81324302495781d \\\n  --served-model-name Qwen/Qwen3.5-397B-A17B-FP8 \\\n  --host 0.0.0.0 --port 8000 \\\n  --tp 4 \\\n  --trust-remote-code \\\n  --kv-cache-dtype fp8_e4m3 \\\n  --mem-fraction-static 0.8 \\\n  --chunked-prefill-size 16384 \\\n  --enable-session-radix-cache \\\n  --enable-metrics \\\n  --stream-response-default-include-usage \\\n  --reasoning-parser qwen3 \\\n  --tool-call-parser qwen3_coder\n"],"command":["bash","-c"],"env":[{"name":"SGLANG_TIMEOUT_KEEP_ALIVE","value":"1800"},{"name":"NCCL_CUMEM_ENABLE","value":"1"},{"name":"NCCL_NET_PLUGIN","value":"none"},{"name":"NCCL_TUNER_PLUGIN","value":"none"},{"name":"NCCL_SOCKET_IFNAME","value":"eth0"}],"image":"docker.io/lmsysorg/sglang@sha256:ddae0e399d3d94f7827f16183301cf8dac4cf0eae0ef25590b7dac5881d713d8","name":"modelserver","ports":[{"containerPort":8000,"name":"http"}],"readinessProbe":{"httpGet":{"path":"/v1/models","port":8000},"periodSeconds":10,"timeoutSeconds":5},"resources":{"claims":[{"name":"gpu"}],"limits":{"memory":"900Gi"},"requests":{"cpu":"50","memory":"700Gi"}},"startupProbe":{"failureThreshold":540,"httpGet":{"path":"/v1/models","port":8000},"periodSeconds":10,"timeoutSeconds":5},"volumeMounts":[{"mountPath":"/dev/shm","name":"dshm"},{"mountPath":"/root/.cache/huggingface","name":"hf-cache"},{"mountPath":"/usr/local/nvidia/lib64","name":"nvidia-install-dir"}]}],"imagePullSecrets":[{"name":"artifact-registry-secret"}],"nodeSelector":{"kubernetes.io/hostname":"gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-13z6","node.kubernetes.io/instance-type":"a4-highgpu-8g"},"resourceClaims":[{"name":"gpu","resourceClaimTemplateName":"qwen35-tp4-gpu"}],"terminationGracePeriodSeconds":60,"tolerations":[{"effect":"NoSchedule","key":"nvidia.com/gpu","operator":"Exists"}],"volumes":[{"emptyDir":{"medium":"Memory","sizeLimit":"450Gi"},"name":"dshm"},{"hostPath":{"path":"/mnt/stateful_partition/kube-ephemeral-ssd/shared_disk/bobzetian-hf-cache","type":"DirectoryOrCreate"},"name":"hf-cache"},{"hostPath":{"path":"/home/kubernetes/bin/nvidia/lib64"},"name":"nvidia-install-dir"}]}}}}
+  creationTimestamp: "2026-10-21T09:25:11Z"
+  generation: 6
+  name: sglang-qwen35-a
+  namespace: bobzetian-llmd
+  resourceVersion: "1792577379886159023"
+  uid: 34c97ddc-47e0-4544-a9e3-b0fad3d2a26d
+spec:
+  progressDeadlineSeconds: 3600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: sglang-qwen35-a
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+      labels:
+        app: sglang-qwen35-a
+        llm-d.ai/engine-type: sglang
+    spec:
+      containers:
+      - args:
+        - |
+          exec python3 -m sglang.launch_server \
+            --model-path /root/.cache/huggingface/hub/models--Qwen--Qwen3.5-397B-A17B-FP8/snapshots/ea5b4f81096f3901c91dea97f81324302495781d \
+            --served-model-name Qwen/Qwen3.5-397B-A17B-FP8 \
+            --host 0.0.0.0 --port 8000 \
+            --tp 4 \
+            --trust-remote-code \
+            --kv-cache-dtype fp8_e4m3 \
+            --mem-fraction-static 0.8 \
+            --chunked-prefill-size 16384 \
+            --enable-session-radix-cache \
+            --enable-metrics \
+            --stream-response-default-include-usage \
+            --reasoning-parser qwen3 \
+            --tool-call-parser qwen3_coder
+        command:
+        - bash
+        - -c
+        env:
+        - name: SGLANG_TIMEOUT_KEEP_ALIVE
+          value: "1800"
+        - name: NCCL_CUMEM_ENABLE
+          value: "1"
+        - name: NCCL_NET_PLUGIN
+          value: none
+        - name: NCCL_TUNER_PLUGIN
+          value: none
+        - name: NCCL_SOCKET_IFNAME
+          value: eth0
+        image: docker.io/lmsysorg/sglang@sha256:ddae0e399d3d94f7827f16183301cf8dac4cf0eae0ef25590b7dac5881d713d8
+        imagePullPolicy: IfNotPresent
+        name: modelserver
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /v1/models
+            port: 8000
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          claims:
+          - name: gpu
+          limits:
+            memory: 900Gi
+          requests:
+            cpu: "50"
+            memory: 700Gi
+        startupProbe:
+          failureThreshold: 540
+          httpGet:
+            path: /v1/models
+            port: 8000
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /dev/shm
+          name: dshm
+        - mountPath: /root/.cache/huggingface
+          name: hf-cache
+        - mountPath: /usr/local/nvidia/lib64
+          name: nvidia-install-dir
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+      - name: artifact-registry-secret
+      nodeSelector:
+        kubernetes.io/hostname: gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-13z6
+        node.kubernetes.io/instance-type: a4-highgpu-8g
+      resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: qwen35-tp4-gpu
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 60
+      tolerations:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Exists
+      volumes:
+      - emptyDir:
+          medium: Memory
+          sizeLimit: 450Gi
+        name: dshm
+      - hostPath:
+          path: /mnt/stateful_partition/kube-ephemeral-ssd/shared_disk/bobzetian-hf-cache
+          type: DirectoryOrCreate
+        name: hf-cache
+      - hostPath:
+          path: /home/kubernetes/bin/nvidia/lib64
+          type: ""
+        name: nvidia-install-dir
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-10-21T10:09:39Z"
+    lastUpdateTime: "2026-10-21T10:09:39Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-10-21T09:25:11Z"
+    lastUpdateTime: "2026-10-21T10:09:39Z"
+    message: ReplicaSet "sglang-qwen35-a-864c588bc" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 6
+  readyReplicas: 1
+  replicas: 1
+  terminatingReplicas: 0
+  updatedReplicas: 1
