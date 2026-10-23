@@ -1,0 +1,254 @@
+# Step 35: 1P1D GLM-5.2-NVFP4 across two a4-highgpu-8g nodes, one TP=8 server per node:
+#   prefill glm52-pd-prefill on 5qjv (checkpoint cached from steps 25/27)
+#   decode  glm52-pd-decode  on 000v (free; first start downloads the checkpoint to its local SSD)
+# Each server claims its node's 8 B200 and 8 RDMA NICs (gpu-nic-claim.yaml); KV moves P -> D over
+# NIXL/UCX RoCE between the nodes.
+# Model flags are step 25's (25-glm52-tp8-offload/b200/vllm.yaml, the InferenceX B200 agg mapping),
+# identical on P and D so the NIXL layouts match: TP=8, FP8 KV, --max-model-len 1048576,
+# --max-num-batched-tokens 8192, MTP 3, --gpu-memory-utilization 0.8, glm47 tool parser. Changes:
+#   - KV transfer: MultiConnector = NixlConnector (P kv_producer, D kv_consumer,
+#     bidirectional_kv_xfer false) + OffloadingConnector with cpu_bytes_to_use 820 GiB, which is what
+#     step 25's --kv-offloading-size 820 --kv-offloading-backend native sets (config/vllm.py);
+#     --kv-offloading-size itself would replace kv_connector and drop NIXL.
+#   - vllm-project/vllm#62862 fix (zetxqx/vllm#1) overlaid with VLLM_PR62862=1, as steps 33/34.
+#   - vLLM listens on 8200 in both pods; the decode pod also runs the llm-d disagg sidecar on 8000
+#     (unused by the pd-proxy baseline, needed for a later EPP/thunder arm without a restart).
+#   - RDMA: IPC_LOCK; UCX_TLS excludes cuda_ipc; UCX_IB_ROCE_REACHABILITY_MODE=all.
+# Memory: as step 25 (the 820 GiB /dev/shm tier plus page cache of the 433 GiB checkpoint).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glm52-pd-prefill
+  namespace: bobzetian-llmd
+  labels: {llm-d.ai/role: prefill, stack: glm52-1p1d}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  progressDeadlineSeconds: 3600
+  selector:
+    matchLabels: {app: glm52-pd-prefill}
+  template:
+    metadata:
+      labels: {app: glm52-pd-prefill, llm-d.ai/role: prefill, stack: glm52-1p1d}
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: a4-highgpu-8g
+        kubernetes.io/hostname: gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-5qjv
+      tolerations:
+      - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      resourceClaims:
+      - name: gpu-nic
+        resourceClaimTemplateName: glm52-tp8-gpu-nic
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: modelserver
+        image: vllm/vllm-openai:v0.31.0
+        command: [bash, -c]
+        args:
+        - |
+          # vllm-project/vllm#62862 fix toggle (zetxqx/vllm#1 ported onto v0.31.0); see step 33.
+          if [ "${VLLM_PR62862:-0}" = 1 ]; then
+            SP=/usr/local/lib/python3.12/dist-packages/vllm
+            cp /pr62862/scheduler.py "$SP/v1/core/sched/scheduler.py"
+            cp /pr62862/multi_connector.py "$SP/distributed/kv_transfer/kv_connector/v1/multi_connector.py"
+            echo "VLLM_PR62862: applied zetxqx/vllm#1"
+          fi
+          exec vllm serve nvidia/GLM-5.2-NVFP4 \
+            --revision aec724e8c7b8ee9db3b48c01c320f63f9cdaf8aa \
+            --served-model-name nvidia/GLM-5.2-NVFP4 \
+            --host 0.0.0.0 --port 8200 \
+            --tensor-parallel-size 8 \
+            --trust-remote-code \
+            --kv-cache-dtype fp8_e4m3 \
+            --max-model-len 1048576 \
+            --max-num-seqs "$MAX_NUM_SEQS" \
+            --max-num-batched-tokens 8192 \
+            --gpu-memory-utilization 0.8 \
+            --speculative-config '{"method":"mtp","num_speculative_tokens":3}' \
+            --kv-transfer-config "$KV_TRANSFER_CONFIG" \
+            --enable-auto-tool-choice --tool-call-parser glm47 \
+            --enable-prompt-tokens-details
+        env:
+        - {name: VLLM_PR62862, value: "1"}
+        - {name: MAX_NUM_SEQS, value: "64"}
+        - name: KV_TRANSFER_CONFIG
+          value: '{"kv_connector":"MultiConnector","kv_role":"kv_both","kv_load_failure_policy":"fail","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_producer","kv_connector_extra_config":{"bidirectional_kv_xfer":false}},{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"cpu_bytes_to_use":880468295680}}]}}'
+        - {name: VLLM_NIXL_SIDE_CHANNEL_HOST, valueFrom: {fieldRef: {fieldPath: status.podIP}}}
+        - {name: UCX_TLS, value: "^cuda_ipc"}
+        - {name: UCX_IB_ROCE_REACHABILITY_MODE, value: all}
+        - {name: NCCL_CUMEM_ENABLE, value: "1"}
+        - {name: NCCL_NET_PLUGIN, value: none}
+        - {name: NCCL_TUNER_PLUGIN, value: none}
+        - {name: NCCL_SOCKET_IFNAME, value: eth0}
+        - {name: VLLM_SERVER_DEV_MODE, value: "1"}
+        - {name: VLLM_HTTP_TIMEOUT_KEEP_ALIVE, value: "1800"}
+        ports:
+        - {name: http, containerPort: 8200}
+        - {name: nixl, containerPort: 5600}
+        startupProbe:
+          httpGet: {path: /health, port: 8200}
+          periodSeconds: 10
+          failureThreshold: 540
+        readinessProbe:
+          httpGet: {path: /health, port: 8200}
+          periodSeconds: 10
+        securityContext:
+          capabilities: {add: [IPC_LOCK]}
+        resources:
+          requests: {cpu: "100", memory: 1300Gi}
+          limits: {memory: 1600Gi}
+          claims:
+          - name: gpu-nic
+        volumeMounts:
+        - {name: dshm, mountPath: /dev/shm}
+        - {name: hf-cache, mountPath: /root/.cache/huggingface}
+        - {name: nvidia-install-dir, mountPath: /usr/local/nvidia/lib64}
+        - {name: pr62862, mountPath: /pr62862}
+      volumes:
+      - name: pr62862
+        configMap: {name: vllm-pr62862}
+      - name: dshm
+        emptyDir: {medium: Memory, sizeLimit: 900Gi}
+      - name: hf-cache
+        hostPath:
+          path: /mnt/stateful_partition/kube-ephemeral-ssd/shared_disk/bobzetian-hf-cache
+          type: DirectoryOrCreate
+      - name: nvidia-install-dir
+        hostPath: {path: /home/kubernetes/bin/nvidia/lib64}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glm52-pd-decode
+  namespace: bobzetian-llmd
+  labels: {llm-d.ai/role: decode, stack: glm52-1p1d}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  progressDeadlineSeconds: 5400
+  selector:
+    matchLabels: {app: glm52-pd-decode}
+  template:
+    metadata:
+      labels: {app: glm52-pd-decode, llm-d.ai/role: decode, stack: glm52-1p1d}
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: a4-highgpu-8g
+        kubernetes.io/hostname: gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-000v
+      tolerations:
+      - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      resourceClaims:
+      - name: gpu-nic
+        resourceClaimTemplateName: glm52-tp8-gpu-nic
+      terminationGracePeriodSeconds: 60
+      initContainers:
+      # llm-d disagg sidecar (native sidecar), as step 31: on 8000, prefills on the pod named in
+      # x-llm-d-prefiller-host-port, then decodes on the local vLLM (8200). Unused by pd-proxy.
+      - name: routing-proxy
+        image: ghcr.io/llm-d/llm-d-router-disagg-sidecar:v1.0.0
+        args: [--port=8000, --kv-connector=nixlv2, --secure-serving=false, --zap-log-level=1]
+        ports:
+        - {name: sidecar, containerPort: 8000}
+        restartPolicy: Always
+        securityContext: {allowPrivilegeEscalation: false, runAsNonRoot: true}
+      containers:
+      - name: modelserver
+        image: vllm/vllm-openai:v0.31.0
+        command: [bash, -c]
+        args:
+        - |
+          # vllm-project/vllm#62862 fix toggle (zetxqx/vllm#1 ported onto v0.31.0); see step 33.
+          if [ "${VLLM_PR62862:-0}" = 1 ]; then
+            SP=/usr/local/lib/python3.12/dist-packages/vllm
+            cp /pr62862/scheduler.py "$SP/v1/core/sched/scheduler.py"
+            cp /pr62862/multi_connector.py "$SP/distributed/kv_transfer/kv_connector/v1/multi_connector.py"
+            echo "VLLM_PR62862: applied zetxqx/vllm#1"
+          fi
+          exec vllm serve nvidia/GLM-5.2-NVFP4 \
+            --revision aec724e8c7b8ee9db3b48c01c320f63f9cdaf8aa \
+            --served-model-name nvidia/GLM-5.2-NVFP4 \
+            --host 0.0.0.0 --port 8200 \
+            --tensor-parallel-size 8 \
+            --trust-remote-code \
+            --kv-cache-dtype fp8_e4m3 \
+            --max-model-len 1048576 \
+            --max-num-seqs "$MAX_NUM_SEQS" \
+            --max-num-batched-tokens 8192 \
+            --gpu-memory-utilization 0.8 \
+            --speculative-config '{"method":"mtp","num_speculative_tokens":3}' \
+            --kv-transfer-config "$KV_TRANSFER_CONFIG" \
+            --enable-auto-tool-choice --tool-call-parser glm47 \
+            --enable-prompt-tokens-details
+        env:
+        - {name: VLLM_PR62862, value: "1"}
+        - {name: MAX_NUM_SEQS, value: "128"}
+        - name: KV_TRANSFER_CONFIG
+          value: '{"kv_connector":"MultiConnector","kv_role":"kv_both","kv_load_failure_policy":"fail","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_consumer","kv_connector_extra_config":{"bidirectional_kv_xfer":false}},{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"cpu_bytes_to_use":880468295680}}]}}'
+        - {name: VLLM_NIXL_SIDE_CHANNEL_HOST, valueFrom: {fieldRef: {fieldPath: status.podIP}}}
+        - {name: UCX_TLS, value: "^cuda_ipc"}
+        - {name: UCX_IB_ROCE_REACHABILITY_MODE, value: all}
+        - {name: NCCL_CUMEM_ENABLE, value: "1"}
+        - {name: NCCL_NET_PLUGIN, value: none}
+        - {name: NCCL_TUNER_PLUGIN, value: none}
+        - {name: NCCL_SOCKET_IFNAME, value: eth0}
+        - {name: VLLM_SERVER_DEV_MODE, value: "1"}
+        - {name: VLLM_HTTP_TIMEOUT_KEEP_ALIVE, value: "1800"}
+        ports:
+        - {name: http, containerPort: 8200}
+        - {name: nixl, containerPort: 5600}
+        startupProbe:
+          httpGet: {path: /health, port: 8200}
+          periodSeconds: 10
+          failureThreshold: 720
+        readinessProbe:
+          httpGet: {path: /health, port: 8200}
+          periodSeconds: 10
+        securityContext:
+          capabilities: {add: [IPC_LOCK]}
+        resources:
+          requests: {cpu: "100", memory: 1300Gi}
+          limits: {memory: 1600Gi}
+          claims:
+          - name: gpu-nic
+        volumeMounts:
+        - {name: dshm, mountPath: /dev/shm}
+        - {name: hf-cache, mountPath: /root/.cache/huggingface}
+        - {name: nvidia-install-dir, mountPath: /usr/local/nvidia/lib64}
+        - {name: pr62862, mountPath: /pr62862}
+      volumes:
+      - name: pr62862
+        configMap: {name: vllm-pr62862}
+      - name: dshm
+        emptyDir: {medium: Memory, sizeLimit: 900Gi}
+      - name: hf-cache
+        hostPath:
+          path: /mnt/stateful_partition/kube-ephemeral-ssd/shared_disk/bobzetian-hf-cache
+          type: DirectoryOrCreate
+      - name: nvidia-install-dir
+        hostPath: {path: /home/kubernetes/bin/nvidia/lib64}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: glm52-pd-prefill
+  namespace: bobzetian-llmd
+spec:
+  selector: {app: glm52-pd-prefill}
+  ports:
+  - {name: http, port: 8200, targetPort: 8200}
+---
+# 8000: the decode sidecar (for an EPP arm); 8200: decode vLLM (pd-proxy, metrics, cache reset).
+apiVersion: v1
+kind: Service
+metadata:
+  name: glm52-pd-decode
+  namespace: bobzetian-llmd
+spec:
+  selector: {app: glm52-pd-decode}
+  ports:
+  - {name: sidecar, port: 8000, targetPort: 8000}
+  - {name: http, port: 8200, targetPort: 8200}

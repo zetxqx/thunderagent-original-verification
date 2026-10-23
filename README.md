@@ -142,6 +142,10 @@ Open item, resolved in step 10: the extra errors were 600 s client timeouts on t
 
 `34-qwen35-1p1d-thunder/` puts thunder-agent (built from zetxqx/llm-d-router#15, which tracks only decode pods under P/D; capacity = the prefill server's GPU KV pool, lease 10 s) in front of step 33's 1P1D pair, always P then D through the llm-d disagg sidecar, at c = 64 and 96, one hour each. **At c=96 the gate keeps the pair at its knee: 355 against 287 output tok/s/GPU (1.23x), TTFT p50 4.7 s against 36 s, prefill queue 10 against 82, 20% more completed requests; the cost is the held sessions' tail (E2E p99 222 against 155 s, 26 forced admissions, mean router wait 9.8 s). At c=64, where the baseline does not thrash, it is a small loss (0.95x throughput, 1.19x TTFT p90 and E2E p99).**
 
+### 35. No-router 1P1D GLM-5.2 across two nodes (done)
+
+`35-glm52-1p1d/` runs GLM-5.2-NVFP4 as one prefill and one decode TP=8 server on two 8x B200 nodes (KV over cross-node NIXL/RDMA, 820 GiB CPU tier on each, vllm#62862 fix on), with no router (vLLM's NIXL toy proxy), at c = 16 to 64, one hour each, against step 25's TP=8 aggregated server. **Per GPU 1P1D never wins: 0.68x to 0.92x TP=8 aggregated at equal concurrency per GPU, TTFT p50 2x to 12x higher; it saturates at about 70 output tok/s/GPU from c=48. Decode is KV-bound at 5 to 6 long requests but never queues; the prefill server does (19.6 waiting at c=48, 44 at c=64). Against one 8-GPU server at the same load, the 16 GPUs give 1.05x to 1.45x the total throughput, half the TTFT and 1.3x to 2.4x the per-user decode speed. MLA makes the transfer 8x redundant (every decode rank pulls the whole block): 63 to 211 TB per hour, not a limit.**
+
 ## Proposals (not part of the numbered steps)
 
 `proposal/PROPOSAL.md` - eight ThunderAgent proposals; Part 3 and its Option B were run in step 13, the rest are unrun. Kept outside the numbered sequence.
