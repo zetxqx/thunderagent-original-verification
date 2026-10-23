@@ -152,7 +152,7 @@ Open item, resolved in step 10: the extra errors were 600 s client timeouts on t
 
 ### 36. llm-d-thunder-agent-simplified on the GLM-5.2 1P1D pair (done)
 
-`36-glm52-1p1d-thunder/` puts step 34's thunder EPP (zetxqx/llm-d-router#15, capacity = the prefill server's GPU KV pool 1,572,864 tokens, lease 10 s) in front of step 35's GLM-5.2 1P1D pair, always P then D through the disagg sidecar, at c = 48 and 64, one hour each. **The prefill queue disappears (2 to 6 waiting against 20 to 44), TTFT p50 is 1.2 s against 25 and 49 s, E2E-normalized interactivity p50 is 7x to 11x higher and output throughput holds (0.92x, 1.03x); NIXL traffic falls 4x to 5x. But the gate admits only 5 to 8 of these ~250k-token sessions and serves smaller sessions first: completed requests are 22% to 32% shorter, input throughput is 0.7x, E2E p99 is 563 and 1,109 s against 75 and 153 s, with 14 and 32 forced admissions.**
+`36-glm52-1p1d-thunder/` puts step 34's thunder EPP (zetxqx/llm-d-router#15, capacity = the prefill server's GPU KV pool 1,572,864 tokens, lease 10 s) in front of step 35's GLM-5.2 1P1D pair, always P then D through the disagg sidecar, at c = 24, 32, 48 and 64, one hour each. **TTFT p50 stays at 1.2 to 1.4 s at every load (no thunder: 3.4, 9.7, 25, 49 s), E2E-normalized interactivity p50 is 1.4x to 11x higher, output throughput 0.91x to 1.03x, NIXL traffic 4x to 5x lower. The gate admits only 4 to 8 of these ~250k-token sessions and serves smaller sessions first, at a cost that grows with the load: completed requests 12% to 32% shorter, E2E p99 2.3x to 7.5x the baseline (124 to 1,109 s), 1 to 32 forced admissions.**
 
 ## Proposals (not part of the numbered steps)
 
