@@ -150,6 +150,10 @@ Open item, resolved in step 10: the extra errors were 600 s client timeouts on t
 
 `35-glm52-1p1d/` runs GLM-5.2-NVFP4 as one prefill and one decode TP=8 server on two 8x B200 nodes (KV over cross-node NIXL/RDMA, 820 GiB CPU tier on each, vllm#62862 fix on), with no router (vLLM's NIXL toy proxy), at c = 16 to 64, one hour each, against step 25's TP=8 aggregated server. **Per GPU 1P1D never wins: 0.68x to 0.92x TP=8 aggregated at equal concurrency per GPU, TTFT p50 2x to 12x higher; it saturates at about 70 output tok/s/GPU from c=48. Decode is KV-bound at 5 to 6 long requests but never queues; the prefill server does (19.6 waiting at c=48, 44 at c=64). Against one 8-GPU server at the same load, the 16 GPUs give 1.05x to 1.45x the total throughput, half the TTFT and 1.3x to 2.4x the per-user decode speed. MLA makes the transfer 8x redundant (every decode rank pulls the whole block): 63 to 211 TB per hour, not a limit.**
 
+### 36. llm-d-thunder-agent-simplified on the GLM-5.2 1P1D pair (done)
+
+`36-glm52-1p1d-thunder/` puts step 34's thunder EPP (zetxqx/llm-d-router#15, capacity = the prefill server's GPU KV pool 1,572,864 tokens, lease 10 s) in front of step 35's GLM-5.2 1P1D pair, always P then D through the disagg sidecar, at c = 48 and 64, one hour each. **The prefill queue disappears (2 to 6 waiting against 20 to 44), TTFT p50 is 1.2 s against 25 and 49 s, E2E-normalized interactivity p50 is 7x to 11x higher and output throughput holds (0.92x, 1.03x); NIXL traffic falls 4x to 5x. But the gate admits only 5 to 8 of these ~250k-token sessions and serves smaller sessions first: completed requests are 22% to 32% shorter, input throughput is 0.7x, E2E p99 is 563 and 1,109 s against 75 and 153 s, with 14 and 32 forced admissions.**
+
 ## Proposals (not part of the numbered steps)
 
 `proposal/PROPOSAL.md` - eight ThunderAgent proposals; Part 3 and its Option B were run in step 13, the rest are unrun. Kept outside the numbered sequence.

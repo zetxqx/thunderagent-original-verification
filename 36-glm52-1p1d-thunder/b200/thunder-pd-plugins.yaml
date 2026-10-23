@@ -1,0 +1,81 @@
+# Step 36: llm-d-thunder-agent-simplified on the step 35 GLM-5.2 1P1D pair (glm52-pd-prefill on 5qjv,
+# glm52-pd-decode on 000v, TP=8 each). Same EPP image and plugin config as step 34 (Qwen3.5):
+# llm-d-router PR zetxqx/llm-d-router#15 (thunder-agent tracks only decode pods under P/D), commit
+# 8d1fbc87, image us-central1-docker.pkg.dev/bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker:
+# thunder-pd-8d1fbc87; disagg-profile-handler + always-disagg-pd-decider (P then D through the decode
+# pod's llm-d disagg sidecar); thunder lease 10 s, utilThreshold 1.0, forced admission 1800 s.
+# The one change: capacityTokens 1572864, the PREFILL server's GPU KV pool (its vLLM
+# kv_cache_size_tokens; D's is 1505088). Under always-disagg every turn is prefilled on P, and in 1P1D
+# P's working set is the sum of all sessions, which the decode pod's ledger entry counts.
+# cacheInfoSpec stays dropped so the gate uses capacityTokens.
+apiVersion: llm-d.ai/v1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- name: vllm-endpoints
+  type: file-discovery
+  parameters:
+    path: /config/endpoints.yaml
+    watchFile: true
+- type: openai-parser
+- type: metrics-data-source
+  parameters:
+    scheme: http
+    path: /metrics
+- type: core-metrics-extractor
+  parameters:
+    defaultEngine: vllm-no-cacheinfo
+    engineConfigs:
+    - name: vllm-no-cacheinfo
+      queuedRequestsSpec: vllm:num_requests_waiting
+      runningRequestsSpec: vllm:num_requests_running
+      kvUsageSpec: vllm:kv_cache_usage_perc
+      loraSpec: vllm:lora_requests_info
+- type: agent-identity
+  parameters:
+    additionalSessionHeaders:
+    - x-session-id
+- type: thunder-agent
+  name: thunder
+  parameters:
+    capacityTokens: 1572864
+    utilThreshold: 1.0
+    idleLeaseSeconds: 10
+    headWaitStarvationMs: 1800000
+    evictionTtlSeconds: 3600
+- type: always-disagg-pd-decider
+- type: disagg-profile-handler
+  parameters:
+    deciders:
+      prefill: always-disagg-pd-decider
+- type: prefill-filter
+- type: decode-filter
+- type: max-score-picker
+flowControl:
+  defaultRequestTTL: "0s"
+  saturationDetector:
+    pluginRef: thunder
+  defaultPriorityBand:
+    fairnessPolicyRef: thunder
+schedulingProfiles:
+- name: prefill
+  plugins:
+  - pluginRef: prefill-filter
+  - pluginRef: max-score-picker
+- name: decode
+  plugins:
+  - pluginRef: decode-filter
+  - pluginRef: thunder
+  - pluginRef: max-score-picker
+requestHandler:
+  parsers:
+  - pluginRef: openai-parser
+dataLayer:
+  sources:
+  - pluginRef: metrics-data-source
+    extractors:
+    - pluginRef: core-metrics-extractor
+  discovery:
+    endpoints:
+      pluginRef: vllm-endpoints
