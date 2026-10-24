@@ -1,0 +1,22 @@
+# Step 35: all eight B200 plus all eight RDMA NICs of one a4-highgpu-8g node for one TP=8 server
+# (GLM-5.2 prefill or decode). Taking every device of the node needs no pcieRoot constraint (step 31
+# had to pair 2 GPU + 2 NIC per root to split a node in two). The NIC selector keeps devices with an
+# IPv4 address (RoCE needs one).
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: glm52-tp8-gpu-nic
+  namespace: bobzetian-llmd
+spec:
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly: {deviceClassName: gpu.nvidia.com, allocationMode: ExactCount, count: 8}
+      - name: nic
+        exactly:
+          deviceClassName: mrdma.google.com
+          allocationMode: ExactCount
+          count: 8
+          selectors:
+          - cel: {expression: 'has(device.attributes["dra.net"].ipv4) && device.attributes["dra.net"].ipv4 != ""'}
