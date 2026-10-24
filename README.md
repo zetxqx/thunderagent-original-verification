@@ -150,6 +150,10 @@ Open item, resolved in step 10: the extra errors were 600 s client timeouts on t
 
 `36-glm52-1p1d-thunder/` puts step 34's thunder EPP (zetxqx/llm-d-router#15, capacity = the prefill server's GPU KV pool 1,572,864 tokens, lease 10 s) in front of step 35's GLM-5.2 1P1D pair, always P then D through the disagg sidecar, at c = 24, 32, 48 and 64, one hour each. **TTFT p50 stays at 1.2 to 1.4 s at every load (no thunder: 3.4, 9.7, 25, 49 s), E2E-normalized interactivity p50 is 1.4x to 11x higher, output throughput 0.91x to 1.03x, NIXL traffic 4x to 5x lower. The gate admits only 4 to 8 of these ~250k-token sessions and serves smaller sessions first, at a cost that grows with the load: completed requests 12% to 32% shorter, E2E p99 2.3x to 7.5x the baseline (124 to 1,109 s), 1 to 32 forced admissions.**
 
+### 37. GLM-5.2 2P1D across three nodes, no router (done)
+
+`37-glm52-2p1d/` adds a second prefill server to step 35's pair: two prefill and one decode TP=8 server on three 8x B200 nodes (24 GPUs), step 35's toy proxy with session-sticky prefill choice (CRC32 of the session id), no router, at c = 32, 48, 64, 96 and 144, one hour each. **Per GPU it is the worst of the four GLM deployments: 44 to 54 output tok/s/GPU, 0.5x to 0.6x TP=8 aggregated, about 0.5x TP=8 + thunder and 0.75x to 0.8x 1P1D at equal load per GPU; peak total 1,292 tok/s at c=96, only 2% to 9% above 1P1D at the same total concurrency. The second prefill server empties the prefill queue at c=32 (under 1 waiting), and the decode server becomes the limit: KV-bound at 5 to 8 of the ~150k-token requests (KV 82% to 89%), queue 6.5 to 20. TTFT p50 7.8 s at c=32 and 20 to 175 s above; the session hash splits requests 43:57 to 57:43 but leaves the two prefill queues 2x to 4x apart.**
+
 ## Proposals (not part of the numbered steps)
 
 `proposal/PROPOSAL.md` - eight ThunderAgent proposals; Part 3 and its Option B were run in step 13, the rest are unrun. Kept outside the numbered sequence.
