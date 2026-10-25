@@ -1,0 +1,41 @@
+# Extra Helm values for the step 38 GLM-5.2 2P1D thunder EPP on cluster a4-pr (render-lane-epp.sh EXTRA_VALUES):
+# the PR #15 image from bobinference, node pool pool-1, no HF_TOKEN env, and the step 37 servers'
+# endpoints (Services' ClusterIPs):
+#   prefill-a 10.0.47.167:8200  vLLM
+#   prefill-b 10.0.40.154:8200  vLLM
+#   decode    10.0.40.43:8000   the disagg sidecar (it proxies every other path, /metrics included,
+#                               to the decode vLLM on 8200)
+router:
+  epp:
+    image:
+      registry: us-central1-docker.pkg.dev
+      repository: bobzetian-gke-dev/bobinference/llm-d-router-endpoint-picker
+      tag: thunder-pd-8d1fbc87
+    env: []
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - {key: cloud.google.com/gke-nodepool, operator: In, values: [pool-1]}
+    pluginsCustomConfig:
+      endpoints.yaml: |
+        endpoints:
+        - name: glm52-2p1d-prefill-a
+          namespace: bobzetian-llmd
+          address: "10.0.47.167"
+          port: "8200"
+          labels:
+            llm-d.ai/role: prefill
+        - name: glm52-2p1d-prefill-b
+          namespace: bobzetian-llmd
+          address: "10.0.40.154"
+          port: "8200"
+          labels:
+            llm-d.ai/role: prefill
+        - name: glm52-2p1d-decode
+          namespace: bobzetian-llmd
+          address: "10.0.40.43"
+          port: "8000"
+          labels:
+            llm-d.ai/role: decode
