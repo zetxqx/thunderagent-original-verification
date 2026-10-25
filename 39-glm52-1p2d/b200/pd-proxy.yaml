@@ -1,0 +1,66 @@
+# Step 39 (from step 37), router-less 1P2D: vLLM's NIXL toy proxy (toy_proxy_server.py, ConfigMap
+# pd-proxy-script-1p2d) in front of glm52-2p1d-prefill-a:8200 and two decode vLLMs, glm52-2p1d-decode:8200
+# and glm52-1p2d-decode-b:8200 (decode vLLM directly, not the llm-d sidecar on 8000). Every request: P with
+# max_tokens=1 + do_remote_decode, then D with P's kv_transfer_params, streamed back; the decode server is
+# chosen by a stable hash of X-Session-ID (CRC32 mod 2), so a session's turns stay on one decode server.
+# Same Deployment and Service name as step 37 (the client URL stays http://pd-proxy:8000). No GPUs.
+# Not labeled stack=glm52-2p1d, so run-point.sh's DECODE_SELECTOR does not reset or scrape it.
+# ConfigMap: kubectl create configmap pd-proxy-script-1p2d --from-file=toy_proxy_server.py
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pd-proxy
+  namespace: bobzetian-llmd
+  labels: {app: pd-proxy}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: pd-proxy}
+  template:
+    metadata:
+      labels: {app: pd-proxy}
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: gke-a4-pr-a4-highgpu-8g-a4-pool-1-13a7a362-p3mf
+      tolerations:
+      - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      containers:
+      - name: proxy
+        image: vllm/vllm-openai:v0.31.0
+        command: [python3, /proxy/toy_proxy_server.py]
+        args:
+        - --host=0.0.0.0
+        - --port=8000
+        - --prefiller-hosts
+        - glm52-2p1d-prefill-a
+        - --prefiller-ports
+        - "8200"
+        - --decoder-hosts
+        - glm52-2p1d-decode
+        - glm52-1p2d-decode-b
+        - --decoder-ports
+        - "8200"
+        - "8200"
+        ports:
+        - {name: http, containerPort: 8000}
+        readinessProbe:
+          httpGet: {path: /healthcheck, port: 8000}
+          periodSeconds: 5
+        resources:
+          requests: {cpu: "4", memory: 8Gi}
+          limits: {memory: 16Gi}
+        volumeMounts:
+        - {name: script, mountPath: /proxy}
+      volumes:
+      - name: script
+        configMap: {name: pd-proxy-script-1p2d}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pd-proxy
+  namespace: bobzetian-llmd
+spec:
+  selector: {app: pd-proxy}
+  ports:
+  - {name: http, port: 8000, targetPort: 8000}
