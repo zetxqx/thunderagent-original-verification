@@ -201,6 +201,7 @@ Every inference-perf cell in `07-inference-perf-weka/results/` and `08-weka-repl
 - `LESSONS.md` - what bit us and the rules that came out of it: which metrics must always be recorded, why the overnight driver died (and the cluster-side grace period that saved the results), why `--enable-prompt-tokens-details` was missing, and how to calibrate the pressure regime before spending hours.
 - `08-cluster-changes.md` - every change made to shared cluster state, with revert instructions.
 - `INFERENCE-PERF-BUGS.md` - the five inference-perf v0.7.0 bugs this campaign hit, written to be filed upstream as-is.
+- `summary-report/PD-VS-AGGREGATED.md` (Chinese: `.zh.md`) - every P/D and aggregated deployment of GLM-5.2 (steps 25, 27, 35 to 40) and Qwen3.5 (steps 26, 33, 34) compared at equal cost: on GLM-5.2 no P/D deployment is worth its GPUs (best 72 to 73 tok/s/GPU against 109 to 127 aggregated with thunder), on Qwen3.5 P/D gives 1.5x the per-user decode speed at about 0.9x the output per GPU.
 
 ## Result summary
 
