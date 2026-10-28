@@ -144,3 +144,11 @@ Also on `a4-pr`: namespace `bobzetian-llmd` created; it holds the step 25 B200 v
 ## 2026-10-10 afternoon: thunder EPP on a4-pr (step 25)
 
 In namespace `bobzetian-llmd` on `a4-pr`: Deployment, Service, ServiceAccount and two ConfigMaps `agentx-epp-a-epp*` (`25-glm52-tp8-offload/b200/lane-epp-a.yaml`, no RBAC objects), ServiceAccount `thunderagent-metrics-reader` (no roles). The vLLM Deployment `glm52-tp8` got `progressDeadlineSeconds: 3600`. Skill script changes: `run-point.sh` `MODE=direct` and `SERVER_ENV` (also in pool mode), `render-lane-epp.sh` `EXTRA_VALUES` and the `-produces` default image.
+
+## 2026-10-28: step 26 part 2 (Qwen3.5 without CPU offload) on a4-pr
+
+In namespace `bobzetian-llmd`: scaled to 0 (all idle, their steps done) step 41's `glm52-tp8-prefill` (`gw0s`), `glm52-dep8-decode` (`p3mf`), `pd-dep8-proxy`, EPP `agentx-epp-gt8d-epp`; step 32's `sglang-qwen35-a` (`13z6`), `sglang-qwen35-b` (was Pending), EPP `agentx-epp-sglang-epp`; and the KV delta compression test `vllm-delta-qwen35` (`13z6`). Their manifests before the change were saved locally (`26-qwen35-tp4-thunder/b200/results/nooff-saved-before/`, not committed: it holds the unpublished KV delta patch). Created Deployments and Services `qwen35-nooff-{a..f}` (`26-qwen35-tp4-thunder/b200/vllm-qwen35-nooff-*.yaml`; a, b on `13z6`, c, d on `gw0s`, e, f on `p3mf`) and the thunder lane EPPs `agentx-epp-n{b,d,f}-epp`.
+
+**Revert**: `kubectl delete -f 26-qwen35-tp4-thunder/b200/vllm-qwen35-nooff-<x>.yaml` for each server and `kubectl delete -f` the lane EPP files, then scale the eight Deployments above back to their saved replica counts (1 each; `sglang-qwen35-b` was 1 but Pending).
+
+2026-10-28 05:54 UTC: step 26 part 2 done; `qwen35-nooff-{a..f}` and `agentx-epp-n{b,d,f}-epp` scaled to 0 (objects kept). The eight Deployments scaled to 0 at the start (step 41 GLM, step 32 SGLang, `vllm-delta-qwen35`) are still at 0; restore them with the revert above when needed.
