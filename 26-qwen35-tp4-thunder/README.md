@@ -45,7 +45,8 @@ Part 1 found no throughput gain on Qwen3.5 (0.97x to 1.00x): a GPU cache miss wa
 - llm-d thunder: part 1's settings (`utilThreshold` 1.0, idle lease 10 s, forced admission 1800 s, no `cacheInfoSpec`), capacity = the server's `kv_cache_size_tokens`, set again after every server restart. Lane EPPs `agentx-epp-n{b,d,f}` rendered by [`b200/render-nooff-epp.py`](b200/render-nooff-epp.py) from part 1's `lane-epp-qd.yaml` (same EPP image and envoy config).
 - Client and method: as part 1 (AgentX `agentx-v1.0.6`, `semianalysis_cc_traces_weka_062126_256k`, 3600 s, `RESET=1`).
 - Third arm (added after the first two, 2026-10-28 23:49 to 02:29 UTC): llm-d thunder with `utilThreshold` 0.8, so the gate admits sessions up to 80% of the GPU KV pool and leaves room for paused sessions' blocks; everything else as the 100% arm. Label `qwen35-nooff-thunder-u08`, runner [`b200/run-nooff-u08.sh`](b200/run-nooff-u08.sh), lane EPPs `agentx-epp-t{a,c,e}`. Servers a (`13z6`, c=96), c (`gw0s`, c=48 then 32), e (`p3mf`, c=64 then 24): each of these nodes had one GPU taken by another team, and two servers tried on `d213` were evicted for low ephemeral storage. The no-router baseline for this arm is the run of the first two arms: same node for every c, about 21 hours earlier.
-- Grid: c = 24, 32, 48, 64, 96, both arms of one c at the same time on one node. Node queues: `13z6` c=96; `gw0s` c=48 then 32; `p3mf` c=64 then 24. Runner [`b200/run-nooff.sh`](b200/run-nooff.sh) (`SMOKE=1` for the c=4 smoke), labels `qwen35-nooff-direct` and `qwen35-nooff-thunder-l10`, analysis `b200/results/report-nooff/`.
+- Grid: c = 24, 32, 48, 64, 96, both arms of one c at the same time on one node.
+- Knee points (2026-10-29 07:19 to 09:12 UTC): c = 28, 36, 40, 44, where the no-router working set crosses the GPU KV pool, all three arms each, 12 points at once on 12 servers `qwen35-nooff-{g..r}` (c=44: g, h on `p3mf`, i on `13z6`; c=40: j on `gw0s`, k, l on `1g50`; c=36: m on `9r8s`, n on `dkvh`, o on `3v40`; c=28: p on `mzl3`, q on `q2b8`, r on `xfxp`). The three arms of one c started together after each passed its own c=4 smoke. Runner [`b200/run-nooff-knee.sh`](b200/run-nooff-knee.sh), lane EPPs `agentx-epp-k*`. Node pool `pool-1` had about 28 free CPU of requests, so clients requested 1.5 CPU / 8Gi (no CPU limit) and lane EPPs 250m / 1Gi per container (`EPP_SMALL_REQUESTS=1` in `render-nooff-epp.py`; limits and behavior unchanged); the two pool-1 nodes used about 1 core each before the run. Node queues: `13z6` c=96; `gw0s` c=48 then 32; `p3mf` c=64 then 24. Runner [`b200/run-nooff.sh`](b200/run-nooff.sh) (`SMOKE=1` for the c=4 smoke), labels `qwen35-nooff-direct` and `qwen35-nooff-thunder-l10`, analysis `b200/results/report-nooff/`.
 
 ### Expectations (written before the run)
 
@@ -64,6 +65,7 @@ Part 1 found no throughput gain on Qwen3.5 (0.97x to 1.00x): a GPU cache miss wa
 | `qwen35-nooff-direct` / `qwen35-nooff-thunder-l10` | e / f (`p3mf`) | 64, then 24 | ok (02:57 to 05:53 UTC) |
 | `qwen35-nooff-thunder-u08-smoke-{a,c,e}` | a, c, e | 4 (120 s) | ok |
 | `qwen35-nooff-thunder-u08` | a (`13z6`) / c (`gw0s`) / e (`p3mf`) | 96 / 48, then 32 / 64, then 24 | ok (23:49 to 02:22 UTC); all five pass `verify-point.sh` |
+| knee: `qwen35-nooff-{direct,thunder-l10,thunder-u08}` (+ one smoke each) | g to r | 28, 36, 40, 44 | ok (07:36 to 09:01 UTC); all twelve pass `verify-point.sh` |
 
 All ten points pass `verify-point.sh` (job succeeded, pods unchanged, EPP scrape present, no gate warning). Thunder capacities (vLLM `kv_cache_size_tokens`): 4,686,531 (c=96), 4,780,827 (c=48), 4,739,337 (c=64), 4,843,063 (c=32), 4,869,466 (c=24). No-router warmups took 20 to 43 min at c >= 48 (thunder: 5 to 13 min), so no-router profiling started later than thunder's on the same node. Incidents: the first smoke run gave all three nodes the same label, so two smoke Jobs clashed (fixed: one smoke label per server); the runner's final `analyze.py` call failed (`uv` not on its PATH; fixed after the runs, analyses run by hand).
 
@@ -75,23 +77,37 @@ Steady state (requests started after minute 5), 4 B200 per point. Report [`b200/
 
 ![](b200/results/report-nooff/fig2-load.png)
 
-| c | arm | output tok/s/GPU (vs no router) | goodput tok/s/GPU (TTFT under 60 s) | TTFT p50 / p90 / p99 (s) | decode interactivity p90 | E2E-norm. interactivity p90 | GPU hit / computed | vLLM waiting | forced admissions |
-|---|---|---|---|---|---|---|---|---|---|
-| 24 | no router | 245.8 | 245.8 | 0.73 / 2.5 / 7 | 50.4 | 33.1 | 88.2% / 11.8% | 0.3 | - |
-| 24 | thunder 100% | 245.4 (1.00x) | 245.4 | 0.75 / 2.8 / 8 | 50.5 | 32.4 | 88.2% / 11.8% | 0.4 | 0 |
-| 24 | thunder 80% | 247.1 (1.01x) | 247.1 | 0.72 / 2.6 / 9 | 50.3 | 32.6 | 88.2% / 11.8% | 0.4 | 0 |
-| 32 | no router | 168.7 | 168.6 | 2.6 / 17.3 / 32 | 8.4 | 4.86 | 60.2% / 39.8% | 3.3 | - |
-| 32 | thunder 100% | 161.5 (0.96x) | 161.5 | 3.3 / 19.1 / 33 | 8.4 | 4.63 | 56.5% / 43.5% | 3.4 | 0 |
-| 32 | thunder 80% | 178.6 (1.06x) | 176.8 | 2.0 / 11.4 / 58 | 9.9 | 6.88 | 63.7% / 36.3% | 2.0 | 0 |
-| 48 | no router | 77.0 | 65.4 | 50 / 63 / 84 | 7.8 | 1.56 | 2.8% / 97.2% | 23.3 | - |
-| 48 | thunder 100% | 82.4 (1.07x) | 73.9 | 21 / 39 / 265 | 7.9 | 2.54 | 4.3% / 95.7% | 9.5 | 7 |
-| 48 | thunder 80% | **122.6 (1.59x)** | **109.9** | 7.5 / 24 / 430 | 8.2 | 4.18 | 29.5% / 70.5% | 3.6 | 8 |
-| 64 | no router | 84.9 | 0.0 | 103 / 118 / 135 | 8.2 | 0.88 | 0.9% / 99.1% | 48.6 | - |
-| 64 | thunder 100% | 88.1 (1.04x) | 79.2 | 26 / 55 / 1,173 | 8.1 | 2.31 | 4.1% / 95.9% | 12.7 | 21 |
-| 64 | thunder 80% | **110.3 (1.30x)** | **99.0** | 10.6 / 44 / 1,813 | 8.3 | 3.06 | 16.3% / 83.7% | 5.3 | 24 |
-| 96 | no router | 95.6 | 0.4 | 213 / 231 / 246 | 8.5 | 0.50 | 0.9% / 99.1% | 99.6 | - |
-| 96 | thunder 100% | 90.1 (0.94x) | 63.7 | 29 / 137 / 1,847 | 8.3 | 1.62 | 2.9% / 97.1% | 19.7 | 53 |
-| 96 | thunder 80% | 101.4 (1.06x) | 70.6 | 12.7 / 136 / 1,925 | 8.3 | 1.90 | 4.4% / 95.6% | 12.4 | 59 |
+| c | arm | output tok/s/GPU (vs no router) | goodput tok/s/GPU (TTFT under 60 s) | TTFT p50 / p90 / p99 (s) | decode interactivity p90 | E2E-norm. interactivity p90 | GPU hit / computed | vLLM waiting | forced admissions | working set / pool, mean / peak |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 24 | no router | 245.8 | 245.8 | 0.73 / 2.5 / 7 | 50.4 | 33.1 | 88.2% / 11.8% | 0.3 | - | 0.67 / 0.86 |
+| 24 | thunder 100% | 245.4 (1.00x) | 245.4 | 0.75 / 2.8 / 8 | 50.5 | 32.4 | 88.2% / 11.8% | 0.4 | 0 | 0.67 / 0.85 |
+| 24 | thunder 80% | 247.1 (1.01x) | 247.1 | 0.72 / 2.6 / 9 | 50.3 | 32.6 | 88.2% / 11.8% | 0.4 | 0 | 0.67 / 0.85 |
+| 28 | no router | 257.3 | 257.3 | 0.73 / 3.9 / 11 | 35.6 | 24.0 | 85.4% / 14.6% | 0.6 | - | 0.80 / 1.01 |
+| 28 | thunder 100% | 260.0 (1.01x) | 260.0 | 0.78 / 3.7 / 11 | 35.6 | 24.5 | 85.8% / 14.2% | 0.6 | 0 | 0.79 / 1.01 |
+| 28 | thunder 80% | 259.3 (1.01x) | 259.3 | 0.76 / 3.8 / 9 | 37.8 | 25.2 | 85.8% / 14.2% | 0.6 | 0 | 0.79 / 1.02 |
+| 32 | no router | 168.7 | 168.6 | 2.6 / 17.3 / 32 | 8.4 | 4.86 | 60.2% / 39.8% | 3.3 | - | 0.90 / 1.07 |
+| 32 | thunder 100% | 161.5 (0.96x) | 161.5 | 3.3 / 19.1 / 33 | 8.4 | 4.63 | 56.5% / 43.5% | 3.4 | 0 | 0.89 / 1.07 |
+| 32 | thunder 80% | 178.6 (1.06x) | 176.8 | 2.0 / 11.4 / 58 | 9.9 | 6.88 | 63.7% / 36.3% | 2.0 | 0 | 0.90 / 1.13 |
+| 36 | no router | 119.7 | 119.1 | 9.6 / 23.2 / 36 | 8.0 | 3.76 | 32.6% / 67.4% | 4.5 | - | 0.99 / 1.21 |
+| 36 | thunder 100% | 114.8 (0.96x) | 114.3 | 9.6 / 23.2 / 54 | 8.0 | 3.72 | 29.7% / 70.3% | 4.4 | 0 | 0.99 / 1.19 |
+| 36 | thunder 80% | **154.5 (1.29x)** | **151.2** | 3.9 / 13.7 / 114 | 9.3 | 6.46 | 51.7% / 48.3% | 2.3 | 0 | 0.98 / 1.18 |
+| 40 | no router | 82.6 | 82.4 | 21.5 / 35.6 / 53 | 7.8 | 2.70 | 5.3% / 94.7% | 8.7 | - | 1.10 / 1.38 |
+| 40 | thunder 100% | 83.4 (1.01x) | 79.9 | 16.8 / 29.4 / 109 | 7.7 | 3.05 | 4.8% / 95.2% | 6.2 | 0 | 1.10 / 1.37 |
+| 40 | thunder 80% | **129.6 (1.57x)** | **124.3** | 5.9 / 20.8 / 198 | 8.5 | 4.97 | 37.2% / 62.8% | 2.9 | 1 | 1.09 / 1.40 |
+| 44 | no router | 78.4 | 75.3 | 36.1 / 49.4 / 70 | 7.9 | 1.98 | 3.1% / 96.9% | 16.3 | - | 1.19 / 1.47 |
+| 44 | thunder 100% | 85.1 (1.09x) | 78.8 | 19.8 / 32.9 / 276 | 8.0 | 2.66 | 4.3% / 95.7% | 8.4 | 2 | 1.19 / 1.49 |
+| 44 | thunder 80% | **120.7 (1.54x)** | **110.0** | 7.1 / 21.8 / 317 | 8.3 | 4.47 | 29.3% / 70.7% | 3.2 | 6 | 1.22 / 1.57 |
+| 48 | no router | 77.0 | 65.4 | 50 / 63 / 84 | 7.8 | 1.56 | 2.8% / 97.2% | 23.3 | - | 1.34 / 1.65 |
+| 48 | thunder 100% | 82.4 (1.07x) | 73.9 | 21 / 39 / 265 | 7.9 | 2.54 | 4.3% / 95.7% | 9.5 | 7 | 1.30 / 1.63 |
+| 48 | thunder 80% | **122.6 (1.59x)** | **109.9** | 7.5 / 24 / 430 | 8.2 | 4.18 | 29.5% / 70.5% | 3.6 | 8 | 1.30 / 1.71 |
+| 64 | no router | 84.9 | 0.0 | 103 / 118 / 135 | 8.2 | 0.88 | 0.9% / 99.1% | 48.6 | - | 1.72 / 2.03 |
+| 64 | thunder 100% | 88.1 (1.04x) | 79.2 | 26 / 55 / 1,173 | 8.1 | 2.31 | 4.1% / 95.9% | 12.7 | 21 | 1.66 / 2.32 |
+| 64 | thunder 80% | **110.3 (1.30x)** | **99.0** | 10.6 / 44 / 1,813 | 8.3 | 3.06 | 16.3% / 83.7% | 5.3 | 24 | 1.64 / 2.28 |
+| 96 | no router | 95.6 | 0.4 | 213 / 231 / 246 | 8.5 | 0.50 | 0.9% / 99.1% | 99.6 | - | 2.52 / 3.02 |
+| 96 | thunder 100% | 90.1 (0.94x) | 63.7 | 29 / 137 / 1,847 | 8.3 | 1.62 | 2.9% / 97.1% | 19.7 | 53 | 2.35 / 3.34 |
+| 96 | thunder 80% | 101.4 (1.06x) | 70.6 | 12.7 / 136 / 1,925 | 8.3 | 1.90 | 4.4% / 95.6% | 12.4 | 59 | 2.29 / 3.28 |
+
+Working set: summed latest context of all live sessions, over the server's GPU KV pool (4.69M to 4.87M tokens).
 
 2x2, output tok/s/GPU (no router / thunder 100%):
 
@@ -103,8 +119,9 @@ Steady state (requests started after minute 5), 4 B200 per point. Report [`b200/
 
 ### Findings
 
-1. **Without a CPU tier, thunder at 100% capacity does not raise throughput on Qwen3.5** (1.00x, 0.96x, 1.07x, 1.04x, 0.94x at c = 24 to 96). From c=48 on, both arms compute 96% to 99% of prompt tokens. The gate does not keep paused sessions on the GPU: its admitted working set averages 1.00x to 1.23x the pool, so the running requests fill the KV cache (91% to 99% used) and every resumed turn is recomputed.
-2. **At 80% capacity (`utilThreshold` 0.8), thunder raises throughput 1.59x at c=48 and 1.30x at c=64** (122.6 and 110.3 against 77.0 and 84.9 tok/s/GPU). The room left in the pool keeps paused sessions' blocks: GPU hit 29.5% and 16.3%, against 4.3% and 4.1% at 100%. At c=32 it gives 1.06x (100%: 0.96x), at c=24 a tie, and at c=96 1.06x, where 96 sessions overflow the pool far beyond the 20% headroom (GPU hit 4.4%).
+0. **The knee is between c=28 and c=32, where the peak working set crosses the GPU KV pool.** At c=28 (working set 0.80x mean, 1.01x peak) all arms run at 257 to 260 tok/s/GPU with 85% GPU hit, the highest output of any CPU-off point. At c=32 (0.90x / 1.07x) no-router output falls to 169 (GPU hit 60%), at c=36 (0.99x / 1.21x) to 120 (33%), and at c=40 (1.10x / 1.38x) to 83 (5%), after which it stays at 77 to 96 tok/s/GPU, recompute-bound.
+1. **Without a CPU tier, thunder at 100% capacity does not raise throughput on Qwen3.5** (0.94x to 1.09x at every c from 24 to 96). From c=48 on, both arms compute 96% to 99% of prompt tokens. The gate does not keep paused sessions on the GPU: its admitted working set averages 1.00x to 1.23x the pool, so the running requests fill the KV cache (91% to 99% used) and every resumed turn is recomputed.
+2. **At 80% capacity (`utilThreshold` 0.8), thunder raises throughput from the knee on: 1.06x at c=32, 1.29x at c=36, 1.57x at c=40, 1.54x at c=44, 1.59x at c=48 and 1.30x at c=64** (for example 129.6 against 82.6 tok/s/GPU at c=40). It holds output at 120 to 155 tok/s/GPU from c=36 to c=48, where no router falls to 77 to 120. The room left in the pool keeps paused sessions' blocks: GPU hit 51.7%, 37.2%, 29.5% and 16.3% at c = 36, 40, 48, 64, against 29.7%, 4.8%, 4.3% and 4.1% at 100%. At c = 24 and 28 all arms tie (the working set fits), and at c=96 it gives 1.06x, where 96 sessions overflow the pool far beyond the 20% headroom (GPU hit 4.4%).
 3. **Latency and goodput:** both thunder arms move the queue from vLLM to the gate. TTFT p50 at 80% is 7.5, 10.6 and 12.7 s at c = 48, 64, 96 (no router 50, 103, 213 s; 100%: 21, 26, 29 s). With a 60 s TTFT SLO, the 80% arm keeps 95%, 92% and 77% of turns (no router 85%, 0%, 0.6%), goodput 109.9, 99.0 and 70.6 tok/s/GPU.
 4. **The cost is the tail, and 80% makes it longer:** TTFT p99 430 s, 1,813 s and 1,925 s at c = 48, 64, 96 (100%: 265, 1,173, 1,847 s; no router 84, 135, 246 s), with 8, 24 and 59 forced admissions. Admitting less means held sessions wait longer.
 5. **The CPU tier is still the larger lever:** without it, no-router output falls 1.87x at c=32 and about 5x at c = 48 and 64 (407 to 77, 421 to 85 tok/s/GPU). The best CPU-off arm (thunder 80%, 122.6 at c=48) stays at 0.30x of the CPU-on no-router point.

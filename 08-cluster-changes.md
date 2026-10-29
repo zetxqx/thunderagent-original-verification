@@ -162,3 +162,11 @@ In namespace `bobzetian-llmd`: `qwen35-nooff-{a..e}` scaled back to 1 with new M
 23:49 UTC: b and d were evicted on `d213` (node low on ephemeral storage during the checkpoint download) and scaled back to 0; c=32 and c=24 run as second points on c (`gw0s`) and e (`p3mf`) instead. Lane EPPs used: `agentx-epp-t{a,c,e}-epp`.
 
 2026-10-29 02:27 UTC: 80% arm done; `qwen35-nooff-{a,c,e}` and `agentx-epp-t{a,c,e}-epp` scaled to 0.
+
+## 2026-10-29 07:19 UTC: step 26 part 2, knee points (c = 28, 36, 40, 44)
+
+In namespace `bobzetian-llmd`: created Deployments and Services `qwen35-nooff-{g..r}` (`26-qwen35-tp4-thunder/b200/vllm-qwen35-nooff-{g..r}.yaml`, one TP=4 server each): g, h on `p3mf`; i on `13z6`; j on `gw0s`; k, l on `1g50`; m on `9r8s`; n on `dkvh`; o on `3v40`; p on `mzl3`; q on `q2b8`; r on `xfxp`. Thunder lane EPPs `agentx-epp-k{h,i,k,l,n,o,q,r}-epp` with lowered resource requests (250m / 1Gi per container; limits unchanged) and PVCs `agentx-data-k*`. `d213` skipped (1.2 TB free disk, at the eviction threshold).
+
+**Revert**: scale `qwen35-nooff-{g..r}` and `agentx-epp-k*-epp` to 0 (or `kubectl delete -f` their files).
+
+09:12 UTC: knee points done; `qwen35-nooff-{g..r}` and the eight `agentx-epp-k*-epp` scaled to 0.

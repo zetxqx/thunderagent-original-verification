@@ -1,0 +1,104 @@
+# Step 26 part 2 (2026-10-28): step 26's vLLM server (vllm-qwen35.yaml.tmpl) WITHOUT the CPU KV tier.
+# Only changes: no --kv-offloading-size / --kv-offloading-backend, memory request 700Gi -> 256Gi
+# (limit 900Gi -> 400Gi), /dev/shm 450Gi -> 64Gi. Everything else (TP=4, FP8 KV, MTP 3, 16384 batched
+# tokens, gpu-memory-utilization 0.8, prefix caching, MAX_NUM_SEQS = 2x concurrency, keep-alive 1800 s)
+# is identical, so points compare 1:1 with step 26's CPU-tier-on points.
+# Render: sed -e s/qwen35-nooff-p/qwen35-nooff-a/ -e s/gke-a4-pr-a4-highgpu-8g-a4-pool-2-f00f233f-mzl3/<host>/ -e s/56/192/ vllm-qwen35-nooff.yaml.tmpl
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen35-nooff-p
+  namespace: bobzetian-llmd
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  # First start on a node downloads the 406 GB checkpoint.
+  progressDeadlineSeconds: 3600
+  selector:
+    matchLabels: {app: qwen35-nooff-p}
+  template:
+    metadata:
+      labels: {app: qwen35-nooff-p}
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: a4-highgpu-8g
+        kubernetes.io/hostname: gke-a4-pr-a4-highgpu-8g-a4-pool-2-f00f233f-mzl3
+      tolerations:
+      - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: qwen35-tp4-gpu
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: modelserver
+        image: vllm/vllm-openai:v0.31.0
+        command: [bash, -c]
+        args:
+        - |
+          exec vllm serve Qwen/Qwen3.5-397B-A17B-FP8 \
+            --revision ea5b4f81096f3901c91dea97f81324302495781d \
+            --served-model-name Qwen/Qwen3.5-397B-A17B-FP8 \
+            --host 0.0.0.0 --port 8000 \
+            --tensor-parallel-size 4 \
+            --trust-remote-code \
+            --kv-cache-dtype fp8_e4m3 \
+            --max-num-seqs "$MAX_NUM_SEQS" \
+            --max-num-batched-tokens 16384 \
+            --gpu-memory-utilization 0.8 \
+            --enable-prefix-caching \
+            --speculative-config '{"method":"mtp","num_speculative_tokens":3}' \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_coder \
+            --enable-prompt-tokens-details
+        env:
+        - {name: MAX_NUM_SEQS, value: "56"}
+        - {name: NCCL_CUMEM_ENABLE, value: "1"}
+        # The node's NCCL net/tuner plugins need RDMA devices this pod does not claim;
+        # TP=4 stays inside the node on NVLink.
+        - {name: NCCL_NET_PLUGIN, value: none}
+        - {name: NCCL_TUNER_PLUGIN, value: none}
+        - {name: NCCL_SOCKET_IFNAME, value: eth0}
+        - {name: VLLM_SERVER_DEV_MODE, value: "1"}
+        # Keep idle HTTP connections for 1800 s, as InferenceX does for SGLang (SGLANG_TIMEOUT_KEEP_ALIVE
+        # 1800): with vLLM's 5 s default, a client without a router reuses a connection vLLM has just
+        # closed and fails a warmup request with "Connection reset by peer" (no-router c=64, 2026-10-14).
+        - {name: VLLM_HTTP_TIMEOUT_KEEP_ALIVE, value: "1800"}
+        ports:
+        - {name: http, containerPort: 8000}
+        startupProbe:
+          httpGet: {path: /health, port: 8000}
+          periodSeconds: 10
+          failureThreshold: 540
+        readinessProbe:
+          httpGet: {path: /health, port: 8000}
+          periodSeconds: 10
+        resources:
+          requests: {cpu: "50", memory: 256Gi}
+          limits: {memory: 400Gi}
+          claims:
+          - name: gpu
+        volumeMounts:
+        - {name: dshm, mountPath: /dev/shm}
+        - {name: hf-cache, mountPath: /root/.cache/huggingface}
+        - {name: nvidia-install-dir, mountPath: /usr/local/nvidia/lib64}
+      volumes:
+      - name: dshm
+        emptyDir: {medium: Memory, sizeLimit: 64Gi}
+      - name: hf-cache
+        hostPath:
+          path: /mnt/stateful_partition/kube-ephemeral-ssd/shared_disk/bobzetian-hf-cache
+          type: DirectoryOrCreate
+      - name: nvidia-install-dir
+        hostPath: {path: /home/kubernetes/bin/nvidia/lib64}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwen35-nooff-p
+  namespace: bobzetian-llmd
+spec:
+  selector: {app: qwen35-nooff-p}
+  ports:
+  - {name: http, port: 8000, targetPort: 8000}
