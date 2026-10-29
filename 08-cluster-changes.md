@@ -170,3 +170,11 @@ In namespace `bobzetian-llmd`: created Deployments and Services `qwen35-nooff-{g
 **Revert**: scale `qwen35-nooff-{g..r}` and `agentx-epp-k*-epp` to 0 (or `kubectl delete -f` their files).
 
 09:12 UTC: knee points done; `qwen35-nooff-{g..r}` and the eight `agentx-epp-k*-epp` scaled to 0.
+
+## 2026-10-29 16:55 UTC: step 26 part 2, gate capacity sweep (utilThreshold 0.7 and 0.6)
+
+In namespace `bobzetian-llmd`: created Deployments and Services `qwen35-nooff-u07c{24,28,32,36,40}` and `qwen35-nooff-u06c{24,28,32,36,40}` (`26-qwen35-tp4-thunder/b200/vllm-qwen35-nooff-u0*.yaml`): c=24 on `13z6`, c=28 on `gw0s`, c=32 on `p3mf`, c=36 on `1g50`, c=40 on `3v40`, two servers per node. Lane EPPs `agentx-epp-u0{7,6}c*-epp` (lowered requests, as for the knee points) and PVCs `agentx-data-u0*`.
+
+**Revert**: scale `qwen35-nooff-u0*` and `agentx-epp-u0*-epp` to 0 (or `kubectl delete -f` their files).
+
+18:39 UTC: sweep done; `qwen35-nooff-u0*` and `agentx-epp-u0*-epp` scaled to 0.
