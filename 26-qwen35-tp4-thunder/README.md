@@ -44,6 +44,7 @@ Part 1 found no throughput gain on Qwen3.5 (0.97x to 1.00x): a GPU cache miss wa
 - Servers: [`b200/vllm-qwen35-nooff.yaml.tmpl`](b200/vllm-qwen35-nooff.yaml.tmpl), part 1's template without `--kv-offloading-size` / `--kv-offloading-backend` (memory request 256Gi, `/dev/shm` 64Gi). Everything else as part 1, `MAX_NUM_SEQS` = 2x concurrency. Six servers `qwen35-nooff-{a..f}`, two per node: a, b on `13z6`; c, d on `gw0s`; e, f on `p3mf`.
 - llm-d thunder: part 1's settings (`utilThreshold` 1.0, idle lease 10 s, forced admission 1800 s, no `cacheInfoSpec`), capacity = the server's `kv_cache_size_tokens`, set again after every server restart. Lane EPPs `agentx-epp-n{b,d,f}` rendered by [`b200/render-nooff-epp.py`](b200/render-nooff-epp.py) from part 1's `lane-epp-qd.yaml` (same EPP image and envoy config).
 - Client and method: as part 1 (AgentX `agentx-v1.0.6`, `semianalysis_cc_traces_weka_062126_256k`, 3600 s, `RESET=1`).
+- Third arm (added after the first two, 2026-10-28 23:49 to 02:29 UTC): llm-d thunder with `utilThreshold` 0.8, so the gate admits sessions up to 80% of the GPU KV pool and leaves room for paused sessions' blocks; everything else as the 100% arm. Label `qwen35-nooff-thunder-u08`, runner [`b200/run-nooff-u08.sh`](b200/run-nooff-u08.sh), lane EPPs `agentx-epp-t{a,c,e}`. Servers a (`13z6`, c=96), c (`gw0s`, c=48 then 32), e (`p3mf`, c=64 then 24): each of these nodes had one GPU taken by another team, and two servers tried on `d213` were evicted for low ephemeral storage. The no-router baseline for this arm is the run of the first two arms: same node for every c, about 21 hours earlier.
 - Grid: c = 24, 32, 48, 64, 96, both arms of one c at the same time on one node. Node queues: `13z6` c=96; `gw0s` c=48 then 32; `p3mf` c=64 then 24. Runner [`b200/run-nooff.sh`](b200/run-nooff.sh) (`SMOKE=1` for the c=4 smoke), labels `qwen35-nooff-direct` and `qwen35-nooff-thunder-l10`, analysis `b200/results/report-nooff/`.
 
 ### Expectations (written before the run)
@@ -61,6 +62,8 @@ Part 1 found no throughput gain on Qwen3.5 (0.97x to 1.00x): a GPU cache miss wa
 | `qwen35-nooff-direct` / `qwen35-nooff-thunder-l10` | a / b (`13z6`) | 96 | ok (02:49 to 04:41 UTC) |
 | `qwen35-nooff-direct` / `qwen35-nooff-thunder-l10` | c / d (`gw0s`) | 48, then 32 | ok (02:57 to 05:45 UTC) |
 | `qwen35-nooff-direct` / `qwen35-nooff-thunder-l10` | e / f (`p3mf`) | 64, then 24 | ok (02:57 to 05:53 UTC) |
+| `qwen35-nooff-thunder-u08-smoke-{a,c,e}` | a, c, e | 4 (120 s) | ok |
+| `qwen35-nooff-thunder-u08` | a (`13z6`) / c (`gw0s`) / e (`p3mf`) | 96 / 48, then 32 / 64, then 24 | ok (23:49 to 02:22 UTC); all five pass `verify-point.sh` |
 
 All ten points pass `verify-point.sh` (job succeeded, pods unchanged, EPP scrape present, no gate warning). Thunder capacities (vLLM `kv_cache_size_tokens`): 4,686,531 (c=96), 4,780,827 (c=48), 4,739,337 (c=64), 4,843,063 (c=32), 4,869,466 (c=24). No-router warmups took 20 to 43 min at c >= 48 (thunder: 5 to 13 min), so no-router profiling started later than thunder's on the same node. Incidents: the first smoke run gave all three nodes the same label, so two smoke Jobs clashed (fixed: one smoke label per server); the runner's final `analyze.py` call failed (`uv` not on its PATH; fixed after the runs, analyses run by hand).
 
@@ -72,20 +75,25 @@ Steady state (requests started after minute 5), 4 B200 per point. Report [`b200/
 
 ![](b200/results/report-nooff/fig2-load.png)
 
-| c | arm | output tok/s/GPU | goodput tok/s/GPU (TTFT under 60 s) | TTFT p50 / p90 / p99 (s) | decode interactivity p90 | E2E-norm. interactivity p90 | GPU hit / computed | vLLM waiting | forced admissions |
+| c | arm | output tok/s/GPU (vs no router) | goodput tok/s/GPU (TTFT under 60 s) | TTFT p50 / p90 / p99 (s) | decode interactivity p90 | E2E-norm. interactivity p90 | GPU hit / computed | vLLM waiting | forced admissions |
 |---|---|---|---|---|---|---|---|---|---|
 | 24 | no router | 245.8 | 245.8 | 0.73 / 2.5 / 7 | 50.4 | 33.1 | 88.2% / 11.8% | 0.3 | - |
-| 24 | thunder | 245.4 (1.00x) | 245.4 | 0.75 / 2.8 / 8 | 50.5 | 32.4 | 88.2% / 11.8% | 0.4 | 0 |
+| 24 | thunder 100% | 245.4 (1.00x) | 245.4 | 0.75 / 2.8 / 8 | 50.5 | 32.4 | 88.2% / 11.8% | 0.4 | 0 |
+| 24 | thunder 80% | 247.1 (1.01x) | 247.1 | 0.72 / 2.6 / 9 | 50.3 | 32.6 | 88.2% / 11.8% | 0.4 | 0 |
 | 32 | no router | 168.7 | 168.6 | 2.6 / 17.3 / 32 | 8.4 | 4.86 | 60.2% / 39.8% | 3.3 | - |
-| 32 | thunder | 161.5 (0.96x) | 161.5 | 3.3 / 19.1 / 33 | 8.4 | 4.63 | 56.5% / 43.5% | 3.4 | 0 |
+| 32 | thunder 100% | 161.5 (0.96x) | 161.5 | 3.3 / 19.1 / 33 | 8.4 | 4.63 | 56.5% / 43.5% | 3.4 | 0 |
+| 32 | thunder 80% | 178.6 (1.06x) | 176.8 | 2.0 / 11.4 / 58 | 9.9 | 6.88 | 63.7% / 36.3% | 2.0 | 0 |
 | 48 | no router | 77.0 | 65.4 | 50 / 63 / 84 | 7.8 | 1.56 | 2.8% / 97.2% | 23.3 | - |
-| 48 | thunder | 82.4 (1.07x) | 73.9 (1.13x) | 21 / 39 / 265 | 7.9 | 2.54 | 4.3% / 95.7% | 9.5 | 7 |
+| 48 | thunder 100% | 82.4 (1.07x) | 73.9 | 21 / 39 / 265 | 7.9 | 2.54 | 4.3% / 95.7% | 9.5 | 7 |
+| 48 | thunder 80% | **122.6 (1.59x)** | **109.9** | 7.5 / 24 / 430 | 8.2 | 4.18 | 29.5% / 70.5% | 3.6 | 8 |
 | 64 | no router | 84.9 | 0.0 | 103 / 118 / 135 | 8.2 | 0.88 | 0.9% / 99.1% | 48.6 | - |
-| 64 | thunder | 88.1 (1.04x) | 79.2 | 26 / 55 / 1,173 | 8.1 | 2.31 | 4.1% / 95.9% | 12.7 | 21 |
+| 64 | thunder 100% | 88.1 (1.04x) | 79.2 | 26 / 55 / 1,173 | 8.1 | 2.31 | 4.1% / 95.9% | 12.7 | 21 |
+| 64 | thunder 80% | **110.3 (1.30x)** | **99.0** | 10.6 / 44 / 1,813 | 8.3 | 3.06 | 16.3% / 83.7% | 5.3 | 24 |
 | 96 | no router | 95.6 | 0.4 | 213 / 231 / 246 | 8.5 | 0.50 | 0.9% / 99.1% | 99.6 | - |
-| 96 | thunder | 90.1 (0.94x) | 63.7 | 29 / 137 / 1,847 | 8.3 | 1.62 | 2.9% / 97.1% | 19.7 | 53 |
+| 96 | thunder 100% | 90.1 (0.94x) | 63.7 | 29 / 137 / 1,847 | 8.3 | 1.62 | 2.9% / 97.1% | 19.7 | 53 |
+| 96 | thunder 80% | 101.4 (1.06x) | 70.6 | 12.7 / 136 / 1,925 | 8.3 | 1.90 | 4.4% / 95.6% | 12.4 | 59 |
 
-2x2, output tok/s/GPU (no router / thunder):
+2x2, output tok/s/GPU (no router / thunder 100%):
 
 | c | CPU tier on (part 1) | CPU tier off (part 2) | CPU tier gain, no router |
 |---|---|---|---|
@@ -95,10 +103,11 @@ Steady state (requests started after minute 5), 4 B200 per point. Report [`b200/
 
 ### Findings
 
-1. **Without a CPU tier, thunder does not raise throughput on Qwen3.5** (1.00x, 0.96x, 1.07x, 1.04x, 0.94x at c = 24 to 96). From c=48 on, both arms compute 96% to 99% of prompt tokens. The gate does not keep paused sessions on the GPU: its admitted working set averages 1.00x to 1.23x the pool (growing contexts and forced admissions), so the running requests fill the KV cache (91% to 99% used) and every resumed turn is recomputed. Decode interactivity p90 is about 8 tok/s/user in both arms, because recompute prefills share every engine step.
-2. **Thunder does help latency and goodput past the knee.** It moves the queue from vLLM (23 to 100 waiting) to the gate (10 to 20 waiting): TTFT p50 2.4x, 4.0x and 7.3x lower at c = 48, 64, 96; E2E-normalized interactivity p90 1.6x, 2.6x and 3.2x higher. With a 60 s TTFT SLO, no router keeps 85%, 0% and 0.6% of turns at c = 48, 64, 96, thunder 95%, 91% and 76% (goodput 73.9, 79.2, 63.7 against 65.4, 0.0, 0.4 tok/s/GPU).
-3. **The cost is the tail:** TTFT p99 3.2x to 8.7x higher (up to 1,847 s at c=96), with 7, 21 and 53 forced admissions.
-4. **The CPU tier is the larger lever on Qwen3.5 too:** without it, no-router output falls 1.87x at c=32 and about 5x at c = 48 and 64 (407 to 77, 421 to 85 tok/s/GPU), the same effect as on GLM-5.2 (6.0x to 7.5x).
-5. **Up to c=32 nothing changes:** at c=24 the working set fits (88% GPU hit, both arms identical); at c=32 it peaks at 1.07x the pool, and both arms lose the same share to recompute (40% to 44%).
+1. **Without a CPU tier, thunder at 100% capacity does not raise throughput on Qwen3.5** (1.00x, 0.96x, 1.07x, 1.04x, 0.94x at c = 24 to 96). From c=48 on, both arms compute 96% to 99% of prompt tokens. The gate does not keep paused sessions on the GPU: its admitted working set averages 1.00x to 1.23x the pool, so the running requests fill the KV cache (91% to 99% used) and every resumed turn is recomputed.
+2. **At 80% capacity (`utilThreshold` 0.8), thunder raises throughput 1.59x at c=48 and 1.30x at c=64** (122.6 and 110.3 against 77.0 and 84.9 tok/s/GPU). The room left in the pool keeps paused sessions' blocks: GPU hit 29.5% and 16.3%, against 4.3% and 4.1% at 100%. At c=32 it gives 1.06x (100%: 0.96x), at c=24 a tie, and at c=96 1.06x, where 96 sessions overflow the pool far beyond the 20% headroom (GPU hit 4.4%).
+3. **Latency and goodput:** both thunder arms move the queue from vLLM to the gate. TTFT p50 at 80% is 7.5, 10.6 and 12.7 s at c = 48, 64, 96 (no router 50, 103, 213 s; 100%: 21, 26, 29 s). With a 60 s TTFT SLO, the 80% arm keeps 95%, 92% and 77% of turns (no router 85%, 0%, 0.6%), goodput 109.9, 99.0 and 70.6 tok/s/GPU.
+4. **The cost is the tail, and 80% makes it longer:** TTFT p99 430 s, 1,813 s and 1,925 s at c = 48, 64, 96 (100%: 265, 1,173, 1,847 s; no router 84, 135, 246 s), with 8, 24 and 59 forced admissions. Admitting less means held sessions wait longer.
+5. **The CPU tier is still the larger lever:** without it, no-router output falls 1.87x at c=32 and about 5x at c = 48 and 64 (407 to 77, 421 to 85 tok/s/GPU). The best CPU-off arm (thunder 80%, 122.6 at c=48) stays at 0.30x of the CPU-on no-router point.
+6. **Contrast with part 1:** with the CPU tier on, 80% capacity cost 4% throughput at c=48 (a CPU hit is cheap there); without it, a miss is a full prefill, so keeping paused sessions on the GPU pays.
 
-Against the expectations: (1) holds; (2) holds for no router (output 77 and 85 tok/s/GPU, TTFT p50 50 s and 103 s) but not for thunder's throughput (1.07x and 1.04x, not 1.2x); the risk written in (2) is what happened (GPU hit 4%, near no router); (3) holds for latency and the tail, while no-router throughput did not collapse further at c=96 (recompute-bound from c=48 on); (4) not falsified as written (no router computes 99%), but the cause is the opposite of the falsification case: misses are not rare, thunder cannot avoid them.
+Against the expectations (written for the first two arms): (1) holds; (2) holds for no router but not for thunder at 100% (1.07x and 1.04x, not 1.2x); the risk written in (2) is what happened, and the 80% arm, added afterwards, removes it at c = 48 and 64; (3) holds for latency and the tail; (4) not falsified as written: misses are not rare, and only a gate with headroom avoids some of them.

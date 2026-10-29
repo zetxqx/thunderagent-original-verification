@@ -6,18 +6,22 @@ settings as step 26 (utilThreshold 1.0, idle lease 10 s, forced admission after 
 cacheInfoSpec). Only the lane name, the one endpoint (server Service ClusterIP) and capacityTokens
 (= that server's vLLM kv_cache_size_tokens) change.
 
-  ./render-nooff-epp.py <lane> <server> <cluster-ip> <capacity-tokens> > lane-epp-<lane>.yaml
+  ./render-nooff-epp.py <lane> <server> <cluster-ip> <capacity-tokens> [util-threshold] > lane-epp-<lane>.yaml
+
+util-threshold (default 1.0) scales the gate capacity: 0.8 admits sessions up to 80% of capacityTokens.
 """
 import re
 import sys
 from pathlib import Path
 
 lane, server, ip, cap = sys.argv[1:5]
+util = sys.argv[5] if len(sys.argv) > 5 else "1.0"
 assert re.fullmatch(r"[a-z0-9]+", lane), lane
 assert re.fullmatch(r"\d+", cap), cap
+assert re.fullmatch(r"(0\.\d+|1\.0)", util), util
 src = (Path(__file__).resolve().parent / "lane-epp-qd.yaml").read_text()
 for old in ["agentx-epp-qd-", "agentx-lane=qd", "qwen35-tp4-d", '"10.0.47.250"', "capacityTokens: 4780827",
-            "capacity 4780827 tokens", "lane qd ("]:
+            "capacity 4780827 tokens", "lane qd (", "utilThreshold: 1.0"]:
     assert old in src, old
 out = (src.replace("agentx-epp-qd-", f"agentx-epp-{lane}-")
           .replace("agentx-lane=qd", f"agentx-lane={lane}")
@@ -26,6 +30,7 @@ out = (src.replace("agentx-epp-qd-", f"agentx-epp-{lane}-")
           .replace("capacityTokens: 4780827", f"capacityTokens: {cap}")
           .replace("capacity 4780827 tokens", f"capacity {cap} tokens")
           .replace("lane qd (", f"lane {lane} (")
+          .replace("utilThreshold: 1.0", f"utilThreshold: {util}")
           .replace("for step 26,", "for step 26 part 2 (CPU tier off),"))
 for left in ["agentx-epp-qd-", "agentx-lane=qd", "qwen35-tp4-d", "10.0.47.250"]:
     assert left not in out, left

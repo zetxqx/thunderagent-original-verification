@@ -152,3 +152,13 @@ In namespace `bobzetian-llmd`: scaled to 0 (all idle, their steps done) step 41'
 **Revert**: `kubectl delete -f 26-qwen35-tp4-thunder/b200/vllm-qwen35-nooff-<x>.yaml` for each server and `kubectl delete -f` the lane EPP files, then scale the eight Deployments above back to their saved replica counts (1 each; `sglang-qwen35-b` was 1 but Pending).
 
 2026-10-28 05:54 UTC: step 26 part 2 done; `qwen35-nooff-{a..f}` and `agentx-epp-n{b,d,f}-epp` scaled to 0 (objects kept). The eight Deployments scaled to 0 at the start (step 41 GLM, step 32 SGLang, `vllm-delta-qwen35`) are still at 0; restore them with the revert above when needed.
+
+## 2026-10-28 23:28 UTC: step 26 part 2, thunder at 80% capacity (utilThreshold 0.8)
+
+In namespace `bobzetian-llmd`: `qwen35-nooff-{a..e}` scaled back to 1 with new MAX_NUM_SEQS and nodes (`13z6`, `gw0s` and `p3mf` each had one GPU taken by another team, so they hold one server each: a on `13z6`, c on `gw0s`, e on `p3mf`; b and d moved to `d213`). New lane EPPs `agentx-epp-t{a..e}-epp` (`26-qwen35-tp4-thunder/b200/lane-epp-t*.yaml`, utilThreshold 0.8). `qwen35-nooff-f` stays at 0.
+
+**Revert**: scale `qwen35-nooff-{a..e}` and `agentx-epp-t{a..e}-epp` to 0 (or `kubectl delete -f` their files).
+
+23:49 UTC: b and d were evicted on `d213` (node low on ephemeral storage during the checkpoint download) and scaled back to 0; c=32 and c=24 run as second points on c (`gw0s`) and e (`p3mf`) instead. Lane EPPs used: `agentx-epp-t{a,c,e}-epp`.
+
+2026-10-29 02:27 UTC: 80% arm done; `qwen35-nooff-{a,c,e}` and `agentx-epp-t{a,c,e}-epp` scaled to 0.
