@@ -36,6 +36,8 @@ Status: done (2026-10-11). Part A: formal runs (fresh server per point, 3600 s),
 | `explore1h-direct` | exploration | 3600 s | 20, 24, 32 | no router | |
 | `explore1h-thunder-gpu-l10` | exploration | 3600 s | 12, 16, 20, 24, 32 | thunder, GPU capacity, lease 10 s, backstop 1800 s | `-produces` |
 | `explore-thunder-cputier-aborted` | stopped in warmup | | 24 | capacity 2.27M (stopped on request, no result) | `-produces` |
+| `fix-direct` | exploration | 1800 s | 24, 32, 48 | no router + vLLM bounded-load fix (`zetxqx/vllm#2`, `VLLM_KV_OFFLOAD_MAX_LOAD_SUBMIT_DESCRIPTORS=8192`) | |
+| `fix-thunder` | exploration | 1800 s | 24, 32, 48 | thunder, GPU capacity, lease 10 s, backstop 1800 s + vLLM bounded-load fix (`zetxqx/vllm#2`) | `-produces` |
 
 Dashboard (`python3 -m http.server -d dashboard 8000`): `dashboard/data/glm52-nvfp4-8xb200.json`, the one-hour points only (35, built by `dashboard/regroup_by_model.py`; the 900 s exploration points are not on the dashboard).
 

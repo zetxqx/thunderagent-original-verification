@@ -178,3 +178,43 @@ In namespace `bobzetian-llmd`: created Deployments and Services `qwen35-nooff-u0
 **Revert**: scale `qwen35-nooff-u0*` and `agentx-epp-u0*-epp` to 0 (or `kubectl delete -f` their files).
 
 18:39 UTC: sweep done; `qwen35-nooff-u0*` and `agentx-epp-u0*-epp` scaled to 0.
+
+## 2026-11-02 18:43 UTC: step-time investigation (CPU offload copies vs engine step), experiments 1 to 3
+
+Why the GLM-5.2 no-router step (25.6 ms at c=32) is slower than thunder's (18.7 ms): H2D contention microbenchmark, then py-spy and vLLM's torch profiler on step 25's server under no-router c=32. Namespace `bobzetian-llmd`, no Kueue (user's choice). Manifests are kept outside the repo (Jetski scratch `exp1/job.yaml`, `exp23/vllm-glm52-tp8-profile.yaml`).
+
+- Created ResourceClaimTemplate `bobzetian-1gpu`, ConfigMap `h2d-contention-script` and Job `job-bobzetian-h2d-contention` (1 B200 on `t3gv`, `vllm/vllm-openai:v0.31.0`).
+- Created Deployment `glm52-tp8` (it had been deleted; Service `glm52-tp8` and ResourceClaimTemplate `glm52-tp8-gpu` already existed) from `25-glm52-tp8-offload/b200/vllm.yaml` on `xfxp` (the only node with 8 free GPUs; `t3gv` and `qdcj` had GPUs claimed by other teams), with `MAX_NUM_SEQS=64`, `--profiler-config` (torch, `/profiles`, `max_iterations` 600), `SYS_PTRACE` and an emptyDir `/profiles`.
+
+**Revert**: `kubectl -n bobzetian-llmd delete job job-bobzetian-h2d-contention; kubectl -n bobzetian-llmd delete cm h2d-contention-script; kubectl -n bobzetian-llmd delete resourceclaimtemplate bobzetian-1gpu; kubectl -n bobzetian-llmd scale deploy glm52-tp8 --replicas=0`.
+
+2026-11-02 20:21 UTC: experiments done. `glm52-tp8` scaled to 0 (object kept, on `xfxp`); Jobs `job-bobzetian-h2d-contention`, `job-bobzetian-cpu-block` and ConfigMaps `h2d-contention-script`, `cpu-block-script` deleted. ResourceClaimTemplate `bobzetian-1gpu` kept (unused). One extra no-router c=32 point (`stepprof-direct`, 30 min, KV tiers reset first) ran on `glm52-tp8` and used PVC `agentx-data`.
+
+## 2026-11-02 21:25 UTC: vLLM fix test (bounded CPU-offload load submission)
+
+In namespace `bobzetian-llmd`: ConfigMap `offload-fix-patch` (branch diffs and a v0.31.0 `gpu_worker.py` backport); Job `job-bobzetian-offload-unittest` (1 B200, unit tests of the vLLM branch); Deployment `glm52-tp8` moved to `zxhd` (the `xfxp` node was taken by another team; `zxhd` had no HF cache, so the checkpoint downloads there) and patched at start-up with the backport (`VLLM_KV_OFFLOAD_MAX_LOAD_SUBMIT_DESCRIPTORS=8192`), for one no-router c=32 point (`stepfix-direct`).
+
+**Revert**: `kubectl -n bobzetian-llmd scale deploy glm52-tp8 --replicas=0; kubectl -n bobzetian-llmd delete job job-bobzetian-offload-unittest; kubectl -n bobzetian-llmd delete cm offload-fix-patch`.
+
+Also created in `bobzetian-llmd`: Jobs `job-bobzetian-offload-conn-{base,fix}` (1 B200 each, connector unit tests with and without the change; manifests in Jetski scratch `expfix/conn-*-job.yaml`). Client Job `agentx-c32-stepfix-direct` used PVC `agentx-data`.
+
+2026-11-02 22:42 UTC: the cluster admins added the ValidatingAdmissionPolicy `require-queue` (go/cmcs-capacity-management#queues). Users can no longer create Pods, Jobs or Deployments in `bobzetian-llmd`; they must go to a queue namespace (`default`, `priority`, `automation`, `long-running`). The `stepfix-direct` results fetch Pod was denied, so its `aiperf_artifacts` stay on PVC `agentx-data` (only `bench-stdout.log` and `meta/` are local).
+
+2026-11-02 22:55 UTC: `glm52-tp8` scaled to 0 (object kept, on `zxhd`). In namespace `default` (Kueue LocalQueue `default`, no queue label): ResourceClaimTemplate `bobzetian-1gpu`, ConfigMap `bobzetian-offload-fix-patch`, Job `job-bobzetian-offload-unittest2` (1 B200, re-run of the branch's unit test).
+
+**Revert**: `kubectl -n bobzetian-llmd delete job job-bobzetian-offload-unittest job-bobzetian-offload-conn-base job-bobzetian-offload-conn-fix agentx-c32-stepfix-direct; kubectl -n bobzetian-llmd delete cm offload-fix-patch; kubectl -n default delete job job-bobzetian-offload-unittest2; kubectl -n default delete cm bobzetian-offload-fix-patch; kubectl -n default delete resourceclaimtemplate bobzetian-1gpu`.
+
+2026-11-02 23:03 UTC: Job `job-bobzetian-offload-unittest2`, ConfigMap `bobzetian-offload-fix-patch` and ResourceClaimTemplate `bobzetian-1gpu` deleted from `default`. Still left in `bobzetian-llmd`: the Jobs and ConfigMap listed above (no Pods running, no GPUs held) and `glm52-tp8` at 0 replicas.
+
+## 2026-11-02 23:54 UTC: vLLM fix sweep (no-router + fix vs thunder + fix at c = 24, 32, 48)
+
+In namespace `long-running` (Kueue LocalQueue `default` -> ClusterQueue `gpu-longrun`, 480 min cap; user is in `cmcs-a4-longrun-users@twosync.google.com`):
+
+- ServiceAccounts `thunderagent-metrics-reader`, `agentx-epp-b-epp` (`default` also patched with `imagePullSecrets: [artifact-registry-secret]`); Secret `artifact-registry-secret`; ConfigMap `bobzetian-offload-fix-patch`; ResourceClaimTemplate `glm52-tp8-gpu`; PVCs `agentx-data`, `agentx-data-b` (200 GiB `standard-rwo` each).
+- Deployments and Services `glm52-tp8` (on `zxhd`, no-router + fix arm) and `glm52-tp8-b` (on `xfxp`, thunder-gpu-l10 + fix arm), both patched at start-up with `gpu_worker_v031_bounded.py` (`VLLM_KV_OFFLOAD_MAX_LOAD_SUBMIT_DESCRIPTORS=8192`, `MAX_NUM_SEQS=64`, no profiler).
+- Deployment, Service and ConfigMaps `agentx-epp-b-{epp,envoy}` (`scratch/expfix/lane-epp-b-lr.yaml`, `thunder-gpu-l10-plugins.yaml`, pointing at `glm52-tp8-b` ClusterIP `10.0.40.172:8000`; `nodeAffinity` to `pool-1` removed because Kueue's `a4-dra` flavor injects `nodeSelector: cloud.google.com/gke-accelerator=nvidia-b200`).
+- Driver `scratch/expfix/run_sweep.sh` running c = 24, 32, 48 (30 min each, `RESET=1`) on both arms in parallel (`CLIENT_NODE_LABEL=cloud.google.com/gke-accelerator`, `CLIENT_POOL=nvidia-b200`).
+
+**Revert**: `kubectl -n long-running scale deploy glm52-tp8 glm52-tp8-b agentx-epp-b-epp --replicas=0` (or `kubectl -n long-running delete deploy glm52-tp8 glm52-tp8-b agentx-epp-b-epp svc/glm52-tp8 svc/glm52-tp8-b svc/agentx-epp-b-epp cm/bobzetian-offload-fix-patch cm/agentx-epp-b-epp cm/agentx-epp-b-envoy cm/agentic-bench-scripts sa/thunderagent-metrics-reader sa/agentx-epp-b-epp secret/artifact-registry-secret resourceclaimtemplate/glm52-tp8-gpu pvc/agentx-data pvc/agentx-data-b`).
+
+2026-11-03 03:01 UTC: all 6 points (`fix-direct` and `fix-thunder` at c = 24, 32, 48) finished and their artifacts were fetched to Jetski scratch `expfix/results/{fix-direct,fix-thunder}/c{24,32,48}/`. In `long-running`: `glm52-tp8`, `glm52-tp8-b`, and `agentx-epp-b-epp` scaled to 0; all 6 client Jobs and both PVCs (`agentx-data`, `agentx-data-b`, which had been switched from `standard-rwo` to `a4-hyperdisk` because B200 nodes cannot attach `pd-balanced`) deleted. No GPUs or disks remain claimed in `long-running`.
